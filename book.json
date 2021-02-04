@@ -1,0 +1,57 @@
+{
+    "title": "golang goroutine详解",
+    "author": "zput",
+    "description": "select * from learn",
+    "language": "zh-hans",
+    "gitbook": "3.2.3",
+    "styles": {
+        "website": "./styles/website.css"
+    },
+    "structure": {
+        "readme": "README.md"
+    },
+    "links": {
+        "sidebar": {
+            "my web": "https://zput.github.io"
+        }
+    },
+    "plugins" : [ 
+        "-page-toc-button",
+        "-toc2",
+        "anchor-navigation-ex"
+    ],
+    "pluginsConfig": {
+        "page-toc-button": {
+            "maxTocDepth": 2,
+            "minTocSize": 2
+           },
+        "toc2": {
+            "addClass": true,
+            "className": "toc"
+        },
+        "anchor-navigation-ex": {
+            "showLevel": true,
+            "associatedWithSummary": true,
+            "printLog": false,
+            "multipleH1": true,
+            "mode": "float",
+            "showGoTop":true,
+            "float": {
+                "floatIcon": "fa fa-navicon",
+                "showLevelIcon": false,
+                "level1Icon": "fa fa-hand-o-right",
+                "level2Icon": "fa fa-hand-o-right",
+                "level3Icon": "fa fa-hand-o-right"
+            },
+            "pageTop": {
+                "showLevelIcon": false,
+                "level1Icon": "fa fa-hand-o-right",
+                "level2Icon": "fa fa-hand-o-right",
+                "level3Icon": "fa fa-hand-o-right"
+            }
+        }
+
+
+
+    }
+}
