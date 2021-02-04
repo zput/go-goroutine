@@ -27,35 +27,3 @@
         * [调度循环](part3.调度/3.调度循环/3.3.调度循环.md)
     * [总结](part3.调度/总结.md)
 
-
-
-view_manager_salecenter_user_sub_follow_up_record
-
- SELECT basic.id,
-    basic.sale_center_user_id,
-    basic.manager_user_id,
-    basic.communication_mode,
-    basic.communication_result,
-    basic.content,
-    basic.next_follow_up_time,
-    basic.follow_up_status,
-    basic.tag_important_custom,
-    basic.reback_reason,
-    basic.quick_note,
-    basic.created_time,
-    basic.updated_time,
-    basic.is_deleted
-   FROM (( SELECT manager_salecenter_user_sub_follow_up_record.sale_center_user_id,
-            max(manager_salecenter_user_sub_follow_up_record.id) AS id
-           FROM manager_salecenter_user_sub_follow_up_record
-          GROUP BY manager_salecenter_user_sub_follow_up_record.sale_center_user_id) sub
-     JOIN manager_salecenter_user_sub_follow_up_record basic ON (((basic.sale_center_user_id = sub.sale_center_user_id) AND (basic.id = sub.id))))
-
-
-
-
-
-
-
-
-
