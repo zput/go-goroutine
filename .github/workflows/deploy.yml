@@ -34,7 +34,7 @@ jobs:
       env:
         TOKEN: ${{ secrets.TOKEN }}
         #REF: github.com/${{ github.repository }}
-        REF: github.com/go-goroutine
+        REF: github.com/zput/go-goroutine
         MYEMAIL:  wkzxc@sina.cn                 # 修改为自己github设置的邮箱 
         MYNAME: ${{ github.repository_owner }} 
       run: |
