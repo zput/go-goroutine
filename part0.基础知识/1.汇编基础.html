@@ -1,0 +1,964 @@
+
+<!DOCTYPE HTML>
+<html lang="zh-hans" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>第一部分 基础知识 · golang goroutine详解</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        <meta name="author" content="zput">
+        
+        
+    
+    <link rel="stylesheet" href="../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-anchor-navigation-ex/style/plugin.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="1.汇编基础.html" />
+    
+    
+    <link rel="prev" href="../" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="输入并搜索" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+    
+        
+        <li>
+            <a href="https://zput.github.io" target="_blank" class="custom-link">zput|堆排序</a>
+        </li>
+    
+    
+
+    
+    <li class="divider"></li>
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    大纲
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.3" data-path="1.汇编基础.html">
+            
+                <a href="1.汇编基础.html">
+            
+                    
+                    第一部分 基础知识
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter active" data-level="1.3.1" data-path="1.汇编基础.html">
+            
+                <a href="1.汇编基础.html">
+            
+                    
+                    汇编基础
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="2.内存.html">
+            
+                <a href="2.内存.html">
+            
+                    
+                    内存
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    第二部分 进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.4.1" data-path="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    第三部分 退出goroutine
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.5.1" data-path="../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    退出goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <span>
+            
+                    
+                    第四部分 调度
+            
+                </span>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1" data-path="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    1.调度策略
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1.1" data-path="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    从本地队列或全局队列获取goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.1.2" data-path="../part3.调度/1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                <a href="../part3.调度/1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                    
+                    盗取goroutine从其他队列
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2" data-path="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    2.调度的时机
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.2.1" data-path="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    主动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.2" data-path="../part3.调度/2.调度的时机/2.2.被动调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.2.被动调度.html">
+            
+                    
+                    被动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.3" data-path="../part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                    
+                    运行用户代码时间过长调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.4" data-path="../part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                    
+                    系统调用收尾,如果从系统调用返回,如何重新得到P
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.3" data-path="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                <a href="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                    
+                    3.调度循环
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.3.1" data-path="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                <a href="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                    
+                    调度循环
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.4" data-path="../part3.调度/总结.html">
+            
+                <a href="../part3.调度/总结.html">
+            
+                    
+                    总结
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            本书使用 GitBook 发布
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href=".." >第一部分 基础知识</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <div id="anchor-navigation-ex-navbar"><i class="fa fa-navicon"></i><ul><ul><li><span class="title-icon "></span><a href="#go&#x6C47;&#x7F16;"><b>1.1. </b>go&#x6C47;&#x7F16;</a></li><ul><li><span class="title-icon "></span><a href="#dropg&#x51FD;&#x6570;"><b>1.1.1. </b>dropg()&#x51FD;&#x6570;</a></li><li><span class="title-icon "></span><a href="#parkm&#x51FD;&#x6570;"><b>1.1.2. </b>park_m&#x51FD;&#x6570;</a></li></ul><li><span class="title-icon "></span><a href="#&#x901A;&#x8FC7;mcall&#x4ECE;gn&#x8F6C;&#x5230;g0-stack&#x8F6C;&#x79FB;&#x4E86;-jmp&#x8DF3;&#x8F6C;&#x5230;parkmg&#x51FD;&#x6570;"><b>1.2. </b>&#x901A;&#x8FC7;mcall&#x4ECE;gN&#x8F6C;&#x5230;g0; stack&#x8F6C;&#x79FB;&#x4E86;, jmp&#x8DF3;&#x8F6C;&#x5230;park_m(*g)&#x51FD;&#x6570;,</a></li><li><span class="title-icon "></span><a href="#gettls&#x51FD;&#x6570;"><b>1.3. </b>get_tls&#x51FD;&#x6570;</a></li><ul><li><span class="title-icon "></span><a href="#&#x53C2;&#x8003;"><b>1.3.1. </b>&#x53C2;&#x8003;</a></li></ul><li><span class="title-icon "></span><a href="#mmorebufgobufpcregister"><b>1.4. </b>(m_morebuf+gobuf_pc)(REGISTER)</a></li><li><span class="title-icon "></span><a href="#&#x4F2A;&#x5BC4;&#x5B58;&#x5668;"><b>1.5. </b>&#x4F2A;&#x5BC4;&#x5B58;&#x5668;</a></li><ul><li><span class="title-icon "></span><a href="#&#x6269;&#x5C55;"><b>1.5.1. </b>&#x6269;&#x5C55;</a></li></ul><li><span class="title-icon "></span><a href="#go&#x7F16;&#x8BD1;&#x5668;&#x52A0;&#x7684;&#x51FD;&#x6570;&#x5934;&#x7684;&#x90E8;&#x5206;"><b>1.6. </b>go&#x7F16;&#x8BD1;&#x5668;&#x52A0;&#x7684;&#x51FD;&#x6570;&#x5934;&#x7684;&#x90E8;&#x5206;</a></li><li><span class="title-icon "></span><a href="#&#x4F8B;&#x5B50;"><b>1.7. </b>&#x4F8B;&#x5B50;</a></li><ul><li><span class="title-icon "></span><a href="#main-goroutine&#x5F97;&#x4E0D;&#x5230;&#x6267;&#x884C;"><b>1.7.1. </b>main goroutine&#x5F97;&#x4E0D;&#x5230;&#x6267;&#x884C;</a></li><li><span class="title-icon "></span><a href="#&#x4E00;&#x4E9B;&#x6C47;&#x7F16;&#x9700;&#x8981;&#x7684;&#x5E38;&#x89C1;&#x7684;&#x6307;&#x4EE4;"><b>1.7.2. </b>&#x4E00;&#x4E9B;&#x6C47;&#x7F16;&#x9700;&#x8981;&#x7684;&#x5E38;&#x89C1;&#x7684;&#x6307;&#x4EE4;</a></li></ul><li><span class="title-icon "></span><a href="#&#x9644;&#x5F55;"><b>1.8. </b>&#x9644;&#x5F55;</a></li></ul></ul></div><a href="#" id="anchorNavigationExGoTop"><i class="fa fa-arrow-up"></i></a><h2 id="go&#x6C47;&#x7F16;"><a name="go&#x6C47;&#x7F16;" class="anchor-navigation-ex-anchor" href="#go&#x6C47;&#x7F16;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1. go&#x6C47;&#x7F16;</h2>
+<p>gdb golang assamble
+non-split;    sp bp &#x4F1A;&#x66F4;&#x65B0;&#x5417;?</p>
+<p>main function enter BP is useful ? schedule</p>
+<h3 id="dropg&#x51FD;&#x6570;"><a name="dropg&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#dropg&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.1. dropg()&#x51FD;&#x6570;</h3>
+<ul>
+<li>dropg()  //&#x89E3;&#x9664;g&#x548C;m&#x4E4B;&#x95F4;&#x7684;&#x5173;&#x7CFB;; </li>
+</ul>
+<pre><code class="lang-go"><span class="hljs-keyword">func</span> dropg() {
+    _g_ := getg()
+
+    setMNoWB(&amp;_g_.m.curg.m, <span class="hljs-literal">nil</span>)
+    setGNoWB(&amp;_g_.m.curg, <span class="hljs-literal">nil</span>)
+}
+</code></pre>
+<h3 id="parkm&#x51FD;&#x6570;"><a name="parkm&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#parkm&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.2. park_m&#x51FD;&#x6570;</h3>
+<h2 id="&#x901A;&#x8FC7;mcall&#x4ECE;gn&#x8F6C;&#x5230;g0-stack&#x8F6C;&#x79FB;&#x4E86;-jmp&#x8DF3;&#x8F6C;&#x5230;parkmg&#x51FD;&#x6570;"><a name="&#x901A;&#x8FC7;mcall&#x4ECE;gn&#x8F6C;&#x5230;g0-stack&#x8F6C;&#x79FB;&#x4E86;-jmp&#x8DF3;&#x8F6C;&#x5230;parkmg&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#&#x901A;&#x8FC7;mcall&#x4ECE;gn&#x8F6C;&#x5230;g0-stack&#x8F6C;&#x79FB;&#x4E86;-jmp&#x8DF3;&#x8F6C;&#x5230;parkmg&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>1.2. &#x901A;&#x8FC7;mcall&#x4ECE;gN&#x8F6C;&#x5230;g0; stack&#x8F6C;&#x79FB;&#x4E86;, jmp&#x8DF3;&#x8F6C;&#x5230;park_m(*g)&#x51FD;&#x6570;,</h2>
+<p>gN--&gt;m ---&gt; gN 
+mcall&#x600E;&#x4E48;&#x4FDD;&#x8BC1;g0&#x7684;m&#x6307;&#x5411;&#x4E86;m&#x7684;?</p>
+<pre><code class="lang-go"><span class="hljs-comment">// park continuation on g0.</span>
+<span class="hljs-keyword">func</span> park_m(gp *g) {
+    _g_ := getg()
+
+    <span class="hljs-keyword">if</span> trace.enabled {
+        traceGoPark(_g_.m.waittraceev, _g_.m.waittraceskip)
+    }
+
+    casgstatus(gp, _Grunning, _Gwaiting)
+    dropg()  <span class="hljs-comment">//&#x89E3;&#x9664;g&#x548C;m&#x4E4B;&#x95F4;&#x7684;&#x5173;&#x7CFB;</span>
+
+    ......
+
+    schedule()
+}
+</code></pre>
+<h2 id="gettls&#x51FD;&#x6570;"><a name="gettls&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#gettls&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>1.3. get_tls&#x51FD;&#x6570;</h2>
+<pre><code class="lang-go">TEXT runtime&#xB7;rt0_go(SB),NOSPLIT,$<span class="hljs-number">0</span>
+    <span class="hljs-comment">//...</span>
+
+    LEAQ    runtime&#xB7;m0+m_tls(SB), DI  <span class="hljs-comment">// //DI = &amp;m0.tls&#xFF0C;&#x53D6;m0&#x7684;tls&#x6210;&#x5458;&#x7684;&#x5730;&#x5740;&#x5230;DI&#x5BC4;&#x5B58;&#x5668;</span>
+    CALL    runtime&#xB7;settls(SB)        <span class="hljs-comment">// &#x8C03;&#x7528;settls&#x8BBE;&#x7F6E;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x5B58;&#x50A8;&#xFF0C;settls&#x51FD;&#x6570;&#x7684;&#x53C2;&#x6570;&#x5728;DI&#x5BC4;&#x5B58;&#x5668;&#x4E2D;</span>
+    <span class="hljs-comment">// store through it, to make sure it works // &#x53EF;&#x4EE5;&#x770B;&#x505A;&#x662F;&#x6D4B;&#x8BD5;;&#x6D4B;&#x8BD5;&#x521A;&#x521A;&#x90A3;&#x4E2A;&#x7ED1;&#x5B9A;&#x662F;&#x5426;&#x6210;&#x529F;&#x3002;</span>
+    get_tls(BX)    <span class="hljs-comment">// &#x628A;TLS&#x5730;&#x5740;&#x653E;&#x5165;BX&#x5BC4;&#x5B58;&#x5668;</span>
+    MOVQ    $<span class="hljs-number">0x123</span>, g(BX)
+    MOVQ    runtime&#xB7;m0+m_tls(SB), AX
+    CMPQ    AX, $<span class="hljs-number">0x123</span>
+    JEQ <span class="hljs-number">2</span>(PC)
+    CALL    runtime&#xB7;abort(SB)
+</code></pre>
+<h4 id="settls"><a name="settls" class="anchor-navigation-ex-anchor" href="#settls"><i class="fa fa-link" aria-hidden="true"></i></a>settls</h4>
+<pre><code class="lang-go"><span class="hljs-comment">// set tls base to DI</span>
+TEXT runtime&#xB7;settls(SB),NOSPLIT,$<span class="hljs-number">32</span>
+    ADDQ    $<span class="hljs-number">8</span>, DI    <span class="hljs-comment">// ELF wants to use -8(FS) //&#x56E0;&#x4E3A;&#x540E;&#x9762;&#x8981;-8,&#x6240;&#x4EE5;&#x5148;&#x52A0;+8</span>
+    MOVQ    DI, SI  <span class="hljs-comment">// is SI parameter?</span>
+    MOVQ    $<span class="hljs-number">0x1002</span>, DI    <span class="hljs-comment">// ARCH_SET_FS</span>
+    MOVQ    $SYS_arch_prctl, AX
+    SYSCALL
+    CMPQ    AX, $<span class="hljs-number">0xfffffffffffff001</span>
+    JLS    <span class="hljs-number">2</span>(PC)
+    MOVL    $<span class="hljs-number">0xf1</span>, <span class="hljs-number">0xf1</span>  <span class="hljs-comment">// crash</span>
+    RET
+</code></pre>
+<p><a href="https://www.man7.org/linux/man-pages/man2/arch_prctl.2.html" target="_blank">arch_prctl</a></p>
+<pre><code class="lang-c"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">arch_prctl</span><span class="hljs-params">(<span class="hljs-keyword">int</span> code, <span class="hljs-keyword">unsigned</span> <span class="hljs-keyword">long</span> addr)</span></span>;
+<span class="hljs-comment">// arch_prctl() sets architecture-specific process or thread state. code selects a subfunction and passes argument addr to it;</span>
+</code></pre>
+<p>&#x5176;&#x4E2D;&#xFF1A;<code>ARCH_SET_FS</code>: Set the 64-bit base for the FS register to addr.</p>
+<blockquote>
+<p>&#x73B0;&#x5728;&#x77E5;&#x9053;&#x5C31;&#x662F;&#x628A;m0.tls[0]&#x4F20;&#x7ED9;FS&#x5BC4;&#x5B58;&#x5668;</p>
+</blockquote>
+<h4 id="gettlsbx&#x4E0E;gbx"><a name="gettlsbx&#x4E0E;gbx" class="anchor-navigation-ex-anchor" href="#gettlsbx&#x4E0E;gbx"><i class="fa fa-link" aria-hidden="true"></i></a>get_tls(BX)&#x4E0E;g(BX)</h4>
+<p>&#x8FD9;&#x4E2A;<code>get_tls(BX)</code>&#x4E0E;<code>g()</code>&#x5176;&#x5B9E;&#x90FD;&#x662F;&#x5B8F;&#x5B9A;&#x4E49;&#xFF1A;</p>
+<pre><code class="lang-go">#ifdef GOARCH_amd64
+#define    get_tls(r)    MOVQ TLS, r
+#define    g(r)    <span class="hljs-number">0</span>(r)(TLS*<span class="hljs-number">1</span>)
+#endif
+</code></pre>
+<p>&#x53EF;&#x4EE5;&#x5F97;&#x5230;</p>
+<pre><code class="lang-go">MOVQ TLS, BX
+<span class="hljs-number">0</span>(BX)(TLS*<span class="hljs-number">1</span>)
+</code></pre>
+<p>&#x6709;&#x4E24;&#x4E2A;&#x7591;&#x95EE;&#xFF0C;
+&#x7B2C;&#x4E00;&#x4E2A;&#x662F;TLS&#x662F;&#x4EE3;&#x8868;&#x4EC0;&#x4E48;?
+&#x7B2C;&#x4E8C;&#x4E2A;&#x662F;0(BX)(TLS*1)&#x662F;&#x80FD;&#x8F6C;&#x6362;&#x4E3A;&#x4EC0;&#x4E48;&#x5730;&#x5740;&#xFF1F;</p>
+<pre><code>    // Thread-local storage references use the TLS pseudo-register.
+    // As a register, TLS refers to the thread-local storage base, and it
+    // can only be loaded into another register:
+    //
+    //         MOVQ TLS, AX
+    //
+    // An offset from the thread-local storage base is written off(reg)(TLS*1).
+    // Semantically it is off(reg), but the (TLS*1) annotation marks this as
+    // indexing from the loaded TLS base. This emits a relocation so that
+    // if the linker needs to adjust the offset, it can. For example:
+    //
+    //         MOVQ TLS, AX
+    //         MOVQ 0(AX)(TLS*1), CX // load g into CX
+    //
+    // On systems that support direct access to the TLS memory, this
+    // pair of instructions can be reduced to a direct TLS memory reference:
+    //
+    //         MOVQ 0(TLS), CX // load g into CX
+    //
+    // The 2-instruction and 1-instruction forms correspond to the two code
+    // sequences for loading a TLS variable in the local exec model given in &quot;ELF
+    // Handling For Thread-Local Storage&quot;.
+</code></pre><blockquote>
+<p>&#x8FD9;&#x91CC;&#x603B;&#x7ED3;&#x5C31;&#x662F;:</p>
+<blockquote>
+<p>TLS&#x4EE3;&#x8868;&#x7684;&#x662F;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#xFF0C;&#x662F;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x5B58;&#x50A8;&#x7684;&#x57FA;&#x5730;&#x5740;&#x3002;
+&#x8BED;&#x4E49;&#x4E0A;<code>off(reg)(TLS*1)== off(reg)</code>. &#x800C;&#x8FD9;&#x4E2A;<code>(TLS*1)</code>&#x8BF4;&#x660E;&#x662F;&#x4ECE;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x5B58;&#x50A8;&#x7684;&#x57FA;&#x5730;&#x5740;&#x4E0A;&#x8FDB;&#x884C;&#x7D22;&#x5F15;&#x3002;</p>
+</blockquote>
+</blockquote>
+<h3 id="&#x53C2;&#x8003;"><a name="&#x53C2;&#x8003;" class="anchor-navigation-ex-anchor" href="#&#x53C2;&#x8003;"><i class="fa fa-link" aria-hidden="true"></i></a>1.3.1. &#x53C2;&#x8003;</h3>
+<p><a href="https://www.zhihu.com/question/284288720" target="_blank">https://www.zhihu.com/question/284288720</a>
+<a href="https://segmentfault.com/a/1190000038626134" target="_blank">https://segmentfault.com/a/1190000038626134</a>
+<a href="https://www.altoros.com/blog/golang-internals-part-5-the-runtime-bootstrap-process/" target="_blank">https://www.altoros.com/blog/golang-internals-part-5-the-runtime-bootstrap-process/</a></p>
+<p><a href="https://segmentfault.com/a/1190000010984538" target="_blank">gid</a></p>
+<ul>
+<li>Addressing modes:<ul>
+<li>(DI)(BX<em>2): The location at address DI plus BX</em>2.</li>
+<li>64(DI)(BX<em>2): The location at address DI plus BX</em>2 plus 64. These modes accept only 1, 2, 4, and 8 as scale factors.</li>
+</ul>
+</li>
+</ul>
+<p><a href="https://golang.org/doc/asm#directives" target="_blank">https://golang.org/doc/asm#directives</a></p>
+<p><a href="https://lrita.github.io/2017/12/12/golang-asm/#%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E5%A3%B0%E6%98%8E" target="_blank">https://lrita.github.io/2017/12/12/golang-asm/#%E5%B1%80%E9%83%A8%E5%8F%98%E9%87%8F%E5%A3%B0%E6%98%8E</a></p>
+<p><a href="https://github.com/go-internals-cn/go-internals" target="_blank">https://github.com/go-internals-cn/go-internals</a></p>
+<pre><code class="lang-go">
+    <span class="hljs-comment">// When building for inclusion into a shared library, an instruction of the form</span>
+    <span class="hljs-comment">//     MOV off(CX)(TLS*1), AX</span>
+    <span class="hljs-comment">// becomes</span>
+    <span class="hljs-comment">//     mov %fs:off(%rcx), %rax</span>
+    <span class="hljs-comment">// which assumes that the correct TLS offset has been loaded into %rcx (today</span>
+    <span class="hljs-comment">// there is only one TLS variable -- g -- so this is OK). When not building for</span>
+    <span class="hljs-comment">// a shared library the instruction does not require a prefix.</span>
+</code></pre>
+<h2 id="mmorebufgobufpcregister"><a name="mmorebufgobufpcregister" class="anchor-navigation-ex-anchor" href="#mmorebufgobufpcregister"><i class="fa fa-link" aria-hidden="true"></i></a>1.4. (m_morebuf+gobuf_pc)(REGISTER)</h2>
+<pre><code class="lang-go">    MOVQ    <span class="hljs-number">8</span>(SP), AX    <span class="hljs-comment">// f&apos;s caller&apos;s PC</span>
+    MOVQ    AX, (m_morebuf+gobuf_pc)(BX)
+</code></pre>
+<p><a href="https://github.com/zput/go/blob/5622128a77b4af5e5dc02edf53ecac545e3af730/src/runtime/runtime2.go#L452" target="_blank">runtime.m</a>
+<a href="https://github.com/zput/go/blob/5622128a77b4af5e5dc02edf53ecac545e3af730/src/runtime/runtime2.go#L302" target="_blank">runtime.gobuf</a></p>
+<pre><code class="lang-go"><span class="hljs-keyword">type</span> m <span class="hljs-keyword">struct</span> {
+    g0      *g     <span class="hljs-comment">// goroutine with scheduling stack</span>
+    morebuf gobuf  <span class="hljs-comment">// gobuf arg to morestack   //-----------morebuf-------------//</span>
+    divmod  <span class="hljs-keyword">uint32</span> <span class="hljs-comment">// div/mod denominator for arm - known to liblink</span>
+    <span class="hljs-comment">//...</span>
+}
+
+<span class="hljs-keyword">type</span> gobuf <span class="hljs-keyword">struct</span> {
+    <span class="hljs-comment">// The offsets of sp, pc, and g are known to (hard-coded in) libmach.</span>
+    <span class="hljs-comment">//</span>
+    <span class="hljs-comment">// ctxt is unusual with respect to GC: it may be a</span>
+    <span class="hljs-comment">// heap-allocated funcval, so GC needs to track it, but it</span>
+    <span class="hljs-comment">// needs to be set and cleared from assembly, where it&apos;s</span>
+    <span class="hljs-comment">// difficult to have write barriers. However, ctxt is really a</span>
+    <span class="hljs-comment">// saved, live register, and we only ever exchange it between</span>
+    <span class="hljs-comment">// the real register and the gobuf. Hence, we treat it as a</span>
+    <span class="hljs-comment">// root during stack scanning, which means assembly that saves</span>
+    <span class="hljs-comment">// and restores it doesn&apos;t need write barriers. It&apos;s still</span>
+    <span class="hljs-comment">// typed as a pointer so that any other writes from Go get</span>
+    <span class="hljs-comment">// write barriers.</span>
+    sp   <span class="hljs-keyword">uintptr</span>
+    pc   <span class="hljs-keyword">uintptr</span>   <span class="hljs-comment">// &lt;&lt;&lt;--- </span>
+    g    guintptr
+    ctxt unsafe.Pointer
+    ret  sys.Uintreg
+    lr   <span class="hljs-keyword">uintptr</span>
+    bp   <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// for GOEXPERIMENT=framepointer</span>
+}
+</code></pre>
+<p>&#x6211;&#x4EEC;&#x4ECE;&#x8FD9;&#x4E2A;<code>m_morebuf+gobuf_pc</code>&#x5C31;&#x77E5;&#x9053;&#x6307;&#x7684;&#x662F;&#x8FD9;&#x4E2A;m&#x7ED3;&#x6784;&#x4F53;&#x4E2D;&#x7684;morebuf&#x7ED3;&#x6784;&#x4F53;&#x5B57;&#x6BB5;&#x4E2D;&#x7684;pc&#x503C;&#x3002;</p>
+<p><a href="https://github.com/zput/go/blob/5622128a77b4af5e5dc02edf53ecac545e3af730/src/runtime/runtime2.go#L387" target="_blank">runtime.g</a></p>
+<h2 id="&#x4F2A;&#x5BC4;&#x5B58;&#x5668;"><a name="&#x4F2A;&#x5BC4;&#x5B58;&#x5668;" class="anchor-navigation-ex-anchor" href="#&#x4F2A;&#x5BC4;&#x5B58;&#x5668;"><i class="fa fa-link" aria-hidden="true"></i></a>1.5. &#x4F2A;&#x5BC4;&#x5B58;&#x5668;</h2>
+<p><a href="https://golang.org/doc/asm#symbols" target="_blank">A Quick Guide to Go&apos;s Assembler</a></p>
+<pre><code class="lang-go">FP: Frame pointer: arguments and locals.
+PC: Program counter: jumps and branches.
+SB: Static base pointer: global symbols.
+SP: Stack pointer: top of stack.
+</code></pre>
+<h4 id="fp"><a name="fp" class="anchor-navigation-ex-anchor" href="#fp"><i class="fa fa-link" aria-hidden="true"></i></a>FP</h4>
+<blockquote>
+<p>FP&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#x662F;&#x4E00;&#x4E2A;&#x7528;&#x4E8E;&#x5F15;&#x7528;&#x51FD;&#x6570;&#x53C2;&#x6570;&#x7684;&#x865A;&#x62DF;&#x5E27;&#x6307;&#x9488;&#x3002;&#x7F16;&#x8BD1;&#x5668;&#x7EF4;&#x62A4;&#x4E00;&#x4E2A;&#x865A;&#x62DF;&#x5E27;&#x6307;&#x9488;&#xFF0C;&#x5E76;&#x5C06;&#x5806;&#x6808;&#x4E0A;&#x7684;&#x53C2;&#x6570;&#x5F15;&#x7528;&#x4E3A;&#x8BE5;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x504F;&#x79FB;&#x91CF;&#x3002;&#x56E0;&#x6B64;0(FP)&#x662F;&#x51FD;&#x6570;&#x7684;&#x7B2C;&#x4E00;&#x4E2A;&#x53C2;&#x6570;&#xFF0C;8(FP)&#x662F;&#x7B2C;&#x4E8C;&#x4E2A;&#x53C2;&#x6570;(&#x5728;64&#x4F4D;&#x673A;&#x5668;&#x4E0A;)&#xFF0C;&#x4EE5;&#x6B64;&#x7C7B;&#x63A8;&#x3002;&#x4F46;&#x662F;&#xFF0C;&#x5F53;&#x4EE5;&#x8FD9;&#x79CD;&#x65B9;&#x5F0F;&#x5F15;&#x7528;&#x4E00;&#x4E2A;&#x51FD;&#x6570;&#x53C2;&#x6570;&#x65F6;&#xFF0C;&#x6709;&#x5FC5;&#x8981;&#x5C06;&#x540D;&#x79F0;&#x653E;&#x5728;&#x5F00;&#x5934;&#xFF0C;&#x5982;first_arg+0(FP)&#x548C;second_arg+8(FP)&#x3002;(&#x504F;&#x79FB;&#x91CF;&#x7684;&#x542B;&#x4E49;--&#x4ECE;&#x5E27;&#x6307;&#x9488;&#x51FA;&#x53D1;&#x7684;&#x504F;&#x79FB;&#x91CF;--&#x4E0E;&#x5B83;&#x5728;SB&#x4E2D;&#x7684;&#x4F7F;&#x7528;&#x4E0D;&#x540C;&#xFF0C;&#x5728;SB&#x4E2D;&#xFF0C;&#x5B83;&#x662F;&#x4ECE;&#x7B26;&#x53F7;&#x51FA;&#x53D1;&#x7684;&#x504F;&#x79FB;&#x91CF;&#x3002;) &#x6C47;&#x7F16;&#x5668;&#x5F3A;&#x5236;&#x6267;&#x884C;&#x8FD9;&#x4E2A;&#x7EA6;&#x5B9A;&#xFF0C;&#x62D2;&#x7EDD;&#x666E;&#x901A;&#x7684;0(FP)&#x548C;8(FP)&#x3002;&#x5B9E;&#x9645;&#x7684;&#x540D;&#x79F0;&#x5728;&#x8BED;&#x4E49;&#x4E0A;&#x662F;&#x4E0D;&#x76F8;&#x5173;&#x7684;&#xFF0C;&#x4F46;&#x5E94;&#x8BE5;&#x7528;&#x6765;&#x8BB0;&#x5F55;&#x53C2;&#x6570;&#x7684;&#x540D;&#x79F0;&#x3002;&#x503C;&#x5F97;&#x5F3A;&#x8C03;&#x7684;&#x662F;&#xFF0C;FP&#x59CB;&#x7EC8;&#x662F;&#x4E00;&#x4E2A;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#xFF0C;&#x800C;&#x4E0D;&#x662F;&#x786C;&#x4EF6;&#x5BC4;&#x5B58;&#x5668;&#xFF0C;&#x5373;&#x4F7F;&#x5728;&#x5177;&#x6709;&#x786C;&#x4EF6;&#x5E27;&#x6307;&#x9488;&#x7684;&#x67B6;&#x6784;&#x4E0A;&#x4E5F;&#x662F;&#x5982;&#x6B64;&#x3002;</p>
+<p>The FP pseudo-register is a virtual frame pointer used to refer to function arguments. The compilers maintain a virtual frame pointer and refer to the arguments on the stack as offsets from that pseudo-register. Thus 0(FP) is the first argument to the function, 8(FP) is the second (on a 64-bit machine), and so on. However, when referring to a function argument this way, it is necessary to place a name at the beginning, as in first_arg+0(FP) and second_arg+8(FP). (The meaning of the offset&#x2014;offset from the frame pointer&#x2014;distinct from its use with SB, where it is an offset from the symbol.) The assembler enforces this convention, rejecting plain 0(FP) and 8(FP). The actual name is semantically irrelevant but should be used to document the argument&apos;s name. It is worth stressing that FP is always a pseudo-register, not a hardware register, even on architectures with a hardware frame pointer.</p>
+<p>&#x5BF9;&#x4E8E;&#x5E26;&#x6709;Go&#x539F;&#x578B;&#x7684;&#x6C47;&#x7F16;&#x51FD;&#x6570;&#xFF0C;go vet&#x4F1A;&#x68C0;&#x67E5;&#x53C2;&#x6570;&#x540D;&#x548C;&#x504F;&#x79FB;&#x91CF;&#x662F;&#x5426;&#x5339;&#x914D;&#x3002;&#x5728;32&#x4F4D;&#x7CFB;&#x7EDF;&#x4E0A;&#xFF0C;64&#x4F4D;&#x503C;&#x7684;&#x4F4E;&#x4F4D;&#x548C;&#x9AD8;&#x4F4D;32&#x4F4D;&#x662F;&#x901A;&#x8FC7;&#x5728;&#x540D;&#x79F0;&#x4E2D;&#x6DFB;&#x52A0;&#x4E00;&#x4E2A;_lo&#x6216;_hi&#x540E;&#x7F00;&#x6765;&#x533A;&#x5206;&#x7684;&#xFF0C;&#x5982;arg_lo+0(FP)&#x6216;arg_hi+4(FP)&#x3002;&#x5982;&#x679C;&#x4E00;&#x4E2A;Go&#x539F;&#x578B;&#x6CA1;&#x6709;&#x7ED9;&#x5B83;&#x7684;&#x7ED3;&#x679C;&#x547D;&#x540D;&#xFF0C;&#x90A3;&#x4E48;&#x9884;&#x671F;&#x7684;&#x6C47;&#x7F16;&#x540D;&#x662F;ret&#x3002;</p>
+<p>For assembly functions with Go prototypes, go vet will check that the argument names and offsets match. On 32-bit systems, the low and high 32 bits of a 64-bit value are distinguished by adding a _lo or _hi suffix to the name, as in arg_lo+0(FP) or arg_hi+4(FP). If a Go prototype does not name its result, the expected assembly name is ret.</p>
+</blockquote>
+<h4 id="sp"><a name="sp" class="anchor-navigation-ex-anchor" href="#sp"><i class="fa fa-link" aria-hidden="true"></i></a>SP</h4>
+<blockquote>
+<p>SP&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#x662F;&#x4E00;&#x4E2A;&#x865A;&#x62DF;&#x6808;&#x6307;&#x9488;&#xFF0C;&#x7528;&#x4E8E;&#x5F15;&#x7528;&#x5E27;&#x672C;&#x5730;&#x53D8;&#x91CF;&#x548C;&#x4E3A;&#x51FD;&#x6570;&#x8C03;&#x7528;&#x51C6;&#x5907;&#x7684;&#x53C2;&#x6570;&#x3002;&#x5B83;&#x6307;&#x5411;&#x672C;&#x5730;&#x6808;&#x5E27;&#x7684;&#x9876;&#x90E8;&#xFF0C;&#x6240;&#x4EE5;&#x5F15;&#x7528;&#x65F6;&#x5E94;&#x4F7F;&#x7528;&#x8D1F;&#x504F;&#x79FB;&#x91CF;&#xFF0C;&#x8303;&#x56F4;&#x4E3A;[-framesize&#xFF0C;0)&#xFF1A;x-8(SP)&#xFF0C;y-4(SP)&#xFF0C;&#x4EE5;&#x6B64;&#x7C7B;&#x63A8;&#x3002;</p>
+<p>The SP pseudo-register is a virtual stack pointer used to refer to frame-local variables and the arguments being prepared for function calls. It points to the top of the local stack frame, so references should use negative offsets in the range [&#x2212;framesize, 0): x-8(SP), y-4(SP), and so on.</p>
+<p>&#x5728;&#x5177;&#x6709;&#x540D;&#x4E3A;SP&#x7684;&#x786C;&#x4EF6;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x67B6;&#x6784;&#x4E0A;&#xFF0C;&#x540D;&#x79F0;&#x524D;&#x7F00;&#x53EF;&#x4EE5;&#x533A;&#x5206;&#x5BF9;&#x865A;&#x62DF;&#x6808;&#x6307;&#x9488;&#x7684;&#x5F15;&#x7528;&#x548C;&#x5BF9;&#x67B6;&#x6784;SP&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x5F15;&#x7528;&#xFF0C;&#x5373;x-8(SP)&#xFF0C;y-4(SP)&#xFF0C;&#x4EE5;&#x6B64;&#x7C7B;&#x63A8;&#x3002;&#x4E5F;&#x5C31;&#x662F;&#x8BF4;&#xFF0C;x-8(SP)&#x548C;-8(SP)&#x662F;&#x4E0D;&#x540C;&#x7684;&#x5185;&#x5B58;&#x4F4D;&#x7F6E;&#xFF1A;&#x7B2C;&#x4E00;&#x4E2A;&#x662F;&#x6307;&#x865A;&#x62DF;&#x6808;&#x6307;&#x9488;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#xFF0C;&#x800C;&#x7B2C;&#x4E8C;&#x4E2A;&#x662F;&#x6307;&#x786C;&#x4EF6;&#x7684;SP&#x5BC4;&#x5B58;&#x5668;&#x3002;</p>
+<p>On architectures with a hardware register named SP, the name prefix distinguishes references to the virtual stack pointer from references to the architectural SP register. That is, x-8(SP) and -8(SP) are different memory locations: the first refers to the virtual stack pointer pseudo-register, while the second refers to the hardware&apos;s SP register.</p>
+</blockquote>
+<ul>
+<li><p>&#x603B;&#x7ED3;&#x4E0B;&#xFF1A;</p>
+<ul>
+<li>&#x5982;&#x4F55;&#x7406;&#x89E3;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;FP&#x548C;SP&#x5462;&#xFF1F;&#x5176;&#x5B9E;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;FP&#x548C;SP&#x76F8;&#x5F53;&#x4E8E;plan9&#x4F2A;&#x6C47;&#x7F16;&#x4E2D;&#x7684;&#x4E00;&#x4E2A;&#x52A9;&#x8BB0;&#x7B26;&#xFF0C;&#x4ED6;&#x4EEC;&#x662F;&#x6839;&#x636E;&#x5F53;&#x524D;&#x51FD;&#x6570;&#x6808;&#x7A7A;&#x95F4;&#x8BA1;&#x7B97;&#x51FA;&#x6765;&#x7684;&#x4E00;&#x4E2A;&#x76F8;&#x5BF9;&#x4E8E;&#x7269;&#x7406;&#x5BC4;&#x5B58;&#x5668;SP&#x7684;&#x4E00;&#x4E2A;&#x504F;&#x79FB;&#x91CF;&#x5750;&#x6807;&#x3002;</li>
+<li>&#x4F2A;SP&#x548C;FP&#x7684;&#x76F8;&#x5BF9;&#x4F4D;&#x7F6E;&#x662F;&#x4F1A;&#x53D8;&#x7684;&#xFF0C;&#x6240;&#x4EE5;&#x4E0D;&#x5E94;&#x8BE5;&#x5C1D;&#x8BD5;&#x7528;&#x4F2A;SP&#x5BC4;&#x5B58;&#x5668;&#x53BB;&#x627E;&#x90A3;&#x4E9B;&#x7528;FP+offset&#x6765;&#x5F15;&#x7528;&#x7684;&#x503C;&#xFF0C;&#x4F8B;&#x5982;&#x51FD;&#x6570;&#x7684;&#x5165;&#x53C2;&#x548C;&#x8FD4;&#x56DE;&#x503C;&#x3002;</li>
+<li>&#x5B98;&#x65B9;&#x6587;&#x6863;&#x4E2D;&#x8BF4;&#x7684;&#x4F2A;SP&#x6307;&#x5411;stack&#x7684;top&#xFF0C;&#x662F;&#x6709;&#x95EE;&#x9898;&#x7684;&#x3002;&#x5176;&#x6307;&#x5411;&#x7684;&#x5C40;&#x90E8;&#x53D8;&#x91CF;&#x4F4D;&#x7F6E;&#x5B9E;&#x9645;&#x4E0A;&#x662F;&#x6574;&#x4E2A;&#x6808;&#x7684;&#x6808;&#x5E95;&#xFF08;&#x9664;caller BP &#x4E4B;&#x5916;&#xFF09;&#xFF0C;&#x6240;&#x4EE5;&#x8BF4;bottom&#x66F4;&#x5408;&#x9002;&#x4E00;&#x4E9B;&#x3002;</li>
+<li><code>MOVQ    0(SP), AX // f&apos;s PC</code>,&#x8FD9;&#x79CD;&#x524D;&#x9762;&#x6CA1;&#x6709;flags&#x7684;&#xFF0C;&#x5B83;&#x76F8;&#x5F53;&#x4E8E;&#x5B9E;&#x9645;&#x7684;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#xFF0C;&#x4E0D;&#x662F;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;&#x4E86;&#x3002;</li>
+</ul>
+</li>
+<li><p>&#x4E0B;&#x9762;&#x6765;&#x505A;&#x4E0B;&#x5B9E;&#x9A8C;&#x3002;</p>
+<ul>
+<li>&#x786E;&#x8BA4;FP&#xFF0C; SP&#x76F8;&#x5BF9;&#x4E8E;real register&#x7684;&#x4F4D;&#x7F6E;&#x70B9;&#x5728;&#x90A3;&#x91CC;&#x3002;</li>
+<li>&#x6211;&#x4EEC; presudo FP&#x5E94;&#x8BE5;&#x5728;caller&apos;s next pc + 8byte</li>
+<li>presudo SP&#x5E94;&#x8BE5;&#x5728;caller&apos;s BP</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>main.go
+```go
+package main</p>
+</blockquote>
+<p>func test_FP_SP(a, b int64)(first uintptr, second uintptr)</p>
+<p>func main(){
+    first, second := test<em>FP_SP(1, 2)
+    first -= second
+    </em> = first
+}</p>
+<pre><code>
+
+
+&gt; test_FP_SP.s
+
+```go
+// func test_FP_SP(a, b int64)(first uintptr, second uintptr)
+TEXT &#xB7;test_FP_SP(SB),$4112-16
+        LEAQ x-0(SP), DI         // 
+        MOVQ DI, first+16(FP)    // &#x5C06;&#x539F;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;SP&#x504F;&#x79FB;&#x91CF;&#x5B58;&#x5165;&#x8FD4;&#x56DE;&#x503C;first
+
+        MOVQ    SP, BP           // &#x5B58;&#x50A8;&#x7269;&#x7406;SP&#x504F;&#x79FB;&#x91CF;&#x5230;BP&#x5BC4;&#x5B58;&#x5668;
+        ADDQ    $4096, SP        // &#x5C06;&#x7269;&#x7406;SP&#x504F;&#x79FB;&#x589E;&#x52A0;4K
+
+        LEAQ x-0(SP), SI         // &#x5728;&#x4E0A;&#x9762;&#x4E2D;&#x53EA;&#x6539;&#x53D8;&#x4E86;&#x4E00;&#x4E2A;&#x503C;&#x5C31;&#x662F;SP&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#xFF0C;&#x7136;&#x540E;&#x518D;&#x6B21;&#x4E00;&#x6A21;&#x4E00;&#x6837;&#x7684;&#x628A;x-0(SP)&#x7ED9;&#x5230;&#x4E86;SI.
+
+        /* &#x7B2C;&#x4E00;&#x4E2A; MOVQ    BP, SP */
+        MOVQ    BP, SP           // &#x6062;&#x590D;&#x7269;&#x7406;SP&#xFF0C;&#x56E0;&#x4E3A;&#x4FEE;&#x6539;&#x7269;&#x7406;SP&#x540E;&#xFF0C;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;FP/SP&#x968F;&#x4E4B;&#x6539;&#x53D8;&#xFF0C;
+                                 // &#x4E3A;&#x4E86;&#x6B63;&#x786E;&#x8BBF;&#x95EE;FP&#xFF0C;&#x5148;&#x6062;&#x590D;&#x7269;&#x7406;SP
+        MOVQ SI, second+24(FP)   // &#x5C06;&#x504F;&#x79FB;&#x540E;&#x7684;&#x4F2A;&#x5BC4;&#x5B58;&#x5668;SP&#x504F;&#x79FB;&#x91CF;&#x5B58;&#x5165;&#x8FD4;&#x56DE;&#x503C;second
+
+        /* &#x7B2C;&#x4E8C;&#x4E2A; MOVQ    BP, SP */
+        //MOVQ    BP, SP         
+
+        RET                        // &#x4ECE;&#x8F93;&#x51FA;&#x7684;second-first&#x6765;&#x770B;&#xFF0C;&#x6B63;&#x597D;&#x76F8;&#x5DEE;4K
+</code></pre><p>&#x7F16;&#x8BD1;&#x4E00;&#x4E0B;&#x6E90;&#x4EE3;&#x7801;&#xFF1A;<code>go build -gcflags &quot;-N -l&quot; -o test .</code> OR <code>go build -gcflags &quot;all=-N -l&quot; -o test .</code> OR <code>GOOS=linux GOARCH=amd64 go tool compile -S .</code></p>
+<pre><code class="lang-sh">[root@iZf8z14idfp0rwhiicngwqZ FP_SP]<span class="hljs-comment"># tree .</span>
+.
+&#x251C;&#x2500;&#x2500; main.go
+&#x251C;&#x2500;&#x2500; main.o
+&#x251C;&#x2500;&#x2500; <span class="hljs-built_in">test</span>
+&#x2514;&#x2500;&#x2500; <span class="hljs-built_in">test</span>_FP_SP.s
+</code></pre>
+<p>&#x6211;&#x4EEC;&#x7528;&#x5230;&#x7684;gdb&#x547D;&#x4EE4;:</p>
+<pre><code class="lang-sh">
+gdb ./<span class="hljs-built_in">test</span>
+list
+b 6
+display /25i <span class="hljs-variable">$pc</span>-8
+si
+si
+si
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210129195940.png" alt="20210129195940">
+&#x4ECE;&#x4E0A;&#x9762;&#x7684;&#x56FE;&#x4E2D;&#x53EF;&#x4EE5;&#x770B;&#x51FA;&#xFF0C;go assemble&#x4E2D;&#x7684;<code>x-0(SP)</code>&#x4E0E;<code>first+16(FP)</code>,&#x5176;&#x5B9E;&#x90FD;&#x662F;&#x4E0E;SP&#x5BC4;&#x5B58;&#x5668;&#x5173;&#x8054;&#x7684;&#xFF0C;
+&#x5176;&#x4E2D;SP&#xFF0C;&#x4F2A;FP&#xFF0C;&#x4E0E;&#x4F2A;SP&#x7684;&#x4F4D;&#x7F6E;&#xFF0C;&#x5728;&#x4E0B;&#x56FE;&#x4E2D;&#x5DF2;&#x7ECF;&#x6807;&#x8BC6;&#x51FA;&#x6765;&#x4E86;;</p>
+<pre><code class="lang-sh">+------------------------+                                  
+|                        |                                  
+|                        |                                  
+|         second         |                                  
+|                        |                                  
+|-------------------------                                  
+|                        |                                  
+|                        |                                  
+|         first          |                                  
+|                        |                                  
+|------------------------|                                  
+|                        |                                  
+|                        |                                  
+|         b              |                                  
+|                        |                                  
+|------------------------|                                  
+|                        |                                  
+|                        |                                  
+|         a              |                                  
+|                        |                                  
++------------------------+ &lt;-------- &#x4F2A;FP!!!                      
+|                        |                                  
+|                        |                                  
+|     <span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s pc        |                                  
+|                        |                                  
++------------------------+                                  
+|                        |                                  
+|                        |                                  
+|     caller&apos;</span>s BP        |                                  
+|                        |                                  
+|------------------------| &lt;-------- callee<span class="hljs-string">&apos;s BP &lt;===&gt; &#x4F2A;SP!!!
+|                        |                                  
+|                        |                                  
+|        ...             |                                  
+|                        |                                  
+|                        |                                  
++------------------------+ &lt;-------- &#x771F;&#x5B9E;&#x5BC4;&#x5B58;&#x5668;SP[&#x5B83;&#x7B49;&#x4E8E;caller&apos;</span>s SP - <span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s next CP(8) - callee&apos;</span>s stack size;&#x4E0A;&#x56FE;&#x5DF2;&#x7ECF;&#x6807;&#x8BC6;&#x4E86;]
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210129211423.png" alt="MOVQ    0(SP), AX // f&apos;s PC"></p>
+<h3 id="&#x6269;&#x5C55;"><a name="&#x6269;&#x5C55;" class="anchor-navigation-ex-anchor" href="#&#x6269;&#x5C55;"><i class="fa fa-link" aria-hidden="true"></i></a>1.5.1. &#x6269;&#x5C55;</h3>
+<p>&#x5F53;&#x6211;&#x4EEC;&#x628A;<code>/* &#x7B2C;&#x4E00;&#x4E2A; MOVQ    BP, SP */</code>&#x4E0B;&#x9762;&#x7684;&#x6CE8;&#x91CA;&#x6389;&#xFF0C;&#x6267;&#x884C;&#x7684;&#x8BDD;&#x4F1A;panic&#xFF0C;&#x662F;&#x56E0;&#x4E3A;PC&#x5BC4;&#x5B58;&#x5668;&#x8BFB;&#x53D6;&#x9519;&#x8BEF;&#xFF0C;&#x800C;&#x4E0D;&#x662F;&#x6CE8;&#x91CA;&#x6389;&#x7684;&#x4E0B;&#x4E00;&#x884C;&#x5BFC;&#x81F4;&#x7684;&#x3002;</p>
+<p>&#x53EF;&#x4EE5;&#x5B9E;&#x9A8C;&#x4E0B;:&#x6211;&#x4EEC;&#x628A;<code>/* &#x7B2C;&#x4E8C;&#x4E2A; MOVQ    BP, SP */</code>&#x53D6;&#x6D88;&#x6CE8;&#x91CA;&#xFF0C;&#x5B83;&#x5C31;&#x6B63;&#x5E38;&#x6267;&#x884C;&#xFF0C;&#x53EA;&#x662F;&#x8FD4;&#x56DE;&#x503C;&#x4E0D;&#x5BF9;&#x800C;&#x5DF2;&#x3002;</p>
+<h2 id="go&#x7F16;&#x8BD1;&#x5668;&#x52A0;&#x7684;&#x51FD;&#x6570;&#x5934;&#x7684;&#x90E8;&#x5206;"><a name="go&#x7F16;&#x8BD1;&#x5668;&#x52A0;&#x7684;&#x51FD;&#x6570;&#x5934;&#x7684;&#x90E8;&#x5206;" class="anchor-navigation-ex-anchor" href="#go&#x7F16;&#x8BD1;&#x5668;&#x52A0;&#x7684;&#x51FD;&#x6570;&#x5934;&#x7684;&#x90E8;&#x5206;"><i class="fa fa-link" aria-hidden="true"></i></a>1.6. go&#x7F16;&#x8BD1;&#x5668;&#x52A0;&#x7684;&#x51FD;&#x6570;&#x5934;&#x7684;&#x90E8;&#x5206;</h2>
+<pre><code>=&gt; 0x459240 &lt;main.test_FP_SP&gt;:    mov    %fs:0xfffffffffffffff8,%rcx
+   0x459249 &lt;main.test_FP_SP+9&gt;:    mov    0x10(%rcx),%rsi
+   0x45924d &lt;main.test_FP_SP+13&gt;:    cmp    $0xfffffffffffffade,%rsi
+   0x459254 &lt;main.test_FP_SP+20&gt;:    je     0x4592bd &lt;main.test_FP_SP+125&gt;
+   0x459256 &lt;main.test_FP_SP+22&gt;:    lea    0x370(%rsp),%rax
+   0x45925e &lt;main.test_FP_SP+30&gt;:    sub    %rsi,%rax
+   0x459261 &lt;main.test_FP_SP+33&gt;:    cmp    $0x1308,%rax
+   0x459267 &lt;main.test_FP_SP+39&gt;:    jbe    0x4592bd &lt;main.test_FP_SP+125&gt;
+   0x459269 &lt;main.test_FP_SP+41&gt;:    sub    $0x1018,%rsp
+   0x459270 &lt;main.test_FP_SP+48&gt;:    mov    %rbp,0x1010(%rsp)
+   0x459278 &lt;main.test_FP_SP+56&gt;:    lea    0x1010(%rsp),%rbp
+   0x459280 &lt;main.test_FP_SP+64&gt;:    lea    0x1010(%rsp),%rdi
+   0x459288 &lt;main.test_FP_SP+72&gt;:    mov    %rdi,0x1030(%rsp)
+   0x459290 &lt;main.test_FP_SP+80&gt;:    mov    %rsp,%rbp
+   0x459293 &lt;main.test_FP_SP+83&gt;:    add    $0x1000,%rsp
+   0x45929a &lt;main.test_FP_SP+90&gt;:    lea    0x1010(%rsp),%rsi
+   0x4592a2 &lt;main.test_FP_SP+98&gt;:    mov    %rbp,%rsp
+   0x4592a5 &lt;main.test_FP_SP+101&gt;:    mov    %rsi,0x1038(%rsp)
+   0x4592ad &lt;main.test_FP_SP+109&gt;:    mov    0x1010(%rsp),%rbp
+   0x4592b5 &lt;main.test_FP_SP+117&gt;:    add    $0x1018,%rsp
+   0x4592bc &lt;main.test_FP_SP+124&gt;:    retq
+   0x4592bd &lt;main.test_FP_SP+125&gt;:    callq  0x450c70 &lt;runtime.morestack_noctxt&gt;
+   0x4592c2 &lt;main.test_FP_SP+130&gt;:    jmpq   0x459240 &lt;main.test_FP_SP&gt;
+   0x4592c7:    add    %al,(%rax)
+   0x4592c9:    add    %al,(%rax)
+</code></pre><p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210201140600.png" alt="&#x4EE5;&#x4E0A;&#x9762;&#x7684;&#x4F8B;&#x5B50;&#x6765;&#x770B;"></p>
+<ul>
+<li>&#x5728;&#x5934;&#x548C;&#x5C3E;&#x90E8;&#x52A0;&#x4E0A;&#x4E86;&#x5176;&#x4ED6;&#x8DF3;&#x8F6C;&#x4EE3;&#x7801;&#x3002;<ul>
+<li><code>0x10(%rcx)</code></li>
+<li><code>$0xfffffffffffffade</code></li>
+</ul>
+</li>
+</ul>
+<pre><code class="lang-go">
+<span class="hljs-keyword">type</span> stack <span class="hljs-keyword">struct</span> {
+    lo <span class="hljs-keyword">uintptr</span>
+    hi <span class="hljs-keyword">uintptr</span>
+}
+
+<span class="hljs-keyword">type</span> g <span class="hljs-keyword">struct</span> {
+    <span class="hljs-comment">// Stack parameters.</span>
+    <span class="hljs-comment">// stack describes the actual stack memory: [stack.lo, stack.hi).</span>
+    <span class="hljs-comment">// stackguard0 is the stack pointer compared in the Go stack growth prologue.</span>
+    <span class="hljs-comment">// It is stack.lo+StackGuard normally, but can be StackPreempt to trigger a preemption.</span>
+    <span class="hljs-comment">// stackguard1 is the stack pointer compared in the C stack growth prologue.</span>
+    <span class="hljs-comment">// It is stack.lo+StackGuard on g0 and gsignal stacks.</span>
+    <span class="hljs-comment">// It is ~0 on other goroutine stacks, to trigger a call to morestackc (and crash).</span>
+    stack       stack   <span class="hljs-comment">// offset known to runtime/cgo</span>
+    stackguard0 <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// offset known to liblink</span>
+    stackguard1 <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// offset known to liblink</span>
+    <span class="hljs-comment">//...</span>
+</code></pre>
+<p>&#x5176;&#x4E2D;rcx&#x662F;g&#x7684;&#x5730;&#x5740;&#xFF0C;&#x6240;&#x4EE5;<code>0x10(%rcx)</code>&#x662F;&#x5C31;&#x662F;&#x8DF3;&#x8FC7;stack&#x5F97;&#x5230;stackguard0(&#x5B83;&#x662F;go&#x6808;&#x589E;&#x957F;&#x7684;&#x5E8F;&#x7AE0;&#xFF0C;&#x5F00;&#x59CB;&#x7684;&#x5730;&#x65B9;,&#x503C;&#x662F;&#xFF1A;stack.lo+StackGuard)
+<a href="https://github.com/golang/go/blob/0e85fd7561de869add933801c531bf25dee9561c/src/cmd/internal/objabi/stack.go#L21" target="_blank">var StackGuard = 928*stackGuardMultiplier() + StackSystem</a></p>
+<p>&#x5F53;&#x88AB;&#x62A2;&#x5360;&#x7684;&#x65F6;&#x5019;&#xFF0C;&#x5B83;&#x662F;:<a href="https://github.com/golang/go/blob/0e85fd7561de869add933801c531bf25dee9561c/src/cmd/internal/objabi/stack.go#L17" target="_blank">StackPreempt = -1314 // 0xfff...fade</a></p>
+<table>
+<thead>
+<tr>
+<th>order</th>
+<th>explainment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>je</td>
+<td>Jumps if equal</td>
+</tr>
+<tr>
+<td>jbe</td>
+<td>Jumps if below or equal</td>
+</tr>
+</tbody>
+</table>
+<h2 id="&#x4F8B;&#x5B50;"><a name="&#x4F8B;&#x5B50;" class="anchor-navigation-ex-anchor" href="#&#x4F8B;&#x5B50;"><i class="fa fa-link" aria-hidden="true"></i></a>1.7. &#x4F8B;&#x5B50;</h2>
+<h3 id="main-goroutine&#x5F97;&#x4E0D;&#x5230;&#x6267;&#x884C;"><a name="main-goroutine&#x5F97;&#x4E0D;&#x5230;&#x6267;&#x884C;" class="anchor-navigation-ex-anchor" href="#main-goroutine&#x5F97;&#x4E0D;&#x5230;&#x6267;&#x884C;"><i class="fa fa-link" aria-hidden="true"></i></a>1.7.1. main goroutine&#x5F97;&#x4E0D;&#x5230;&#x6267;&#x884C;</h3>
+<pre><code class="lang-go"><span class="hljs-keyword">package</span> main
+<span class="hljs-keyword">import</span> (
+    <span class="hljs-string">&quot;fmt&quot;</span>
+    <span class="hljs-string">&quot;runtime&quot;</span>
+)
+<span class="hljs-keyword">func</span> g2() {
+    sum := <span class="hljs-number">0</span>
+    <span class="hljs-keyword">for</span> {
+        sum++
+    }
+}
+<span class="hljs-keyword">func</span> main() {
+    runtime.GOMAXPROCS(<span class="hljs-number">1</span>)
+    <span class="hljs-keyword">go</span> g2()
+    <span class="hljs-keyword">for</span> {
+        runtime.Gosched()
+        fmt.Println(<span class="hljs-string">&quot;main is scheduled!&quot;</span>)
+    }
+}
+</code></pre>
+<ul>
+<li>&#x5C06;&#x4E0D;&#x4F1A;&#x6253;&#x5370;[&quot;main is scheduled!&quot;]</li>
+</ul>
+<h3 id="&#x4E00;&#x4E9B;&#x6C47;&#x7F16;&#x9700;&#x8981;&#x7684;&#x5E38;&#x89C1;&#x7684;&#x6307;&#x4EE4;"><a name="&#x4E00;&#x4E9B;&#x6C47;&#x7F16;&#x9700;&#x8981;&#x7684;&#x5E38;&#x89C1;&#x7684;&#x6307;&#x4EE4;" class="anchor-navigation-ex-anchor" href="#&#x4E00;&#x4E9B;&#x6C47;&#x7F16;&#x9700;&#x8981;&#x7684;&#x5E38;&#x89C1;&#x7684;&#x6307;&#x4EE4;"><i class="fa fa-link" aria-hidden="true"></i></a>1.7.2. &#x4E00;&#x4E9B;&#x6C47;&#x7F16;&#x9700;&#x8981;&#x7684;&#x5E38;&#x89C1;&#x7684;&#x6307;&#x4EE4;</h3>
+<pre><code class="lang-sh">go build  -gcflags <span class="hljs-string">&quot;-N -l&quot;</span> -o <span class="hljs-built_in">test</span> .
+
+info files 
+info registers sp bp
+info breakpoint
+
+x/10x
+<span class="hljs-built_in">help</span> x
+
+x/16xb 0x7fffffffe470
+[https://visualgdb.com/gdbreference/commands/x]
+
+info register rbp rsp pc
+
+display /20i <span class="hljs-variable">$pc</span>
+</code></pre>
+<p><a href="https://blog.csdn.net/counsellor/article/details/100034080" target="_blank">https://blog.csdn.net/counsellor/article/details/100034080</a></p>
+<h2 id="&#x9644;&#x5F55;"><a name="&#x9644;&#x5F55;" class="anchor-navigation-ex-anchor" href="#&#x9644;&#x5F55;"><i class="fa fa-link" aria-hidden="true"></i></a>1.8. &#x9644;&#x5F55;</h2>
+<p><a href="https://lrita.github.io/2017/12/12/golang-asm/#interface" target="_blank">https://lrita.github.io/2017/12/12/golang-asm/#interface</a></p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="../" class="navigation navigation-prev " aria-label="Previous page: 大纲">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="1.汇编基础.html" class="navigation navigation-next " aria-label="Next page: 汇编基础">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"第一部分 基础知识","date":"2019-02-28T15:03:00.000Z","tags":["golang","goroutine"],"categories":["golang调度"],"toc":true,"level":"1.3","depth":1,"next":{"title":"汇编基础","level":"1.3.1","depth":2,"path":"part0.基础知识/1.汇编基础.md","ref":"part0.基础知识/1.汇编基础.md","articles":[]},"previous":{"title":"大纲","level":"1.2","depth":1,"path":"index.md","ref":"index.md","articles":[]},"dir":"ltr"},"config":{"plugins":["-page-toc-button","-toc2","anchor-navigation-ex"],"styles":{"website":"./styles/website.css"},"pluginsConfig":{"search":{},"toc2":{"addClass":true,"className":"toc"},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"fontsettings":{"theme":"white","family":"sans","size":2},"highlight":{},"anchor-navigation-ex":{"associatedWithSummary":true,"float":{"floatIcon":"fa fa-navicon","level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"mode":"float","multipleH1":true,"pageTop":{"level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"printLog":false,"showGoTop":true,"showLevel":true},"page-toc-button":{"maxTocDepth":2,"minTocSize":2},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"theme":"default","author":"zput","pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"variables":{},"title":"golang goroutine详解","language":"zh-hans","links":{"sidebar":{"zput|堆排序":"https://zput.github.io"}},"gitbook":"3.2.3","description":"select * from learn"},"file":{"path":"part0.基础知识/1.汇编基础.md","mtime":"2021-02-04T09:00:58.656Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2021-02-04T09:01:45.726Z"},"basePath":"..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../gitbook/gitbook.js"></script>
+    <script src="../gitbook/theme.js"></script>
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+
