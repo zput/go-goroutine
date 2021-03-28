@@ -1,0 +1,924 @@
+
+<!DOCTYPE HTML>
+<html lang="zh-hans" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>系统调用收尾,如果从系统调用返回,如何重新得到P · golang goroutine详解</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        <meta name="author" content="zput">
+        
+        
+    
+    <link rel="stylesheet" href="../../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-anchor-navigation-ex/style/plugin.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="../3.调度循环/3.3.调度循环.html" />
+    
+    
+    <link rel="prev" href="2.3.1.运行用户代码时间过长调度.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="输入并搜索" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+    
+        
+        <li>
+            <a href="https://zput.github.io" target="_blank" class="custom-link">zput|堆排序</a>
+        </li>
+    
+    
+
+    
+    <li class="divider"></li>
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../../">
+            
+                <a href="../../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="../../">
+            
+                <a href="../../">
+            
+                    
+                    大纲
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="../../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    第一部分 基础知识
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.3.1" data-path="../../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    汇编基础
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="../../part0.基础知识/2.内存.html">
+            
+                <a href="../../part0.基础知识/2.内存.html">
+            
+                    
+                    内存
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    第二部分 进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.4.1" data-path="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    第三部分 退出goroutine
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.5.1" data-path="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    退出goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <span>
+            
+                    
+                    第四部分 调度
+            
+                </span>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1" data-path="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    1.调度策略
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1.1" data-path="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    从本地队列或全局队列获取goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.1.2" data-path="../1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                <a href="../1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                    
+                    盗取goroutine从其他队列
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2" data-path="2.1.主动调度.html">
+            
+                <a href="2.1.主动调度.html">
+            
+                    
+                    2.调度的时机
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.2.1" data-path="2.1.主动调度.html">
+            
+                <a href="2.1.主动调度.html">
+            
+                    
+                    主动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.2" data-path="2.2.被动调度.html">
+            
+                <a href="2.2.被动调度.html">
+            
+                    
+                    被动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.3" data-path="2.3.1.运行用户代码时间过长调度.html">
+            
+                <a href="2.3.1.运行用户代码时间过长调度.html">
+            
+                    
+                    运行用户代码时间过长调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.6.2.4" data-path="2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                <a href="2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                    
+                    系统调用收尾,如果从系统调用返回,如何重新得到P
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.3" data-path="../3.调度循环/3.3.调度循环.html">
+            
+                <a href="../3.调度循环/3.3.调度循环.html">
+            
+                    
+                    3.调度循环
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.3.1" data-path="../3.调度循环/3.3.调度循环.html">
+            
+                <a href="../3.调度循环/3.3.调度循环.html">
+            
+                    
+                    调度循环
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.4" data-path="../总结.html">
+            
+                <a href="../总结.html">
+            
+                    
+                    总结
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            本书使用 GitBook 发布
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="../.." >系统调用收尾,如果从系统调用返回,如何重新得到P</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <div id="anchor-navigation-ex-navbar"><i class="fa fa-navicon"></i><ul><ul><li><span class="title-icon "></span><a href="#&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;"><b>1.1. </b>&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;</a></li><li><span class="title-icon "></span><a href="#gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;"><b>1.2. </b>gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;</a></li><ul><li><span class="title-icon "></span><a href="#&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;"><b>1.2.1. </b>&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;</a></li><li><span class="title-icon "></span><a href="#&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;"><b>1.2.2. </b>&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;</a></li></ul><li><span class="title-icon "></span><a href="#gdb"><b>1.3. </b>gdb</a></li><ul><li><span class="title-icon "></span><a href="#entersyscall"><b>1.3.1. </b>entersyscall</a></li><li><span class="title-icon "></span><a href="#exitsyscall"><b>1.3.2. </b>exitsyscall</a></li></ul><li><span class="title-icon "></span><a href="#syscalltick"><b>1.4. </b>syscalltick</a></li></ul></ul></div><a href="#" id="anchorNavigationExGoTop"><i class="fa fa-arrow-up"></i></a><h2 id="&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;"><a name="&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;" class="anchor-navigation-ex-anchor" href="#&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1. &#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;</h2>
+<blockquote>
+<p>main.go</p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">package</span> main
+
+<span class="hljs-keyword">import</span> (
+    <span class="hljs-string">&quot;fmt&quot;</span>
+    <span class="hljs-string">&quot;os&quot;</span>
+)
+
+<span class="hljs-keyword">var</span> path = <span class="hljs-string">&quot;appss.txt&quot;</span>
+
+<span class="hljs-keyword">func</span> isError(err error) <span class="hljs-keyword">bool</span> {
+    <span class="hljs-keyword">if</span> err != <span class="hljs-literal">nil</span> {
+        fmt.Println(err.Error())
+    }
+    <span class="hljs-keyword">return</span> (err != <span class="hljs-literal">nil</span>)
+}
+
+<span class="hljs-keyword">func</span> main() {
+    <span class="hljs-keyword">var</span> file, err = os.OpenFile(path, os.O_RDWR, <span class="hljs-number">0644</span>)
+    <span class="hljs-keyword">if</span> isError(err) {
+        <span class="hljs-keyword">return</span>
+    }
+    <span class="hljs-keyword">defer</span> file.Close()
+}
+</code></pre>
+<h2 id="gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;"><a name="gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;" class="anchor-navigation-ex-anchor" href="#gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;"><i class="fa fa-link" aria-hidden="true"></i></a>1.2. gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;</h2>
+<h3 id="&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;"><a name="&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;" class="anchor-navigation-ex-anchor" href="#&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;"><i class="fa fa-link" aria-hidden="true"></i></a>1.2.1. &#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;</h3>
+<p>&#x7F16;&#x8BD1;&#x4E00;&#x4E0B;&#x6E90;&#x4EE3;&#x7801;: <code>go build  -gcflags &quot;-N -l&quot; -o test .</code>.</p>
+<h3 id="&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;"><a name="&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;" class="anchor-navigation-ex-anchor" href="#&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;"><i class="fa fa-link" aria-hidden="true"></i></a>1.2.2. &#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;</h3>
+<ul>
+<li>gdb<ul>
+<li><code>list /usr/lib/golang/src/syscall/zsyscall_linux_amd64.go:62</code></li>
+<li><code>list /usr/lib/golang/src/syscall/asm_linux_amd64.s:44</code></li>
+</ul>
+</li>
+</ul>
+<h2 id="gdb"><a name="gdb" class="anchor-navigation-ex-anchor" href="#gdb"><i class="fa fa-link" aria-hidden="true"></i></a>1.3. gdb</h2>
+<pre><code class="lang-go"><span class="hljs-comment">// func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr)</span>
+TEXT &#xB7;Syscall6(SB),NOSPLIT,$<span class="hljs-number">0</span><span class="hljs-number">-80</span>
+    CALL    runtime&#xB7;entersyscall(SB)
+    MOVQ    a1+<span class="hljs-number">8</span>(FP), DI
+    MOVQ    a2+<span class="hljs-number">16</span>(FP), SI
+    MOVQ    a3+<span class="hljs-number">24</span>(FP), DX
+    MOVQ    a4+<span class="hljs-number">32</span>(FP), R10
+    MOVQ    a5+<span class="hljs-number">40</span>(FP), R8
+    MOVQ    a6+<span class="hljs-number">48</span>(FP), R9
+
+    SYSCALL
+    CMPQ    AX, $<span class="hljs-number">0xfffffffffffff001</span>
+    JLS    ok6
+    MOVQ    $<span class="hljs-number">-1</span>, r1+<span class="hljs-number">56</span>(FP)
+    MOVQ    $<span class="hljs-number">0</span>, r2+<span class="hljs-number">64</span>(FP)
+    NEGQ    AX
+    MOVQ    AX, err+<span class="hljs-number">72</span>(FP)
+    CALL    runtime&#xB7;exitsyscall(SB)
+    RET
+ok6:
+    MOVQ    AX, r1+<span class="hljs-number">56</span>(FP)
+    MOVQ    DX, r2+<span class="hljs-number">64</span>(FP)
+    MOVQ    $<span class="hljs-number">0</span>, err+<span class="hljs-number">72</span>(FP)
+    CALL    runtime&#xB7;exitsyscall(SB)
+  RET
+</code></pre>
+<h3 id="entersyscall"><a name="entersyscall" class="anchor-navigation-ex-anchor" href="#entersyscall"><i class="fa fa-link" aria-hidden="true"></i></a>1.3.1. entersyscall</h3>
+<blockquote>
+<p><code>src/runtime/proc.go</code></p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">func</span> entersyscall() {
+    reentersyscall(getcallerpc(), getcallersp()) <span class="hljs-comment">// &#x8FD9;&#x4E2A;&#x662F;Goroutine&#x7684;pc, sp,&#x4E0D;&#x662F;g0&#x7684;&#xFF0C;&#x56E0;&#x4E3A;&#x8FD8;&#x6CA1;&#x6709;&#x5207;&#x6362;&#x6808;&#x3002;</span>
+}
+</code></pre>
+<h4 id="reentersyscall"><a name="reentersyscall" class="anchor-navigation-ex-anchor" href="#reentersyscall"><i class="fa fa-link" aria-hidden="true"></i></a>reentersyscall</h4>
+<ul>
+<li>reentersyscall&#x4E3B;&#x8981;&#x662F;&#x505A;&#x4E09;&#x4EF6;&#x4E8B;:<ul>
+<li>&#x628A;PC,SP&#x4FDD;&#x5B58;&#x5230;&#x5F53;&#x524D;Goroutine.sched&#x91CC;&#x9762;;</li>
+<li>&#x89E3;&#x9664;M&#x4E0E;P&#x4E24;&#x8005;&#x4E4B;&#x95F4;&#x7684;&#x5173;&#x7CFB;;</li>
+<li>&#x8BBE;&#x7F6E;P&#x7684;&#x72B6;&#x6001;&#x4E3A;_Psyscall</li>
+</ul>
+</li>
+</ul>
+<pre><code class="lang-go"><span class="hljs-comment">/*
+- &#x628A;PC,SP&#x4FDD;&#x5B58;&#x5230;&#x5F53;&#x524D;Goroutine.sched&#x91CC;&#x9762;;
+- &#x89E3;&#x9664;M&#x4E0E;P&#x4E24;&#x8005;&#x4E4B;&#x95F4;&#x7684;&#x5173;&#x7CFB;;
+- &#x8BBE;&#x7F6E;P&#x7684;&#x72B6;&#x6001;&#x4E3A;_Psyscall
+*/</span>
+<span class="hljs-keyword">func</span> reentersyscall(pc, sp <span class="hljs-keyword">uintptr</span>) {
+    _g_ := getg() <span class="hljs-comment">// get Goroutine&#x7684;g</span>
+
+    <span class="hljs-comment">// Disable preemption because during this function g is in Gsyscall status,</span>
+    <span class="hljs-comment">// but can have inconsistent g-&gt;sched, do not let GC observe it.</span>
+    _g_.m.locks++ <span class="hljs-comment">// ++&#x5C31;&#x80FD;&#x8BA9;GC&#x4E0D;&#x80FD;&#x89C2;&#x5BDF;&#x5230;&#xFF1F;TODO zxc:</span>
+
+    <span class="hljs-comment">// Entersyscall must not call any function that might split/grow the stack.</span>
+    <span class="hljs-comment">// (See details in comment above.)</span>
+    <span class="hljs-comment">// Catch calls that might, by replacing the stack guard with something that</span>
+    <span class="hljs-comment">// will trip any stack check and leaving a flag to tell newstack to die.</span>
+    _g_.stackguard0 = stackPreempt <span class="hljs-comment">//&#x8FDB;&#x5165;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x524D;&#x5C31;&#x8BBE;&#x7F6E;&#x4E86;&#x62A2;&#x5360;&#x6807;&#x5FD7;&#x3002;</span>
+    _g_.throwsplit = <span class="hljs-literal">true</span>
+
+    <span class="hljs-comment">// Leave SP around for GC and traceback.</span>
+    save(pc, sp) <span class="hljs-comment">//&#x4FDD;&#x5B58;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x5230;&#x5F53;&#x524D;Goroutine&#x7684;sched&#x7ED3;&#x6784;&#x4F53;&#x3002;</span>
+    _g_.syscallsp = sp <span class="hljs-comment">//gc&#x4F7F;&#x7528;</span>
+    _g_.syscallpc = pc <span class="hljs-comment">//gc&#x4F7F;&#x7528;</span>
+    casgstatus(_g_, _Grunning, _Gsyscall) <span class="hljs-comment">// &#x4FEE;&#x6539;&#x72B6;&#x6001;</span>
+    <span class="hljs-keyword">if</span> _g_.syscallsp &lt; _g_.stack.lo || _g_.stack.hi &lt; _g_.syscallsp {
+        systemstack(<span class="hljs-keyword">func</span>() {
+            <span class="hljs-built_in">print</span>(<span class="hljs-string">&quot;entersyscall inconsistent &quot;</span>, hex(_g_.syscallsp), <span class="hljs-string">&quot; [&quot;</span>, hex(_g_.stack.lo), <span class="hljs-string">&quot;,&quot;</span>, hex(_g_.stack.hi), <span class="hljs-string">&quot;]\n&quot;</span>)
+            throw(<span class="hljs-string">&quot;entersyscall&quot;</span>)
+        })
+    }
+
+    <span class="hljs-keyword">if</span> trace.enabled {
+        systemstack(traceGoSysCall)
+        <span class="hljs-comment">// systemstack itself clobbers g.sched.{pc,sp} and we might</span>
+        <span class="hljs-comment">// need them later when the G is genuinely blocked in a</span>
+        <span class="hljs-comment">// syscall</span>
+        save(pc, sp)
+    }
+
+    <span class="hljs-keyword">if</span> atomic.Load(&amp;sched.sysmonwait) != <span class="hljs-number">0</span> {
+        systemstack(entersyscall_sysmon)
+        save(pc, sp)
+    }
+
+    <span class="hljs-keyword">if</span> _g_.m.p.ptr().runSafePointFn != <span class="hljs-number">0</span> {
+        <span class="hljs-comment">// runSafePointFn may stack split if run on this stack</span>
+        systemstack(runSafePointFn)
+        save(pc, sp)
+    }
+
+    _g_.m.syscalltick = _g_.m.p.ptr().syscalltick <span class="hljs-comment">//&#x628A;P&#x7684;syscalltick,&#x653E;&#x5230;m&#x4E2D;&#x3002;</span>
+    _g_.sysblocktraced = <span class="hljs-literal">true</span>
+    _g_.m.mcache = <span class="hljs-literal">nil</span>
+    pp := _g_.m.p.ptr()
+    pp.m = <span class="hljs-number">0</span> <span class="hljs-comment">// &#x89E3;&#x9664;P&#x4E0E;M&#x7684;&#x5173;&#x7CFB;&#x3002;</span>
+    _g_.m.oldp.set(pp) <span class="hljs-comment">// &#x628A;&#x73B0;&#x5728;&#x7684;P&#x653E;&#x5230;M&#x4E2D;&#x7684;oldp&#x4E2D;&#x3002;</span>
+    _g_.m.p = <span class="hljs-number">0</span> <span class="hljs-comment">// &#x89E3;&#x9664;M&#x4E0E;P&#x7684;&#x5173;&#x7CFB;&#x3002;</span>
+    atomic.Store(&amp;pp.status, _Psyscall) <span class="hljs-comment">// &#x4FEE;&#x6539;P&#x7684;&#x72B6;&#x6001;&#x4E3A;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x3002;</span>
+    <span class="hljs-keyword">if</span> sched.gcwaiting != <span class="hljs-number">0</span> {
+        systemstack(entersyscall_gcwait)
+        save(pc, sp)
+    }
+
+    _g_.m.locks-- <span class="hljs-comment">// --&#x89E3;&#x9664;&#x9501;&#x5B9A;&#x3002;</span>
+}
+</code></pre>
+<ul>
+<li><blockquote>
+<p>&#x8FD9;&#x91CC;&#x9700;&#x8981;&#x6CE8;&#x610F;&#x7684;&#x662F;&#xFF1A;&#x5728;&#x8FDB;&#x5165;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x7684;&#x65F6;&#x5019;&#xFF0C;&#x5B83;&#x662F;&#x6CA1;&#x6709;&#x8FDB;&#x884C;&#x81EA;&#x589E;&#x7684;&#xFF0C;&#x5B83;&#x662F;&#x5728;<code>exitsyscall()</code>&#x51FD;&#x6570;&#x624D;&#x5F00;&#x59CB;&#x8FDB;&#x884C;&#x81EA;&#x589E;&#x7684;&#xFF1B;</p>
+</blockquote>
+</li>
+<li><blockquote>
+<p>&#x8FD9;&#x4E2A;&#x5C31;&#x662F;&#x4E3A;&#x4E86;&#x5224;&#x65AD;P&#xFF0C;&#x5728;&#x5F53;&#x524D;Goroutine&#x8FDB;&#x5165;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#xFF0C;&#x5230;&#x8FD4;&#x56DE;&#x7684;&#x90A3;&#x4E00;&#x6BB5;&#x65F6;&#x95F4;&#xFF0C;&#x8FD9;&#x4E2A;P&#x6709;&#x53EF;&#x80FD;&#x53C8;&#x88AB;&#x5176;&#x4ED6;M&#x5173;&#x8054;&#xFF0C;&#x7136;&#x540E;&#x53C8;&#x8FDB;&#x5165;<em>Psyscall&#x72B6;&#x6001;&#xFF0C;```_g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick //&#x628A;P&#x7684;syscalltick,&#x653E;&#x5230;m&#x4E2D;&#x3002;```</p>
+</blockquote>
+</li>
+</ul>
+<h3 id="exitsyscall"><a name="exitsyscall" class="anchor-navigation-ex-anchor" href="#exitsyscall"><i class="fa fa-link" aria-hidden="true"></i></a>1.3.2. exitsyscall</h3>
+<ul>
+<li>&#x8FD9;&#x4E2A;&#x9000;&#x51FA;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#xFF1A;<ul>
+<li>&#x5C1D;&#x8BD5;&#x91CD;&#x65B0;&#x7ED1;&#x5B9A;oldp,&#x5982;&#x679C;&#x6CA1;&#x6709;&#x6210;&#x529F;&#xFF0C;&#x4ECE;&#x5168;&#x5C40;&#x7A7A;&#x95F2;P&#x961F;&#x5217;&#x83B7;&#x5F97;&#x4E00;&#x4E2A;P&#x3002;</li>
+<li>&#x5982;&#x679C;&#x8FD8;&#x662F;&#x5931;&#x8D25;&#xFF0C;mcall--&gt;exitsyscall0()&#xFF0C;<ul>
+<li>&#x5728;&#x8FD9;&#x4E2A;&#x91CC;&#x9762;&#x518D;&#x6B21;&#x4ECE;&#x5168;&#x5C40;&#x7A7A;&#x95F2;P&#x961F;&#x5217;&#x4E2D;&#x5C1D;&#x8BD5;&#x4E0B;&#xFF0C;&#x5982;&#x679C;&#x5931;&#x8D25;&#x5C31;&#x628A;Goroutine&#x653E;&#x5165;&#x5168;&#x5C40;&#x7A7A;&#x95F2;G&#x961F;&#x5217;;</li>
+<li>M&#x653E;&#x5165;&#x5168;&#x5C40;&#x7A7A;&#x95F2;M&#x961F;&#x5217;,&#x4F11;&#x7720;M;</li>
+<li>schedule().</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<pre><code class="lang-go">
+<span class="hljs-comment">/*
+&#x8FD9;&#x4E2A;&#x9000;&#x51FA;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#xFF1A;
+  - &#x5C1D;&#x8BD5;&#x91CD;&#x65B0;&#x7ED1;&#x5B9A;oldp,&#x5982;&#x679C;&#x6CA1;&#x6709;&#x6210;&#x529F;&#xFF0C;&#x4ECE;&#x5168;&#x5C40;&#x7A7A;&#x95F2;P&#x961F;&#x5217;&#x83B7;&#x5F97;&#x4E00;&#x4E2A;P&#x3002;
+  - &#x5982;&#x679C;&#x8FD8;&#x662F;&#x5931;&#x8D25;&#xFF0C;mcall--&gt;exitsyscall0()&#xFF0C;
+    - &#x5728;&#x8FD9;&#x4E2A;&#x91CC;&#x9762;&#x518D;&#x6B21;&#x4ECE;&#x5168;&#x5C40;&#x7A7A;&#x95F2;P&#x961F;&#x5217;&#x4E2D;&#x5C1D;&#x8BD5;&#x4E0B;&#xFF0C;&#x5982;&#x679C;&#x5931;&#x8D25;&#x5C31;&#x628A;Goroutine&#x653E;&#x5165;&#x5168;&#x5C40;&#x7A7A;&#x95F2;G&#x961F;&#x5217;;
+    - M&#x653E;&#x5165;&#x5168;&#x5C40;&#x7A7A;&#x95F2;M&#x961F;&#x5217;,&#x4F11;&#x7720;M;
+    - schedule().
+*/</span>
+<span class="hljs-keyword">func</span> exitsyscall() {
+    _g_ := getg()
+
+    _g_.m.locks++ <span class="hljs-comment">// see comment in entersyscall &#x9632;&#x6B62;GC&#xFF1F; TODO zxc:</span>
+    <span class="hljs-keyword">if</span> getcallersp() &gt; _g_.syscallsp {
+        throw(<span class="hljs-string">&quot;exitsyscall: syscall frame is no longer valid&quot;</span>)
+    }
+
+    _g_.waitsince = <span class="hljs-number">0</span>
+    oldp := _g_.m.oldp.ptr() <span class="hljs-comment">//&#x91CD;&#x65B0;&#x53D6;&#x51FA;oldp</span>
+    _g_.m.oldp = <span class="hljs-number">0</span>
+    <span class="hljs-keyword">if</span> exitsyscallfast(oldp) { <span class="hljs-comment">//&#x5982;&#x679C;&#x8FD4;&#x56DE;true&#xFF0C;&#x90A3;&#x4E48;M&#x4E0E;P&#x5728;&#x8FD9;&#x4E2A;&#x91CC;&#x9762;&#x5DF2;&#x7ECF;&#x91CD;&#x65B0;&#x5173;&#x8054;&#x4E86;&#x3002;</span>
+        <span class="hljs-keyword">if</span> _g_.m.mcache == <span class="hljs-literal">nil</span> {
+            throw(<span class="hljs-string">&quot;lost mcache&quot;</span>)
+        }
+        <span class="hljs-keyword">if</span> trace.enabled {
+            <span class="hljs-keyword">if</span> oldp != _g_.m.p.ptr() || _g_.m.syscalltick != _g_.m.p.ptr().syscalltick {
+                systemstack(traceGoStart)
+            }
+        }
+        <span class="hljs-comment">// There&apos;s a cpu for us, so we can run.</span>
+        _g_.m.p.ptr().syscalltick++ <span class="hljs-comment">//&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x5B8C;&#x6210;&#xFF0C;syscalltick&#x81EA;&#x589E;&#x3002;</span>
+        <span class="hljs-comment">// We need to cas the status and scan before resuming...</span>
+        casgstatus(_g_, _Gsyscall, _Grunning)
+
+        <span class="hljs-comment">// Garbage collector isn&apos;t running (since we are),</span>
+        <span class="hljs-comment">// so okay to clear syscallsp.</span>
+        _g_.syscallsp = <span class="hljs-number">0</span>
+        _g_.m.locks--
+        <span class="hljs-keyword">if</span> _g_.preempt {
+            <span class="hljs-comment">// restore the preemption request in case we&apos;ve cleared it in newstack</span>
+            _g_.stackguard0 = stackPreempt
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-comment">// otherwise restore the real _StackGuard, we&apos;ve spoiled it in entersyscall/entersyscallblock</span>
+            _g_.stackguard0 = _g_.stack.lo + _StackGuard <span class="hljs-comment">//&#x5728;entersyscall&#x91CC;&#x9762;&#x6211;&#x4EEC;&#x8BBE;&#x7F6E;_g_.stackguard0 = stackPreempt //&#x8FDB;&#x5165;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x524D;&#x5C31;&#x8BBE;&#x7F6E;&#x4E86;&#x62A2;&#x5360;&#x6807;&#x5FD7;&#x3002;&#x8FD9;&#x91CC;&#x8981;&#x6062;&#x590D;&#x3002;</span>
+        }
+        _g_.throwsplit = <span class="hljs-literal">false</span>
+
+        <span class="hljs-keyword">if</span> sched.disable.user &amp;&amp; !schedEnabled(_g_) {
+            <span class="hljs-comment">// Scheduling of this goroutine is disabled.</span>
+            Gosched()
+        }
+
+        <span class="hljs-keyword">return</span>
+    }
+
+    _g_.sysexitticks = <span class="hljs-number">0</span>
+    <span class="hljs-keyword">if</span> trace.enabled {
+        <span class="hljs-comment">// Wait till traceGoSysBlock event is emitted.</span>
+        <span class="hljs-comment">// This ensures consistency of the trace (the goroutine is started after it is blocked).</span>
+        <span class="hljs-keyword">for</span> oldp != <span class="hljs-literal">nil</span> &amp;&amp; oldp.syscalltick == _g_.m.syscalltick {
+            osyield()
+        }
+        <span class="hljs-comment">// We can&apos;t trace syscall exit right now because we don&apos;t have a P.</span>
+        <span class="hljs-comment">// Tracing code can invoke write barriers that cannot run without a P.</span>
+        <span class="hljs-comment">// So instead we remember the syscall exit time and emit the event</span>
+        <span class="hljs-comment">// in execute when we have a P.</span>
+        _g_.sysexitticks = cputicks()
+    }
+
+    _g_.m.locks--
+
+    <span class="hljs-comment">// Call the scheduler.</span>
+    mcall(exitsyscall0)
+
+    <span class="hljs-keyword">if</span> _g_.m.mcache == <span class="hljs-literal">nil</span> {
+        throw(<span class="hljs-string">&quot;lost mcache&quot;</span>)
+    }
+
+    <span class="hljs-comment">// Scheduler returned, so we&apos;re allowed to run now.</span>
+    <span class="hljs-comment">// Delete the syscallsp information that we left for</span>
+    <span class="hljs-comment">// the garbage collector during the system call.</span>
+    <span class="hljs-comment">// Must wait until now because until gosched returns</span>
+    <span class="hljs-comment">// we don&apos;t know for sure that the garbage collector</span>
+    <span class="hljs-comment">// is not running.</span>
+    _g_.syscallsp = <span class="hljs-number">0</span>
+    _g_.m.p.ptr().syscalltick++
+    _g_.throwsplit = <span class="hljs-literal">false</span>
+}
+</code></pre>
+<h5 id="exitsyscallfast"><a name="exitsyscallfast" class="anchor-navigation-ex-anchor" href="#exitsyscallfast"><i class="fa fa-link" aria-hidden="true"></i></a>exitsyscallfast</h5>
+<pre><code class="lang-go"><span class="hljs-comment">//go:nosplit</span>
+<span class="hljs-keyword">func</span> exitsyscallfast(oldp *p) <span class="hljs-keyword">bool</span> {
+    _g_ := getg()
+
+    <span class="hljs-comment">// Freezetheworld sets stopwait but does not retake P&apos;s.</span>
+    <span class="hljs-keyword">if</span> sched.stopwait == freezeStopWait {
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-comment">// Try to re-acquire the last P.</span>
+    <span class="hljs-keyword">if</span> oldp != <span class="hljs-literal">nil</span> &amp;&amp; oldp.status == _Psyscall &amp;&amp; atomic.Cas(&amp;oldp.status, _Psyscall, _Pidle) {
+        <span class="hljs-comment">/*
+            - &#x67E5;&#x770B;&#x8001;&#x7684;P&#x7684;&#x72B6;&#x6001;&#x662F;&#x5426;&#x662F;&#x6B63;&#x5904;&#x4E8E;_Psyscall;
+              - &#x4ECE;reentersyscall&#x91CC;&#x9762;&#x7684;&#x4E09;&#x4E2A;&#x6B65;&#x9AA4;&#xFF0C;&#x5F53;&#x5B83;&#x8BBE;&#x7F6E;&#x4E3A;_Psyscall, &#x5B83;&#x8FD9;&#x4E2A;&#x65F6;&#x5019;&#x662F;&#x6CA1;&#x6709;&#x4E0E;&#x4EFB;&#x4F55;M&#x76F8;&#x5173;&#x8054;&#x3002;
+              - &#x6240;&#x4EE5;&#x8FD9;&#x91CC;&#x5982;&#x679C;&#x53D1;&#x73B0;P&#x53C8;&#x5904;&#x4E8E;_psyscall&#xFF0C;&#x76F4;&#x63A5;&#x5173;&#x8054;&#x3002;
+        */</span>
+        <span class="hljs-comment">// There&apos;s a cpu for us, so we can run.</span>
+        wirep(oldp) <span class="hljs-comment">// &#x5173;&#x8054;M&#x548C;P&#xFF1B;&#x5F53;&#x524D;&#x7684;M&#x548C;&#x8FD9;&#x4E2A;oldp&#x3002;</span>
+        exitsyscallfast_reacquired()
+        <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+    }
+
+    <span class="hljs-comment">// Try to get any other idle P.</span>
+    <span class="hljs-keyword">if</span> sched.pidle != <span class="hljs-number">0</span> {
+        <span class="hljs-keyword">var</span> ok <span class="hljs-keyword">bool</span>
+        systemstack(<span class="hljs-keyword">func</span>() {
+            ok = exitsyscallfast_pidle()
+            <span class="hljs-keyword">if</span> ok &amp;&amp; trace.enabled {
+                <span class="hljs-keyword">if</span> oldp != <span class="hljs-literal">nil</span> {
+                    <span class="hljs-comment">// Wait till traceGoSysBlock event is emitted.</span>
+                    <span class="hljs-comment">// This ensures consistency of the trace (the goroutine is started after it is blocked).</span>
+                    <span class="hljs-keyword">for</span> oldp.syscalltick == _g_.m.syscalltick {
+                        osyield()
+                    }
+                }
+                traceGoSysExit(<span class="hljs-number">0</span>)
+            }
+        })
+        <span class="hljs-keyword">if</span> ok {
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">true</span>
+        }
+    }
+    <span class="hljs-keyword">return</span> <span class="hljs-literal">false</span>
+}
+</code></pre>
+<h6 id="exitsyscallfastreacquired"><a name="exitsyscallfastreacquired" class="anchor-navigation-ex-anchor" href="#exitsyscallfastreacquired"><i class="fa fa-link" aria-hidden="true"></i></a>exitsyscallfast_reacquired</h6>
+<pre><code class="lang-go">
+<span class="hljs-keyword">func</span> exitsyscallfast_reacquired() {
+    _g_ := getg()
+    <span class="hljs-keyword">if</span> _g_.m.syscalltick != _g_.m.p.ptr().syscalltick { <span class="hljs-comment">// &#x5982;&#x679C;&#x4ED6;&#x4EEC;&#x4E24;&#x8005;&#x4E0D;&#x76F8;&#x7B49;&#xFF0C;&#x90A3;&#x4E48;&#x8BF4;&#x660E;&#x8BE5;p&#x88AB;&#x6536;&#x56DE;&#xFF0C;&#x7136;&#x540E;&#x518D;&#x6B21;&#x8FDB;&#x5165;syscall(&#x56E0;&#x4E3A;_g_.m.syscalltick&#x53D8;&#x4E86;)</span>
+        <span class="hljs-keyword">if</span> trace.enabled {
+            <span class="hljs-comment">// The p was retaken and then enter into syscall again (since _g_.m.syscalltick has changed).</span>
+            <span class="hljs-comment">// traceGoSysBlock for this syscall was already emitted,</span>
+            <span class="hljs-comment">// but here we effectively retake the p from the new syscall running on the same p.</span>
+            systemstack(<span class="hljs-keyword">func</span>() {
+                <span class="hljs-comment">// Denote blocking of the new syscall.</span>
+                traceGoSysBlock(_g_.m.p.ptr())
+                <span class="hljs-comment">// Denote completion of the current syscall.</span>
+                traceGoSysExit(<span class="hljs-number">0</span>)
+            })
+        }
+        _g_.m.p.ptr().syscalltick++ <span class="hljs-comment">// &#x8FD9;&#x91CC;&#x53C8;&#x5F00;&#x59CB;&#x81EA;&#x589E;&#x4E86;---&gt;&#x56E0;&#x4E3A;&#x5B83;&#x5728;&#x8FDB;&#x5165;reentersyscall()&#x51FD;&#x6570;&#x662F;&#x4E0D;&#x80FD;&#x589E;&#x52A0;&#x8FD9;&#x4E2A;&#x503C;&#x7684;&#x3002;&#x53EA;&#x6709;&#x5F53;&#x9000;&#x51FA;exitsyscall()&#x51FD;&#x6570;&#x624D;&#x4F1A;&#x81EA;&#x589E;&#xFF0C;&#x6240;&#x4EE5;&#x5982;&#x679C;</span>
+    }
+}
+</code></pre>
+<h4 id="mcallexitsyscall0"><a name="mcallexitsyscall0" class="anchor-navigation-ex-anchor" href="#mcallexitsyscall0"><i class="fa fa-link" aria-hidden="true"></i></a>mcall(exitsyscall0)</h4>
+<pre><code class="lang-go"><span class="hljs-comment">// exitsyscall slow path on g0.</span>
+<span class="hljs-comment">// Failed to acquire P, enqueue gp as runnable.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//go:nowritebarrierrec</span>
+<span class="hljs-keyword">func</span> exitsyscall0(gp *g) {
+    _g_ := getg()
+
+    casgstatus(gp, _Gsyscall, _Grunnable) <span class="hljs-comment">//&#x4ECE;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x72B6;&#x6001;&#x8F6C;&#x53D8;&#x4E3A;&#x53EF;&#x8FD0;&#x884C;&#x72B6;&#x6001;</span>
+    dropg() <span class="hljs-comment">//&#x65AD;&#x5F00;M&#x4E0E;G&#x4E4B;&#x95F4;&#x7684;&#x5173;&#x7CFB;</span>
+    lock(&amp;sched.lock) <span class="hljs-comment">//&#x8981;&#x4FEE;&#x6539;&#x5168;&#x5C40;&#x7684;sched,&#x5148;&#x52A0;&#x9501;</span>
+    <span class="hljs-keyword">var</span> _p_ *p
+    <span class="hljs-keyword">if</span> schedEnabled(_g_) {
+        _p_ = pidleget() <span class="hljs-comment">//&#x4ECE;&#x5168;&#x5C40;&#x7A7A;&#x95F2;P&#x961F;&#x5217;&#x83B7;&#x53D6;&#x4E00;&#x4E2A;P</span>
+    }
+    <span class="hljs-keyword">if</span> _p_ == <span class="hljs-literal">nil</span> {
+        globrunqput(gp) <span class="hljs-comment">//&#x5982;&#x679C;&#x6CA1;&#x6709;&#x83B7;&#x53D6;P&#xFF0C;&#x90A3;&#x4E48;&#x628A;Goroutine&#x653E;&#x5165;&#x5168;&#x5C40;&#x7A7A;&#x95F2;g&#x961F;&#x5217;&#x3002;</span>
+    } <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> atomic.Load(&amp;sched.sysmonwait) != <span class="hljs-number">0</span> {
+        atomic.Store(&amp;sched.sysmonwait, <span class="hljs-number">0</span>)
+        notewakeup(&amp;sched.sysmonnote)
+    }
+    unlock(&amp;sched.lock)
+    <span class="hljs-keyword">if</span> _p_ != <span class="hljs-literal">nil</span> { <span class="hljs-comment">//&#x5982;&#x679C;&#x6709;&#x83B7;&#x53D6;&#x5230;P&#x3002;</span>
+        acquirep(_p_) <span class="hljs-comment">// &#x5173;&#x8054;P&#x4E0E;M</span>
+        execute(gp, <span class="hljs-literal">false</span>) <span class="hljs-comment">// Never returns. &#x76F4;&#x63A5;&#x6267;&#x884C;</span>
+    }
+    <span class="hljs-keyword">if</span> _g_.m.lockedg != <span class="hljs-number">0</span> { <span class="hljs-comment">// TODO zxc: &#x6211;&#x8BB0;&#x5F97;&#x662F;&#x8FD9;&#x4E2A;&#x67D0;&#x4E2A;g,&#x5FC5;&#x987B;&#x8FD0;&#x884C;&#x5728;&#x67D0;&#x4E2A;&#x7EBF;&#x7A0B;&#x4E0A;&#x9762;&#xFF0C;&#x6BD4;&#x5982;&#xFF0C;main.main.</span>
+        <span class="hljs-comment">// Wait until another thread schedules gp and so m again.</span>
+        stoplockedm()
+        execute(gp, <span class="hljs-literal">false</span>) <span class="hljs-comment">// Never returns.</span>
+    }
+    stopm() <span class="hljs-comment">//&#x505C;&#x6B62;M&#x3002;</span>
+    schedule() <span class="hljs-comment">// Never returns.</span>
+}
+</code></pre>
+<h2 id="syscalltick"><a name="syscalltick" class="anchor-navigation-ex-anchor" href="#syscalltick"><i class="fa fa-link" aria-hidden="true"></i></a>1.4. syscalltick</h2>
+<p>&#x8FD9;&#x4E2A;<code>syscalltick</code>;&#x53D1;&#x73B0;&#x4E0D;&#x662F;&#x6BCF;&#x6B21;&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x4E00;&#x6B21;&#xFF0C;&#x624D;&#x589E;&#x52A0;&#x4E00;&#x6B21;&#x3002;</p>
+<p>&#x5728;&#x6211;&#x4EEC;&#x8FD9;&#x91CC;&#xFF0C;</p>
+<ul>
+<li>entersystem<ul>
+<li><em>g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick</li>
+</ul>
+</li>
+<li>existsystem<ul>
+<li>exitsyscall&#x4E3B;&#x51FD;&#x6570;&#x91CC;&#x9762;&#x6709;&#x4E00;&#x6B21;;</li>
+<li>exitsyscallfast_reacquired&#x51FD;&#x6570;&#x53C8;&#x589E;&#x52A0;&#x4E86;&#x4E00;&#x6B21;.</li>
+</ul>
+</li>
+</ul>
+<p>// To ensure that traceGoSysExit is emitted strictly after traceGoSysBlock,
+// we remember current value of syscalltick in m (<em>g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick),
+// whoever emits traceGoSysBlock increments p.syscalltick afterwards;
+// and we wait for the increment before emitting traceGoSysExit.
+// Note that the increment is done even if tracing is not enabled,
+// because tracing can be enabled in the middle of syscall. We don&apos;t want the wait to hang.</p>
+<p>// &#x4E3A;&#x4E86;&#x786E;&#x4FDD;traceGoSysExit&#x4E25;&#x683C;&#x5728;traceGoSysBlock&#x4E4B;&#x540E;&#x53D1;&#x51FA;&#x3002;
+// &#x6211;&#x4EEC;&#x8BB0;&#x4F4F;m&#x4E2D;syscalltick&#x7684;&#x5F53;&#x524D;&#x503C;(<em>g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick)&#x3002;
+// &#x4E0D;&#x7BA1;&#x662F;&#x8C01;&#x53D1;&#x51FA;traceGoSysBlock&#xFF0C;&#x90FD;&#x4F1A;&#x5728;&#x4E4B;&#x540E;&#x589E;&#x91CF;p.syscalltick&#x3002;
+// &#x6211;&#x4EEC;&#x7B49;&#x5F85;&#x589E;&#x91CF;&#x540E;&#x518D;&#x53D1;&#x51FA; traceGoSysExit&#x3002;
+// &#x6CE8;&#x610F;&#xFF0C;&#x5373;&#x4F7F;&#x6CA1;&#x6709;&#x542F;&#x7528;&#x8DDF;&#x8E2A;&#xFF0C;&#x589E;&#x91CF;&#x4E5F;&#x4F1A;&#x88AB;&#x5B8C;&#x6210;&#x3002;
+// &#x56E0;&#x4E3A;&#x8DDF;&#x8E2A;&#x53EF;&#x4EE5;&#x5728;syscall&#x4E2D;&#x95F4;&#x542F;&#x7528;&#x3002;&#x6211;&#x4EEC;&#x4E0D;&#x5E0C;&#x671B;&#x7B49;&#x5F85;&#x88AB;&#x6302;&#x8D77;&#x3002;</p>
+<p>&#x5728;&#x8FD9;&#x4E2A;&#x89E3;&#x91CA;&#x91CC;&#x9762;,&#x53D1;&#x73B0;&#x8DDF;&#x8E2A;&#x7684;&#x65F6;&#x5019;&#x4E5F;&#x4F1A;<code>syscalltick</code></p>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200923134905.png" alt="syscall&#x8FD4;&#x56DE;"></p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="2.3.1.运行用户代码时间过长调度.html" class="navigation navigation-prev " aria-label="Previous page: 运行用户代码时间过长调度">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="../3.调度循环/3.3.调度循环.html" class="navigation navigation-next " aria-label="Next page: 3.调度循环">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"系统调用收尾,如果从系统调用返回,如何重新得到P","date":"2020-06-23T20:50:00.000Z","tags":["golang","goroutine"],"categories":["golang调度"],"toc":true,"level":"1.6.2.4","depth":3,"next":{"title":"3.调度循环","level":"1.6.3","depth":2,"path":"part3.调度/3.调度循环/3.3.调度循环.md","ref":"part3.调度/3.调度循环/3.3.调度循环.md","articles":[{"title":"调度循环","level":"1.6.3.1","depth":3,"path":"part3.调度/3.调度循环/3.3.调度循环.md","ref":"part3.调度/3.调度循环/3.3.调度循环.md","articles":[]}]},"previous":{"title":"运行用户代码时间过长调度","level":"1.6.2.3","depth":3,"path":"part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.md","ref":"part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.md","articles":[]},"dir":"ltr"},"config":{"plugins":["-page-toc-button","-toc2","anchor-navigation-ex"],"styles":{"website":"./styles/website.css"},"pluginsConfig":{"search":{},"toc2":{"addClass":true,"className":"toc"},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"fontsettings":{"theme":"white","family":"sans","size":2},"highlight":{},"anchor-navigation-ex":{"associatedWithSummary":true,"float":{"floatIcon":"fa fa-navicon","level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"mode":"float","multipleH1":true,"pageTop":{"level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"printLog":false,"showGoTop":true,"showLevel":true},"page-toc-button":{"maxTocDepth":2,"minTocSize":2},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"theme":"default","author":"zput","pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"variables":{},"title":"golang goroutine详解","language":"zh-hans","links":{"sidebar":{"zput|堆排序":"https://zput.github.io"}},"gitbook":"3.2.3","description":"select * from learn"},"file":{"path":"part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.md","mtime":"2021-03-28T09:04:44.796Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2021-03-28T09:05:35.583Z"},"basePath":"../..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../../gitbook/gitbook.js"></script>
+    <script src="../../gitbook/theme.js"></script>
+    
+        
+        <script src="../../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

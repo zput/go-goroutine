@@ -1,0 +1,541 @@
+
+<!DOCTYPE HTML>
+<html lang="zh-hans" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>总结 · golang goroutine详解</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        <meta name="author" content="zput">
+        
+        
+    
+    <link rel="stylesheet" href="../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-anchor-navigation-ex/style/plugin.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    
+    <link rel="prev" href="3.调度循环/3.3.调度循环.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="输入并搜索" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+    
+        
+        <li>
+            <a href="https://zput.github.io" target="_blank" class="custom-link">zput|堆排序</a>
+        </li>
+    
+    
+
+    
+    <li class="divider"></li>
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    大纲
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    第一部分 基础知识
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.3.1" data-path="../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    汇编基础
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="../part0.基础知识/2.内存.html">
+            
+                <a href="../part0.基础知识/2.内存.html">
+            
+                    
+                    内存
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    第二部分 进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.4.1" data-path="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    第三部分 退出goroutine
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.5.1" data-path="../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    退出goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <span>
+            
+                    
+                    第四部分 调度
+            
+                </span>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1" data-path="1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    1.调度策略
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1.1" data-path="1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    从本地队列或全局队列获取goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.1.2" data-path="1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                <a href="1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                    
+                    盗取goroutine从其他队列
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2" data-path="2.调度的时机/2.1.主动调度.html">
+            
+                <a href="2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    2.调度的时机
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.2.1" data-path="2.调度的时机/2.1.主动调度.html">
+            
+                <a href="2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    主动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.2" data-path="2.调度的时机/2.2.被动调度.html">
+            
+                <a href="2.调度的时机/2.2.被动调度.html">
+            
+                    
+                    被动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.3" data-path="2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                <a href="2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                    
+                    运行用户代码时间过长调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.4" data-path="2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                <a href="2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                    
+                    系统调用收尾,如果从系统调用返回,如何重新得到P
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.3" data-path="3.调度循环/3.3.调度循环.html">
+            
+                <a href="3.调度循环/3.3.调度循环.html">
+            
+                    
+                    3.调度循环
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.3.1" data-path="3.调度循环/3.3.调度循环.html">
+            
+                <a href="3.调度循环/3.3.调度循环.html">
+            
+                    
+                    调度循环
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.6.4" data-path="总结.html">
+            
+                <a href="总结.html">
+            
+                    
+                    总结
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            本书使用 GitBook 发布
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href=".." >总结</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <ul>
+<li>&#x8C03;&#x5EA6;&#x65F6;&#x673A;&#x603B;&#x7ED3;: &#x5230;&#x8FD9;&#x91CC;&#x6211;&#x4EEC;&#x7684;&#x8C03;&#x5EA6;&#x65F6;&#x673A;&#x5C31;&#x603B;&#x7ED3;&#x5B8C;&#x4E86;&#xFF0C;&#x4E3B;&#x8981;&#x662F;&#x4EC0;&#x4E48;&#x65F6;&#x5019;&#x53D1;&#x751F;&#x8C03;&#x5EA6;:<ul>
+<li>&#x4E3B;&#x52A8;&#x8C03;&#x5EA6;</li>
+<li>&#x88AB;&#x52A8;&#x8C03;&#x5EA6;</li>
+<li>&#x5265;&#x593A;&#x8C03;&#x5EA6;<ul>
+<li>&#x8FD0;&#x884C;&#x65F6;&#x95F4;&#x8FC7;&#x957F;</li>
+<li>&#x7CFB;&#x7EDF;&#x8C03;&#x7528;&#x88AB;&#x5265;&#x593A;P</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/goroutine%E8%B0%83%E5%BA%A6.png" alt="goroutine&#x8C03;&#x5EA6;&#x65F6;&#x673A;&#x603B;&#x7ED3;"></p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="3.调度循环/3.3.调度循环.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page: 调度循环">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"总结","date":"2020-04-02T11:03:00.000Z","tags":["golang","goroutine"],"categories":["golang调度"],"toc":true,"level":"1.6.4","depth":2,"previous":{"title":"调度循环","level":"1.6.3.1","depth":3,"path":"part3.调度/3.调度循环/3.3.调度循环.md","ref":"part3.调度/3.调度循环/3.3.调度循环.md","articles":[]},"dir":"ltr"},"config":{"plugins":["-page-toc-button","-toc2","anchor-navigation-ex"],"styles":{"website":"./styles/website.css"},"pluginsConfig":{"search":{},"toc2":{"addClass":true,"className":"toc"},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"fontsettings":{"theme":"white","family":"sans","size":2},"highlight":{},"anchor-navigation-ex":{"associatedWithSummary":true,"float":{"floatIcon":"fa fa-navicon","level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"mode":"float","multipleH1":true,"pageTop":{"level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"printLog":false,"showGoTop":true,"showLevel":true},"page-toc-button":{"maxTocDepth":2,"minTocSize":2},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"theme":"default","author":"zput","pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"variables":{},"title":"golang goroutine详解","language":"zh-hans","links":{"sidebar":{"zput|堆排序":"https://zput.github.io"}},"gitbook":"3.2.3","description":"select * from learn"},"file":{"path":"part3.调度/总结.md","mtime":"2021-03-28T09:04:44.796Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2021-03-28T09:05:35.583Z"},"basePath":"..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../gitbook/gitbook.js"></script>
+    <script src="../gitbook/theme.js"></script>
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

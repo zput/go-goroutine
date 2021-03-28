@@ -1,0 +1,826 @@
+
+<!DOCTYPE HTML>
+<html lang="zh-hans" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>1.调度策略 · golang goroutine详解</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        <meta name="author" content="zput">
+        
+        
+    
+    <link rel="stylesheet" href="../../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-anchor-navigation-ex/style/plugin.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="1.1.从本地队列或全局队列获取goroutine.html" />
+    
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="输入并搜索" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+    
+        
+        <li>
+            <a href="https://zput.github.io" target="_blank" class="custom-link">zput|堆排序</a>
+        </li>
+    
+    
+
+    
+    <li class="divider"></li>
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../../">
+            
+                <a href="../../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="../../">
+            
+                <a href="../../">
+            
+                    
+                    大纲
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="../../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    第一部分 基础知识
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.3.1" data-path="../../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    汇编基础
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="../../part0.基础知识/2.内存.html">
+            
+                <a href="../../part0.基础知识/2.内存.html">
+            
+                    
+                    内存
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    第二部分 进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.4.1" data-path="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    第三部分 退出goroutine
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.5.1" data-path="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    退出goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <span>
+            
+                    
+                    第四部分 调度
+            
+                </span>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter active" data-level="1.6.1" data-path="1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    1.调度策略
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter active" data-level="1.6.1.1" data-path="1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    从本地队列或全局队列获取goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.1.2" data-path="1.2.盗取goroutine从其他队列.html">
+            
+                <a href="1.2.盗取goroutine从其他队列.html">
+            
+                    
+                    盗取goroutine从其他队列
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2" data-path="../2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    2.调度的时机
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.2.1" data-path="../2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    主动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.2" data-path="../2.调度的时机/2.2.被动调度.html">
+            
+                <a href="../2.调度的时机/2.2.被动调度.html">
+            
+                    
+                    被动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.3" data-path="../2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                <a href="../2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                    
+                    运行用户代码时间过长调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.4" data-path="../2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                <a href="../2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                    
+                    系统调用收尾,如果从系统调用返回,如何重新得到P
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.3" data-path="../3.调度循环/3.3.调度循环.html">
+            
+                <a href="../3.调度循环/3.3.调度循环.html">
+            
+                    
+                    3.调度循环
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.3.1" data-path="../3.调度循环/3.3.调度循环.html">
+            
+                <a href="../3.调度循环/3.3.调度循环.html">
+            
+                    
+                    调度循环
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.4" data-path="../总结.html">
+            
+                <a href="../总结.html">
+            
+                    
+                    总结
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            本书使用 GitBook 发布
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="../.." >1.调度策略</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <div id="anchor-navigation-ex-navbar"><i class="fa fa-navicon"></i><ul><ul><li><span class="title-icon "></span><a href="#&#x5206;&#x6790;schedule&#x51FD;&#x6570;"><b>1.1. </b>&#x5206;&#x6790;schedule&#x51FD;&#x6570;</a></li><ul><li><span class="title-icon "></span><a href="#&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine"><b>1.1.1. </b>&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine</a></li><li><span class="title-icon "></span><a href="#&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x5F53;&#x524D;&#x7EBF;&#x7A0B;&#x4E2D;&#x83B7;&#x53D6;goroutine"><b>1.1.2. </b>&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;(&#x5F53;&#x524D;&#x7EBF;&#x7A0B;)&#x4E2D;&#x83B7;&#x53D6;Goroutine</a></li><li><span class="title-icon "></span><a href="#p&#x7684;&#x672C;&#x5730;&#x961F;&#x5217;&#x662F;&#x600E;&#x4E48;&#x6784;&#x6210;&#x7684;"><b>1.1.3. </b>P&#x7684;&#x672C;&#x5730;&#x961F;&#x5217;&#x662F;&#x600E;&#x4E48;&#x6784;&#x6210;&#x7684;</a></li></ul></ul></ul></div><a href="#" id="anchorNavigationExGoTop"><i class="fa fa-arrow-up"></i></a><h2 id="&#x5206;&#x6790;schedule&#x51FD;&#x6570;"><a name="&#x5206;&#x6790;schedule&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#&#x5206;&#x6790;schedule&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1. &#x5206;&#x6790;schedule&#x51FD;&#x6570;</h2>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/schedule(" alt="schedule()&#x51FD;&#x6570;">%E5%87%BD%E6%95%B0.png)</p>
+<p><a href="">src/runtime/proc.go</a></p>
+<pre><code class="lang-go"><span class="hljs-comment">// One round of scheduler: find a runnable goroutine and execute it.</span>
+<span class="hljs-comment">// Never returns.</span>
+<span class="hljs-keyword">func</span> schedule() {
+    _g_ := getg()
+
+    <span class="hljs-comment">//...</span>
+
+top:
+    <span class="hljs-comment">//...</span>
+
+    <span class="hljs-keyword">var</span> gp *g
+    <span class="hljs-keyword">var</span> inheritTime <span class="hljs-keyword">bool</span>
+
+    <span class="hljs-comment">//...</span>
+
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> {
+        <span class="hljs-comment">// Check the global runnable queue once in a while to ensure fairness.</span>
+        <span class="hljs-comment">// Otherwise two goroutines can completely occupy the local runqueue</span>
+        <span class="hljs-comment">// by constantly respawning each other.</span>
+        <span class="hljs-keyword">if</span> _g_.m.p.ptr().schedtick%<span class="hljs-number">61</span> == <span class="hljs-number">0</span> &amp;&amp; sched.runqsize &gt; <span class="hljs-number">0</span> { <span class="hljs-comment">//schedtick&#x5C31;&#x662F;&#x8C03;&#x5EA6;&#x6B21;&#x6570;,&#x5982;&#x679C;&#x80FD;&#x88AB;61&#x6574;&#x9664;&#x4E14;&#x5168;&#x5C40;&#x7684;Goroutine&#x961F;&#x5217;&#x4E0D;&#x4E3A;&#x7A7A;&#x5C31;&#x5C1D;&#x8BD5;&#x83B7;&#x53D6;</span>
+            lock(&amp;sched.lock)
+            gp = globrunqget(_g_.m.p.ptr(), <span class="hljs-number">1</span>)     <span class="hljs-comment">//&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine</span>
+            unlock(&amp;sched.lock)
+        }
+    }
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> {
+        gp, inheritTime = runqget(_g_.m.p.ptr())  <span class="hljs-comment">//&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;(&#x5F53;&#x524D;&#x7EBF;&#x7A0B;)&#x4E2D;&#x83B7;&#x53D6;goroutine</span>
+        <span class="hljs-keyword">if</span> gp != <span class="hljs-literal">nil</span> &amp;&amp; _g_.m.spinning {
+            throw(<span class="hljs-string">&quot;schedule: spinning with local work&quot;</span>)
+        }
+    }
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> {
+        <span class="hljs-comment">/*
+         &#x5219;&#x8C03;&#x7528;findrunnable&#x51FD;&#x6570;&#x4ECE;&#x5176;&#x5B83;&#x5DE5;&#x4F5C;&#x7EBF;&#x7A0B;&#x7684;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x5077;&#x53D6;&#xFF0C;&#x5982;&#x679C;&#x5077;&#x53D6;&#x4E0D;&#x5230;&#xFF0C;&#x5219;&#x5F53;&#x524D;&#x5DE5;&#x4F5C;&#x7EBF;&#x7A0B;&#x8FDB;&#x5165;&#x7761;&#x7720;,
+         &#x76F4;&#x5230;&#x83B7;&#x53D6;&#x5230;&#x9700;&#x8981;&#x8FD0;&#x884C;&#x7684;goroutine&#x4E4B;&#x540E;findrunnable&#x51FD;&#x6570;&#x624D;&#x4F1A;&#x8FD4;&#x56DE;.
+        */</span>
+        gp, inheritTime = findrunnable() <span class="hljs-comment">// blocks until work is available</span>
+    }
+
+    <span class="hljs-comment">// This thread is going to run a goroutine and is not spinning anymore,</span>
+    <span class="hljs-comment">// so if it was marked as spinning we need to reset it now and potentially</span>
+    <span class="hljs-comment">// start a new spinning M.</span>
+    <span class="hljs-keyword">if</span> _g_.m.spinning {
+        resetspinning()
+    }
+
+    <span class="hljs-comment">//...</span>
+
+    execute(gp, inheritTime)
+}
+</code></pre>
+<ul>
+<li>schedule&#x51FD;&#x6570;&#x6309;&#x987A;&#x5E8F;&#x5206;&#x4E09;&#x6B65;&#x5206;&#x522B;&#x6765;&#x83B7;&#x53D6;&#x53EF;&#x8FD0;&#x884C;&#x7684;Goroutine: &#x5168;&#x5C40;&#x961F;&#x5217;&#xFF0C;&#x672C;&#x5730;G&#x961F;&#x5217;&#x548C;&#x5176;&#x4ED6;P&#x4E0A;&#x9762;&#x7684;G&#x961F;&#x5217;<ul>
+<li>&#x7B2C;&#x4E00;&#x6B65;:&#x4ECE;&#x5168;&#x5C40;&#x8FD0;&#x884C;G&#x961F;&#x5217;&#x4E2D;&#x5BFB;&#x627E;Goroutine&#x3002;<ul>
+<li>&#x56E0;&#x4E3A;&#x5168;&#x5C40;&#x4E0A;&#x9762;&#x62FF;Goroutine&#x662F;&#x9700;&#x8981;&#x52A0;&#x9501;&#x7684;,&#x5C3D;&#x91CF;&#x5C11;&#x4ECE;&#x4E0A;&#x9762;&#x62FF;;</li>
+<li>&#x6240;&#x4EE5;&#x5F53;&#x4E00;&#x4E2A;P&#x8C03;&#x5EA6;&#x4E86;61&#x6B21;&#x4E4B;&#x540E;&#x4E14;&#x5168;&#x5C40;&#x7684;Goroutine&#x961F;&#x5217;&#x4E0D;&#x4E3A;&#x7A7A;&#xFF0C;&#x4E3A;&#x4E86;&#x4FDD;&#x8BC1;&#x8C03;&#x5EA6;&#x80FD;&#x8FD0;&#x884C;&#x5168;&#x5C40;G&#x961F;&#x5217;&#xFF0C;&#x6240;&#x4EE5;&#x5C1D;&#x8BD5;&#x8C03;&#x5EA6;&#x4E00;&#x4E0B;&#x3002;</li>
+</ul>
+</li>
+<li>&#x7B2C;&#x4E8C;&#x6B65;:&#x4ECE;&#x5DE5;&#x4F5C;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;[&#x5176;&#x5B9E;&#x5C31;&#x662F;&#x5F53;&#x524D;&#x7EBF;&#x7A0B;&#x5173;&#x8054;&#x7684;P&#x4E0A;&#x9762;&#x7684;&#x8FD0;&#x884C;G&#x961F;&#x5217;&#xFF0C;&#x56E0;&#x4E3A;&#x4E00;&#x4E2A;P&#x5728;&#x540C;&#x4E00;&#x65F6;&#x523B;&#x53EA;&#x80FD;&#x4E0E;&#x4E00;&#x4E2A;M&#x5173;&#x8054;&#xFF0C;&#x6B64;&#x65F6;&#x5C31;&#x4E0D;&#x9700;&#x8981;&#x52A0;&#x9501;]&#x4E2D;&#x5BFB;&#x627E;Goroutine&#x3002;</li>
+<li>&#x7B2C;&#x4E09;&#x6B65;:&#x4ECE;P&#x7684;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x5077;&#x53D6;Goroutine&#x3002;&#x5982;&#x679C;&#x4E0A;&#x4E00;&#x6B65;&#x4E5F;&#x6CA1;&#x6709;&#xFF0C;&#x5219;&#x8C03;&#x7528;findrunnable&#x4ECE;&#x5176;&#x4ED6;&#x5DE5;&#x4F5C;&#x7EBF;&#x7A0B;&#x7684;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x5077;&#x53D6;Goroutine&#xFF0C;&#x5728;&#x5077;&#x53D6;&#x4E4B;&#x524D;,findrunnable&#x51FD;&#x6570;&#x4F1A;&#x518D;&#x6B21;&#x5C1D;&#x8BD5;&#x4ECE;&#x5168;&#x5C40;&#x8FD0;&#x884C;G&#x961F;&#x5217;&#x548C;&#x5F53;&#x524D;P&#x8FD0;&#x884C;G&#x961F;&#x5217;&#x4E2D;&#x67E5;&#x627E;&#x9700;&#x8981;&#x8FD0;&#x884C;&#x7684;Goroutine&#x3002;</li>
+</ul>
+</li>
+</ul>
+<h3 id="&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine"><a name="&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine" class="anchor-navigation-ex-anchor" href="#&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.1. &#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x83B7;&#x53D6;goroutine</h3>
+<pre><code class="lang-go"><span class="hljs-comment">// Try get a batch of G&apos;s from the global runnable queue.</span>
+<span class="hljs-comment">// Sched must be locked.</span>
+<span class="hljs-keyword">func</span> globrunqget(_p_ *p, max <span class="hljs-keyword">int32</span>) *g {
+    <span class="hljs-keyword">if</span> sched.runqsize == <span class="hljs-number">0</span> {  <span class="hljs-comment">//&#x5982;&#x679C;&#x5168;&#x5C40;&#x7684;G&#x961F;&#x5217;&#x4E3A;&#x7A7A;,&#x76F4;&#x63A5;&#x8FD4;&#x56DE;nil</span>
+       <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>
+    }
+
+    <span class="hljs-comment">/*
+        - &#x5982;&#x679C;gomaxprocs==1;sched.runqsize==1;
+        - &#x5BFC;&#x81F4;(n==2)&gt;sched.runqsize[&#x5168;&#x5C40;&#x7684;&#x961F;&#x5217;&#x957F;&#x5EA6;1];
+        - &#x9700;&#x8981;&#x5224;&#x65AD;&#x4E0B;&#xFF0C;&#x53D6;&#x4E24;&#x8005;&#x5C11;&#x7684;&#x6570;;
+    */</span>
+    n := sched.runqsize/gomaxprocs + <span class="hljs-number">1</span> <span class="hljs-comment">//&#x6309;&#x7167;P&#x7684;&#x6570;&#x91CF;&#x5E73;&#x5206;&#x5168;&#x5C40;&#x961F;&#x5217;</span>
+    <span class="hljs-keyword">if</span> n &gt; sched.runqsize { <span class="hljs-comment">//</span>
+        n = sched.runqsize <span class="hljs-comment">//&#x53D6;&#x4E24;&#x8005;&#x5C11;&#x7684;&#x6570;</span>
+    }
+    <span class="hljs-keyword">if</span> max &gt; <span class="hljs-number">0</span> &amp;&amp; n &gt; max {
+        n = max <span class="hljs-comment">//&#x53D6;&#x4E24;&#x8005;&#x5C11;&#x7684;&#x6570;</span>
+    }
+
+    <span class="hljs-keyword">if</span> n &gt; <span class="hljs-keyword">int32</span>(<span class="hljs-built_in">len</span>(_p_.runq))/<span class="hljs-number">2</span> {  <span class="hljs-comment">//&#x53D6;&#x672C;&#x5730;&#x961F;&#x5217;&#x7684;&#x4E00;&#x534A;&#x957F;&#x6700;&#x591A;</span>
+        n = <span class="hljs-keyword">int32</span>(<span class="hljs-built_in">len</span>(_p_.runq)) / <span class="hljs-number">2</span>
+    }
+
+    sched.runqsize -= n
+
+    gp := sched.runq.pop() <span class="hljs-comment">//&#x8FD4;&#x56DE;&#x7B2C;&#x4E00;&#x4E2A;,&#x5176;&#x4ED6;&#x653E;&#x5165;&#x672C;&#x5730;&#x961F;&#x5217;</span>
+    n--
+    <span class="hljs-keyword">for</span> ; n &gt; <span class="hljs-number">0</span>; n-- {
+        gp1 := sched.runq.pop()
+        runqput(_p_, gp1, <span class="hljs-literal">false</span>) <span class="hljs-comment">//-------------------------here</span>
+        <span class="hljs-comment">/*
+        &#x8FD9;&#x91CC;&#x5982;&#x679C;put G&#x5230;&#x672C;&#x5730;&#x6EE1;&#x4E86;,&#x5B83;&#x53C8;&#x4F1A;put&#x5230;&#x5168;&#x5C40;.
+        If the run queue is full, runnext puts g on the global queue.
+        */</span>
+    }
+    <span class="hljs-keyword">return</span> gp
+    }
+</code></pre>
+<p>&#x4ECE;&#x4E0A;&#x9762;&#x7684;&#x6CE8;&#x91CA;&#x5F88;&#x5BB9;&#x6613;&#x770B;&#x61C2;,&#x53EA;&#x6709;&#x4E00;&#x4E2A;&#x9700;&#x8981;&#x6CE8;&#x610F;,<code>-------------------------here</code></p>
+<ul>
+<li><strong>&#x53D6;&#x672C;&#x5730;&#x961F;&#x5217;&#x7684;&#x4E00;&#x534A;&#x957F;&#x6700;&#x591A;</strong><ul>
+<li>&#x5982;&#x679C;&#x672C;&#x8EAB;&#x672C;&#x5730;&#x961F;&#x5217;&#x5C31;&#x662F;&#x5FEB;&#x6EE1;&#x4E86;,&#x540E;&#x9762;for&#x5FAA;&#x73AF;&#x7EE7;&#x7EED;&#x52A0;&#x5C31;&#x4F1A;&#x5BFC;&#x81F4;&#x672C;&#x5730;&#x961F;&#x5217;&#x6EE1;&#x4E86;;</li>
+<li>&#x6240;&#x4EE5;<code>runqput</code>&#x51FD;&#x6570;&#x53C8;&#x4F1A;&#x628A;<code>Goroutine</code>&#x52A0;&#x5230;&#x5168;&#x5C40;&#x91CC;&#x9762;&#x53BB;.</li>
+</ul>
+</li>
+</ul>
+<h5 id="runqput"><a name="runqput" class="anchor-navigation-ex-anchor" href="#runqput"><i class="fa fa-link" aria-hidden="true"></i></a>runqput</h5>
+<pre><code class="lang-go"><span class="hljs-comment">/*
+- runqput&#x5C1D;&#x8BD5;&#x5C06;g&#x653E;&#x5728;&#x672C;&#x5730;&#x53EF;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x3002;
+  1. &gt;&#x5982;&#x679C; next &#x4E3A; false&#xFF0C;runqput &#x5C06; g &#x52A0;&#x5230;&#x53EF;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x7684;&#x5C3E;&#x90E8;&#x3002;
+  2. &#x5982;&#x679C; next &#x4E3A;&#x771F;&#xFF0C;runqput &#x5C06; g &#x653E;&#x5728; _p_.runnext &#x69FD;&#x4E2D;&#x3002;
+  3. &#x5982;&#x679C;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x6EE1;&#x4E86;&#xFF0C;runnext&#x5C31;&#x628A;g&#x653E;&#x5230;&#x5168;&#x5C40;&#x961F;&#x5217;&#x4E2D;&#x3002;
+*/</span>
+<span class="hljs-keyword">func</span> runqput(_p_ *p, gp *g, next <span class="hljs-keyword">bool</span>) {
+    <span class="hljs-keyword">if</span> randomizeScheduler &amp;&amp; next &amp;&amp; fastrand()%<span class="hljs-number">2</span> == <span class="hljs-number">0</span> {
+        next = <span class="hljs-literal">false</span>
+    }
+
+    <span class="hljs-keyword">if</span> next { <span class="hljs-comment">//&#x7B2C;&#x4E8C;&#x6B65;&#x6240;&#x8BF4;&#x7684;</span>
+    retryNext:
+        oldnext := _p_.runnext
+        <span class="hljs-keyword">if</span> !_p_.runnext.cas(oldnext, guintptr(unsafe.Pointer(gp))) {
+            <span class="hljs-keyword">goto</span> retryNext
+        }
+        <span class="hljs-keyword">if</span> oldnext == <span class="hljs-number">0</span> {
+            <span class="hljs-keyword">return</span>
+        }
+        <span class="hljs-comment">// Kick the old runnext out to the regular run queue.</span>
+        gp = oldnext.ptr()
+    }
+
+retry:
+    h := atomic.LoadAcq(&amp;_p_.runqhead) <span class="hljs-comment">// load-acquire, synchronize with consumers</span>
+    t := _p_.runqtail
+    <span class="hljs-keyword">if</span> t-h &lt; <span class="hljs-keyword">uint32</span>(<span class="hljs-built_in">len</span>(_p_.runq)) {
+        _p_.runq[t%<span class="hljs-keyword">uint32</span>(<span class="hljs-built_in">len</span>(_p_.runq))].set(gp)
+        atomic.StoreRel(&amp;_p_.runqtail, t+<span class="hljs-number">1</span>) <span class="hljs-comment">// store-release, makes the item available for consumption</span>
+        <span class="hljs-keyword">return</span>
+    }
+    <span class="hljs-keyword">if</span> runqputslow(_p_, gp, h, t) {
+        <span class="hljs-keyword">return</span>
+    }
+    <span class="hljs-comment">// the queue is not full, now the put above must succeed</span>
+    <span class="hljs-keyword">goto</span> retry
+}
+</code></pre>
+<h3 id="&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x5F53;&#x524D;&#x7EBF;&#x7A0B;&#x4E2D;&#x83B7;&#x53D6;goroutine"><a name="&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x5F53;&#x524D;&#x7EBF;&#x7A0B;&#x4E2D;&#x83B7;&#x53D6;goroutine" class="anchor-navigation-ex-anchor" href="#&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x5F53;&#x524D;&#x7EBF;&#x7A0B;&#x4E2D;&#x83B7;&#x53D6;goroutine"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.2. &#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;(&#x5F53;&#x524D;&#x7EBF;&#x7A0B;)&#x4E2D;&#x83B7;&#x53D6;Goroutine</h3>
+<ul>
+<li>&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x5176;&#x5B9E;&#x5206;&#x4E3A;&#x4E24;&#x4E2A;&#x90E8;&#x5206;:<ul>
+<li>&#x4E00;&#x90E8;&#x5206;&#x662F;&#x7531;P&#x7684;<code>runq</code>&#x3001;<code>runqhead</code>&#x548C;<code>runqtail</code>&#x8FD9;&#x4E09;&#x4E2A;&#x6210;&#x5458;&#x7EC4;&#x6210;&#x7684;&#x4E00;&#x4E2A;<strong>&#x65E0;&#x9501;&#x5FAA;&#x73AF;&#x961F;&#x5217;</strong>&#xFF0C;&#x8BE5;&#x961F;&#x5217;&#x6700;&#x591A;&#x53EF;&#x5305;&#x542B;256&#x4E2A;<code>Goroutine</code>;</li>
+<li>&#x53E6;&#x4E00;&#x90E8;&#x5206;&#x662F;P&#x7684;<code>runnext</code>&#x6210;&#x5458;&#xFF0C;&#x5B83;&#x662F;&#x4E00;&#x4E2A;&#x6307;&#x5411;g&#x7ED3;&#x6784;&#x4F53;&#x5BF9;&#x8C61;&#x7684;&#x6307;&#x9488;&#xFF0C;&#x5B83;&#x6700;&#x591A;&#x53EA;&#x5305;&#x542B;&#x4E00;&#x4E2A;<code>Goroutine</code>.</li>
+</ul>
+</li>
+</ul>
+<pre><code class="lang-go"><span class="hljs-keyword">type</span> p <span class="hljs-keyword">struct</span>{
+    <span class="hljs-comment">//...</span>
+
+    runqhead <span class="hljs-keyword">uint32</span>
+    runqtail <span class="hljs-keyword">uint32</span>
+    runq     [<span class="hljs-number">256</span>]guintptr
+    <span class="hljs-comment">// runnext, if non-nil, is a runnable G that was ready&apos;d by</span>
+    <span class="hljs-comment">// the current G and should be run next instead of what&apos;s in</span>
+    <span class="hljs-comment">// runq if there&apos;s time remaining in the running G&apos;s time</span>
+    <span class="hljs-comment">// slice. It will inherit the time left in the current time</span>
+    <span class="hljs-comment">// slice. If a set of goroutines is locked in a</span>
+    <span class="hljs-comment">// communicate-and-wait pattern, this schedules that set as a</span>
+    <span class="hljs-comment">// unit and eliminates the (potentially large) scheduling</span>
+    <span class="hljs-comment">// latency that otherwise arises from adding the ready&apos;d</span>
+    <span class="hljs-comment">// goroutines to the end of the run queue.</span>
+    runnext guintptr
+
+    <span class="hljs-comment">//...</span>
+}
+</code></pre>
+<h5 id="runqget"><a name="runqget" class="anchor-navigation-ex-anchor" href="#runqget"><i class="fa fa-link" aria-hidden="true"></i></a>runqget</h5>
+<ul>
+<li>&#x5B9E;&#x73B0;&#x662F;&#x7531;<code>runqget</code>&#x51FD;&#x6570;&#x5B8C;&#x6210;&#x7684;:<ul>
+<li>&#x9996;&#x5148;&#x67E5;&#x770B;<code>runnext</code>&#x6210;&#x5458;&#x662F;&#x5426;&#x4E3A;&#x7A7A;&#xFF0C;&#x5982;&#x679C;&#x4E0D;&#x4E3A;&#x7A7A;&#x5219;&#x8FD4;&#x56DE;<code>runnext</code>&#x6240;&#x6307;&#x7684;<code>Goroutine</code>&#xFF0C;&#x5E76;&#x628A;<code>runnext</code>&#x6210;&#x5458;&#x6E05;&#x96F6;;</li>
+<li>&#x5982;&#x679C;<code>runnext</code>&#x4E3A;&#x7A7A;&#xFF0C;&#x5219;&#x7EE7;&#x7EED;&#x4ECE;&#x672C;&#x5730;&#x5FAA;&#x73AF;&#x961F;&#x5217;&#x4E2D;&#x67E5;&#x627E;<code>Goroutine</code>.</li>
+</ul>
+</li>
+</ul>
+<pre><code class="lang-go"><span class="hljs-comment">// Get g from local runnable queue.</span>
+<span class="hljs-comment">// If inheritTime is true, gp should inherit the remaining time in the</span>
+<span class="hljs-comment">// current time slice. Otherwise, it should start a new time slice.</span>
+<span class="hljs-comment">// Executed only by the owner P.</span>
+<span class="hljs-keyword">func</span> runqget(_p_ *p) (gp *g, inheritTime <span class="hljs-keyword">bool</span>) {
+    <span class="hljs-comment">// If there&apos;s a runnext, it&apos;s the next G to run.</span>
+    <span class="hljs-keyword">for</span> {
+        next := _p_.runnext
+        <span class="hljs-keyword">if</span> next == <span class="hljs-number">0</span> { <span class="hljs-comment">// runnext&#x662F;&#x7A7A;&#x7684;,break for loop,&#x7136;&#x540E;&#x4ECE;&#x961F;&#x5217;&#x91CC;&#x9762;&#x62FF;</span>
+            <span class="hljs-keyword">break</span>
+        }
+        <span class="hljs-keyword">if</span> _p_.runnext.cas(next, <span class="hljs-number">0</span>) {
+            <span class="hljs-keyword">return</span> next.ptr(), <span class="hljs-literal">true</span>
+        }
+    }
+
+    <span class="hljs-keyword">for</span> {
+        h := atomic.LoadAcq(&amp;_p_.runqhead) <span class="hljs-comment">// load-acquire, synchronize with other consumers</span>
+        t := _p_.runqtail
+        <span class="hljs-keyword">if</span> t == h { <span class="hljs-comment">// &#x5982;&#x679C;&#x5934;&#x7B49;&#x4E8E;&#x5C3E;&#xFF0C;&#x8BC1;&#x660E;&#x662F;&#x961F;&#x5217;&#x662F;&#x7A7A;&#x7684;</span>
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, <span class="hljs-literal">false</span>
+        }
+        gp := _p_.runq[h%<span class="hljs-keyword">uint32</span>(<span class="hljs-built_in">len</span>(_p_.runq))].ptr()
+        <span class="hljs-keyword">if</span> atomic.CasRel(&amp;_p_.runqhead, h, h+<span class="hljs-number">1</span>) { <span class="hljs-comment">// cas-release, commits consume</span>
+            <span class="hljs-keyword">return</span> gp, <span class="hljs-literal">false</span>
+        }
+    }
+}
+</code></pre>
+<h3 id="p&#x7684;&#x672C;&#x5730;&#x961F;&#x5217;&#x662F;&#x600E;&#x4E48;&#x6784;&#x6210;&#x7684;"><a name="p&#x7684;&#x672C;&#x5730;&#x961F;&#x5217;&#x662F;&#x600E;&#x4E48;&#x6784;&#x6210;&#x7684;" class="anchor-navigation-ex-anchor" href="#p&#x7684;&#x672C;&#x5730;&#x961F;&#x5217;&#x662F;&#x600E;&#x4E48;&#x6784;&#x6210;&#x7684;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.3. P&#x7684;&#x672C;&#x5730;&#x961F;&#x5217;&#x662F;&#x600E;&#x4E48;&#x6784;&#x6210;&#x7684;</h3>
+<blockquote>
+<p>&#x4ECE;&#x4E0A;&#x9762;&#x5DF2;&#x7ECF;&#x77E5;&#x9053;&#x672C;&#x5730;&#x8FD0;&#x884C;G&#x961F;&#x5217;&#x662F;&#x7531;&#x8FD9;&#x4E09;&#x4E2A;field&#x7EC4;&#x6210;&#x7684;&#xFF0C;&#x90A3;&#x4E48;&#x4ED6;&#x4EEC;&#x662F;&#x600E;&#x4E48;&#x7EC4;&#x7EC7;&#x7684;&#xFF1F;</p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">type</span> p <span class="hljs-keyword">struct</span>{
+    <span class="hljs-comment">//...</span>
+
+    runqhead <span class="hljs-keyword">uint32</span>
+    runqtail <span class="hljs-keyword">uint32</span>
+    runq     [<span class="hljs-number">256</span>]guintptr
+    <span class="hljs-comment">// runnext, if non-nil, is a runnable G that was ready&apos;d by</span>
+    <span class="hljs-comment">// the current G and should be run next instead of what&apos;s in</span>
+    <span class="hljs-comment">// runq if there&apos;s time remaining in the running G&apos;s time</span>
+    <span class="hljs-comment">// slice. It will inherit the time left in the current time</span>
+    <span class="hljs-comment">// slice. If a set of goroutines is locked in a</span>
+    <span class="hljs-comment">// communicate-and-wait pattern, this schedules that set as a</span>
+    <span class="hljs-comment">// unit and eliminates the (potentially large) scheduling</span>
+    <span class="hljs-comment">// latency that otherwise arises from adding the ready&apos;d</span>
+    <span class="hljs-comment">// goroutines to the end of the run queue.</span>
+    runnext guintptr
+
+    <span class="hljs-comment">//...</span>
+}
+</code></pre>
+<p>&#x901A;&#x8FC7;&#x8FD9;&#x4E24;&#x4E2A;&#x51FD;&#x6570;:runqget&#x4E0E;runqput,&#x6765;&#x770B;&#x4E0B;&#x5B83;&#x4EEC;&#x662F;&#x600E;&#x4E48;&#x8FD0;&#x4F5C;&#x7684;,&#x6211;&#x4EEC;&#x5148;&#x5217;&#x51FA;&#x5165;&#x961F;&#x548C;&#x51FA;&#x961F;&#x7684;&#x4EE3;&#x7801;,&#x6765;&#x770B;&#x4E00;&#x4E0B;&#x3002;</p>
+<pre><code class="lang-go"><span class="hljs-comment">/* 
+----------------here:  &#x8FD9;&#x91CC;&#x662F;&#x5165;&#x961F;&#xFF0C;&#x628A;Goroutine&#x653E;&#x5165;&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;
+*/</span>
+    h := atomic.LoadAcq(&amp;_p_.runqhead) <span class="hljs-comment">// load-acquire, synchronize with consumers</span>
+    t := _p_.runqtail
+    <span class="hljs-keyword">if</span> t-h &lt; <span class="hljs-keyword">uint32</span>(<span class="hljs-built_in">len</span>(_p_.runq)) {
+        _p_.runq[t%<span class="hljs-keyword">uint32</span>(<span class="hljs-built_in">len</span>(_p_.runq))].set(gp)
+        atomic.StoreRel(&amp;_p_.runqtail, t+<span class="hljs-number">1</span>) <span class="hljs-comment">// store-release, makes the item available for consumption,runqhead&#x4E0D;&#x52A8;,runqtail&#x52A0;&#x4E00;.</span>
+        <span class="hljs-keyword">return</span>
+    }
+
+<span class="hljs-comment">//----------------------------------------------------------------------------------------------------------</span>
+
+    <span class="hljs-keyword">for</span> {
+        h := atomic.LoadAcq(&amp;_p_.runqhead) <span class="hljs-comment">// load-acquire, synchronize with other consumers</span>
+        t := _p_.runqtail
+        <span class="hljs-keyword">if</span> t == h { <span class="hljs-comment">// &#x5982;&#x679C;&#x5934;&#x7B49;&#x4E8E;&#x5C3E;&#xFF0C;&#x8BC1;&#x660E;&#x662F;&#x961F;&#x5217;&#x662F;&#x7A7A;&#x7684;</span>
+            <span class="hljs-keyword">return</span> <span class="hljs-literal">nil</span>, <span class="hljs-literal">false</span>
+        }
+        gp := _p_.runq[h%<span class="hljs-keyword">uint32</span>(<span class="hljs-built_in">len</span>(_p_.runq))].ptr()
+        <span class="hljs-keyword">if</span> atomic.CasRel(&amp;_p_.runqhead, h, h+<span class="hljs-number">1</span>) { <span class="hljs-comment">// cas-release, commits consume,runqhead&#x52A0;&#x4E00;,runqtail&#x4E0D;&#x52A8;.</span>
+            <span class="hljs-keyword">return</span> gp, <span class="hljs-literal">false</span>
+        }
+    }
+</code></pre>
+<ul>
+<li>&#x5165;&#x961F;<ul>
+<li>runqhead&#x4E0D;&#x52A8;,runqtail&#x52A0;&#x4E00;</li>
+</ul>
+</li>
+<li>&#x51FA;&#x961F;<ul>
+<li>runqhead&#x52A0;&#x4E00;,runqtail&#x4E0D;&#x52A8;.</li>
+</ul>
+</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/goroutine%E8%B0%83%E5%BA%A6%20(1" alt="P&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;">.png)</p>
+<h4 id="&#x4E3A;&#x4EC0;&#x4E48;&#x8981;&#x7528;len"><a name="&#x4E3A;&#x4EC0;&#x4E48;&#x8981;&#x7528;len" class="anchor-navigation-ex-anchor" href="#&#x4E3A;&#x4EC0;&#x4E48;&#x8981;&#x7528;len"><i class="fa fa-link" aria-hidden="true"></i></a>&#x4E3A;&#x4EC0;&#x4E48;&#x8981;&#x7528;len</h4>
+<p>&#x5B83;&#x7684;&#x90A3;&#x4E2A;<code>gp := _p_.runq[h%uint32(len(_p_.runq))].ptr()</code>&#x4E3A;&#x4EC0;&#x4E48;&#x4E0D;&#x76F4;&#x63A5;&#x7528;256&#xFF0C;&#x800C;&#x9700;&#x8981;&#x7528;&#x5230;<code>len(_p_.runq)</code>,&#x5982;&#x679C;&#x662F;&#x4E3A;&#x4E86;&#x4EE5;&#x540E;&#x7684;&#x6269;&#x5C55;&#xFF0C;&#x90A3;&#x4E48;&#x53EF;&#x4EE5;&#x5B9A;&#x4E49;&#x4E00;&#x4E2A;&#x5E38;&#x91CF;&#x6765;&#x66FF;&#x4EE3;&#x5C31;&#x884C;&#x4E86;.</p>
+<pre><code class="lang-go"><span class="hljs-keyword">package</span> main
+
+<span class="hljs-keyword">import</span> (
+    <span class="hljs-string">&quot;fmt&quot;</span>
+)
+<span class="hljs-keyword">const</span> lenghtForQueue = <span class="hljs-number">256</span>
+<span class="hljs-keyword">var</span> lenghtForQueueVar = <span class="hljs-number">256</span>
+
+<span class="hljs-keyword">func</span> main() {
+    <span class="hljs-comment">//var runq     [lenghtForQueue]uintptr</span>
+    <span class="hljs-keyword">var</span> runq     [lenghtForQueueVar]<span class="hljs-keyword">uintptr</span>
+
+    fmt.Println(<span class="hljs-built_in">len</span>(runq))
+}
+</code></pre>
+<p>&#x4E0D;&#x80FD;&#x4F7F;&#x7528;&#x53D8;&#x91CF;,&#x53EA;&#x80FD;&#x4F7F;&#x7528;&#x5E38;&#x91CF;&#xFF1A;<code>gdb/main.go:23:15: non-constant array bound lenghtForQueueVar</code>.</p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                
+                <a href="1.1.从本地队列或全局队列获取goroutine.html" class="navigation navigation-next navigation-unique" aria-label="Next page: 从本地队列或全局队列获取goroutine">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"1.调度策略","date":"2020-03-02T13:03:00.000Z","tags":["golang","goroutine"],"categories":["golang调度"],"toc":true,"level":"1.6.1","depth":2,"next":{"title":"从本地队列或全局队列获取goroutine","level":"1.6.1.1","depth":3,"path":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","ref":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","articles":[]},"previous":{"title":"第四部分 调度","level":"1.6","depth":1,"ref":"","articles":[{"title":"1.调度策略","level":"1.6.1","depth":2,"path":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","ref":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","articles":[{"title":"从本地队列或全局队列获取goroutine","level":"1.6.1.1","depth":3,"path":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","ref":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","articles":[]},{"title":"盗取goroutine从其他队列","level":"1.6.1.2","depth":3,"path":"part3.调度/1.调度策略/1.2.盗取goroutine从其他队列.md","ref":"part3.调度/1.调度策略/1.2.盗取goroutine从其他队列.md","articles":[]}]},{"title":"2.调度的时机","level":"1.6.2","depth":2,"path":"part3.调度/2.调度的时机/2.1.主动调度.md","ref":"part3.调度/2.调度的时机/2.1.主动调度.md","articles":[{"title":"主动调度","level":"1.6.2.1","depth":3,"path":"part3.调度/2.调度的时机/2.1.主动调度.md","ref":"part3.调度/2.调度的时机/2.1.主动调度.md","articles":[]},{"title":"被动调度","level":"1.6.2.2","depth":3,"path":"part3.调度/2.调度的时机/2.2.被动调度.md","ref":"part3.调度/2.调度的时机/2.2.被动调度.md","articles":[]},{"title":"运行用户代码时间过长调度","level":"1.6.2.3","depth":3,"path":"part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.md","ref":"part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.md","articles":[]},{"title":"系统调用收尾,如果从系统调用返回,如何重新得到P","level":"1.6.2.4","depth":3,"path":"part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.md","ref":"part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.md","articles":[]}]},{"title":"3.调度循环","level":"1.6.3","depth":2,"path":"part3.调度/3.调度循环/3.3.调度循环.md","ref":"part3.调度/3.调度循环/3.3.调度循环.md","articles":[{"title":"调度循环","level":"1.6.3.1","depth":3,"path":"part3.调度/3.调度循环/3.3.调度循环.md","ref":"part3.调度/3.调度循环/3.3.调度循环.md","articles":[]}]},{"title":"总结","level":"1.6.4","depth":2,"path":"part3.调度/总结.md","ref":"part3.调度/总结.md","articles":[]}]},"dir":"ltr"},"config":{"plugins":["-page-toc-button","-toc2","anchor-navigation-ex"],"styles":{"website":"./styles/website.css"},"pluginsConfig":{"search":{},"toc2":{"addClass":true,"className":"toc"},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"fontsettings":{"theme":"white","family":"sans","size":2},"highlight":{},"anchor-navigation-ex":{"associatedWithSummary":true,"float":{"floatIcon":"fa fa-navicon","level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"mode":"float","multipleH1":true,"pageTop":{"level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"printLog":false,"showGoTop":true,"showLevel":true},"page-toc-button":{"maxTocDepth":2,"minTocSize":2},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"theme":"default","author":"zput","pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"variables":{},"title":"golang goroutine详解","language":"zh-hans","links":{"sidebar":{"zput|堆排序":"https://zput.github.io"}},"gitbook":"3.2.3","description":"select * from learn"},"file":{"path":"part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.md","mtime":"2021-03-28T09:04:44.796Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2021-03-28T09:05:35.583Z"},"basePath":"../..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../../gitbook/gitbook.js"></script>
+    <script src="../../gitbook/theme.js"></script>
+    
+        
+        <script src="../../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

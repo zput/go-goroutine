@@ -1,0 +1,1777 @@
+
+<!DOCTYPE HTML>
+<html lang="zh-hans" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>第二部分 进入main函数之前的初始化 · golang goroutine详解</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        <meta name="author" content="zput">
+        
+        
+    
+    <link rel="stylesheet" href="../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-anchor-navigation-ex/style/plugin.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="1.进入main函数之前的初始化.html" />
+    
+    
+    <link rel="prev" href="../part0.基础知识/2.内存.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="输入并搜索" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+    
+        
+        <li>
+            <a href="https://zput.github.io" target="_blank" class="custom-link">zput|堆排序</a>
+        </li>
+    
+    
+
+    
+    <li class="divider"></li>
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="../">
+            
+                <a href="../">
+            
+                    
+                    大纲
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    第一部分 基础知识
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.3.1" data-path="../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    汇编基础
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="../part0.基础知识/2.内存.html">
+            
+                <a href="../part0.基础知识/2.内存.html">
+            
+                    
+                    内存
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.4" data-path="1.进入main函数之前的初始化.html">
+            
+                <a href="1.进入main函数之前的初始化.html">
+            
+                    
+                    第二部分 进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter active" data-level="1.4.1" data-path="1.进入main函数之前的初始化.html">
+            
+                <a href="1.进入main函数之前的初始化.html">
+            
+                    
+                    进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    第三部分 退出goroutine
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.5.1" data-path="../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    退出goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <span>
+            
+                    
+                    第四部分 调度
+            
+                </span>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1" data-path="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    1.调度策略
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1.1" data-path="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../part3.调度/1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    从本地队列或全局队列获取goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.1.2" data-path="../part3.调度/1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                <a href="../part3.调度/1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                    
+                    盗取goroutine从其他队列
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2" data-path="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    2.调度的时机
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.2.1" data-path="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    主动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.2" data-path="../part3.调度/2.调度的时机/2.2.被动调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.2.被动调度.html">
+            
+                    
+                    被动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.3" data-path="../part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                    
+                    运行用户代码时间过长调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.4" data-path="../part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                <a href="../part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                    
+                    系统调用收尾,如果从系统调用返回,如何重新得到P
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.3" data-path="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                <a href="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                    
+                    3.调度循环
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.3.1" data-path="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                <a href="../part3.调度/3.调度循环/3.3.调度循环.html">
+            
+                    
+                    调度循环
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.4" data-path="../part3.调度/总结.html">
+            
+                <a href="../part3.调度/总结.html">
+            
+                    
+                    总结
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            本书使用 GitBook 发布
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href=".." >第二部分 进入main函数之前的初始化</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <div id="anchor-navigation-ex-navbar"><i class="fa fa-navicon"></i><ul><ul><li><span class="title-icon "></span><a href="#&#x4F8B;&#x5B50;"><b>1.1. </b>&#x4F8B;&#x5B50;</a></li><ul><li><span class="title-icon "></span><a href="#&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;"><b>1.1.1. </b>&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;</a></li><li><span class="title-icon "></span><a href="#&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;"><b>1.1.2. </b>&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;</a></li><li><span class="title-icon "></span><a href="#&#x8FDB;&#x5165;main&#x51FD;&#x6570;"><b>1.1.3. </b>&#x8FDB;&#x5165;main&#x51FD;&#x6570;</a></li></ul></ul></ul></div><a href="#" id="anchorNavigationExGoTop"><i class="fa fa-arrow-up"></i></a><!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
+<!-- code_chunk_output -->
+<ul>
+<li><a href="#&#x4F8B;&#x5B50;">&#x4F8B;&#x5B50;</a><ul>
+<li><a href="#&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;">&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;</a></li>
+<li><a href="#&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;">&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;</a><ul>
+<li><a href="#&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0">&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0</a></li>
+<li><a href="#m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;">m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;</a></li>
+<li><a href="#&#x8BBE;&#x7F6E;&#x4E00;&#x4E9B;ncpucpu&#x6838;&#x6570;-mp&#x7684;&#x4E2A;&#x6570;-&#x521D;&#x59CB;&#x5316;m0">&#x8BBE;&#x7F6E;&#x4E00;&#x4E9B;ncpu(CPU&#x6838;&#x6570;), M,P&#x7684;&#x4E2A;&#x6570;, &#x521D;&#x59CB;&#x5316;m0</a><ul>
+<li><a href="#schedinit">schedinit</a><ul>
+<li><a href="#mcommoninit">mcommoninit</a></li>
+<li><a href="#&#x521D;&#x59CB;&#x5316;allp-m0&#x548C;allp0&#x7ED1;&#x5B9A;">&#x521D;&#x59CB;&#x5316;allp, m0&#x548C;allp[0]&#x7ED1;&#x5B9A;</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#&#x521B;&#x9020;&#x4E00;&#x4E2A;&#x5C06;&#x8981;&#x8FD0;&#x884C;main&#x7684;goroutine">&#x521B;&#x9020;&#x4E00;&#x4E2A;&#x5C06;&#x8981;&#x8FD0;&#x884C;main&#x7684;goroutine</a><ul>
+<li><a href="#newproc">newproc</a><ul>
+<li><a href="#rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x8FD8;&#x6709;&#x7528;">rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x8FD8;&#x6709;&#x7528;?</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#mstart">mstart</a><ul>
+<li><a href="#save&#x51FD;&#x6570;&#x4FDD;&#x5B58;pcsp&#x5230;g0&#x65B9;&#x4FBF;&#x4E0B;&#x6B21;&#x518D;&#x5EA6;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;g0">save&#x51FD;&#x6570;&#x4FDD;&#x5B58;pc,sp&#x5230;g0,&#x65B9;&#x4FBF;&#x4E0B;&#x6B21;&#x518D;&#x5EA6;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;g0</a><ul>
+<li><a href="#&#x53CD;&#x6C47;&#x7F16;&#x770B;&#x4E0B;mstart1&#x5230;save&#x51FD;&#x6570;&#x7684;&#x6C47;&#x7F16;&#x4EE3;&#x7801;">&#x53CD;&#x6C47;&#x7F16;&#x770B;&#x4E0B;mstart1&#x5230;save&#x51FD;&#x6570;&#x7684;&#x6C47;&#x7F16;&#x4EE3;&#x7801;</a></li>
+</ul>
+</li>
+<li><a href="#schedule">schedule</a><ul>
+<li><a href="#execute&#x51FD;&#x6570;">execute&#x51FD;&#x6570;</a></li>
+<li><a href="#gogo">gogo</a></li>
+<li><a href="#&#x91CD;&#x65B0;&#x89C2;&#x5BDF;bp&#x5BC4;&#x5B58;&#x5668;">&#x91CD;&#x65B0;&#x89C2;&#x5BDF;BP&#x5BC4;&#x5B58;&#x5668;</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#&#x8FDB;&#x5165;main&#x51FD;&#x6570;">&#x8FDB;&#x5165;main&#x51FD;&#x6570;</a></li>
+</ul>
+</li>
+</ul>
+<!-- /code_chunk_output -->
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210328170254.png" alt="20210328170254"></p>
+<h2 id="&#x4F8B;&#x5B50;"><a name="&#x4F8B;&#x5B50;" class="anchor-navigation-ex-anchor" href="#&#x4F8B;&#x5B50;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1. &#x4F8B;&#x5B50;</h2>
+<p>&#x6211;&#x4EEC;&#x9996;&#x5148;&#x6765;gdb&#x8C03;&#x8BD5;&#x4E00;&#x4E0B;&#x8FD9;&#x4E2A;&#x7A0B;&#x5E8F;</p>
+<blockquote>
+<p>main.go</p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">package</span> main
+
+<span class="hljs-keyword">import</span> <span class="hljs-string">&quot;fmt&quot;</span>
+
+<span class="hljs-comment">// the function&apos;s body is empty</span>
+<span class="hljs-keyword">func</span> add(x, y <span class="hljs-keyword">int64</span>) <span class="hljs-keyword">int64</span>
+
+<span class="hljs-keyword">func</span> main() {
+    gg:=add(<span class="hljs-number">2</span>, <span class="hljs-number">3</span>)
+    fmt.Println(gg)
+}
+</code></pre>
+<blockquote>
+<p>add_amd.s</p>
+</blockquote>
+<pre><code class="lang-go">TEXT &#xB7;add(SB),$<span class="hljs-number">0</span><span class="hljs-number">-24</span>
+    MOVQ x+<span class="hljs-number">0</span>(FP), BX
+    MOVQ y+<span class="hljs-number">8</span>(FP), BP
+    ADDQ BP, BX
+    MOVQ BX, ret+<span class="hljs-number">16</span>(FP)
+    RET
+</code></pre>
+<p>&#x7F16;&#x8BD1;&#x4E00;&#x4E0B;&#x6E90;&#x4EE3;&#x7801;: <code>go build  -gcflags &quot;-N -l&quot; -o test .</code>.</p>
+<h3 id="&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;"><a name="&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;" class="anchor-navigation-ex-anchor" href="#&#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.1. &#x7A0B;&#x5E8F;&#x52A0;&#x8F7D;&#x5230;&#x5185;&#x5B58;&#x5165;&#x53E3;</h3>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200907142246.png" alt="20200907142246"></p>
+<pre><code class="lang-sh">(gdb) info files
+Symbols from <span class="hljs-string">&quot;/tmp/kubernets/test&quot;</span>.
+Local <span class="hljs-built_in">exec</span> file:
+    `/tmp/kubernets/<span class="hljs-built_in">test</span><span class="hljs-string">&apos;, file type elf64-x86-64.
+    Entry point: 0x454e00
+    0x0000000000401000 - 0x000000000048cfd3 is .text
+    0x000000000048d000 - 0x00000000004dc550 is .rodata
+    0x00000000004dc720 - 0x00000000004dd38c is .typelink
+    0x00000000004dd390 - 0x00000000004dd3e0 is .itablink
+    0x00000000004dd3e0 - 0x00000000004dd3e0 is .gosymtab
+    0x00000000004dd3e0 - 0x0000000000548adf is .gopclntab
+    0x0000000000549000 - 0x0000000000549020 is .go.buildinfo
+    0x0000000000549020 - 0x0000000000556118 is .noptrdata
+    0x0000000000556120 - 0x000000000055d110 is .data
+    0x000000000055d120 - 0x0000000000578990 is .bss
+    0x00000000005789a0 - 0x000000000057b108 is .noptrbss
+    0x0000000000400f9c - 0x0000000000401000 is .note.go.buildid
+</span></code></pre>
+<pre><code class="lang-sh">(gdb) b *0x454e00
+Breakpoint 1 at 0x454e00: file /usr/lib/golang/src/runtime/rt0_linux_amd64.s, line 8. //&#x8DF3;&#x5230;&#x8FD9;&#x4E2A;&#x6587;&#x4EF6;&#x6765;&#x4E86;
+(gdb) list /usr/lib/golang/src/runtime/rt0_linux_amd64.s:1
+1    // Copyright 2009 The Go Authors. All rights reserved.
+2    // Use of this <span class="hljs-built_in">source</span> code is governed by a BSD-style
+3    // license that can be found <span class="hljs-keyword">in</span> the LICENSE file.
+4
+5    <span class="hljs-comment">#include &quot;textflag.h&quot;</span>
+6
+7    TEXT _rt0_amd64_linux(SB),NOSPLIT,$-8
+8        JMP    _rt0_amd64(SB)
+</code></pre>
+<pre><code class="lang-sh">(gdb) run
+Starting program: /tmp/kubernets/<span class="hljs-built_in">test</span>
+
+Breakpoint 1, _rt0_amd64_linux () at /usr/lib/golang/src/runtime/rt0_linux_amd64.s:8 //&#x8DF3;&#x5230;&#x8FD9;&#x4E2A;&#x6587;&#x4EF6;&#x6765;&#x4E86;
+8        JMP    _rt0_amd64(SB)
+
+(gdb) info registers bp
+bp             0x0    0
+(gdb) info registers sp
+sp             0x7fffffffe4d0    0x7fffffffe4d0
+</code></pre>
+<pre><code class="lang-sh">(gdb) next
+16        LEAQ    8(SP), SI    // argv
+(gdb) list
+11    // internal linking. This is the entry point <span class="hljs-keyword">for</span> the program from the
+12    // kernel <span class="hljs-keyword">for</span> an ordinary -buildmode=exe program. The stack holds the
+13    // number of arguments and the C-style argv.
+14    TEXT _rt0_amd64(SB),NOSPLIT,$-8
+15        MOVQ    0(SP), DI    // argc
+16        LEAQ    8(SP), SI    // argv
+17        JMP    runtime&#xB7;rt0_go(SB)
+(gdb) next
+runtime.rt0_go () at /usr/lib/golang/src/runtime/asm_amd64.s:89 //&#x8DF3;&#x5230;&#x8FD9;&#x4E2A;&#x6587;&#x4EF6;&#x6765;&#x4E86;
+89        MOVQ    DI, AX        // argc
+(gdb) list
+84    DATA _rt0_amd64_lib_argv&lt;&gt;(SB)/8, <span class="hljs-variable">$0</span>
+85    GLOBL _rt0_amd64_lib_argv&lt;&gt;(SB),NOPTR, <span class="hljs-variable">$8</span>
+86
+87    TEXT runtime&#xB7;rt0_go(SB),NOSPLIT,<span class="hljs-variable">$0</span>
+88        // copy arguments forward on an even stack
+89        MOVQ    DI, AX        // argc
+90        MOVQ    SI, BX        // argv
+91        SUBQ    $(4*8+7), SP        // 2args 2auto
+92        ANDQ    $~15, SP
+93        MOVQ    AX, 16(SP)
+</code></pre>
+<blockquote>
+<p>&#x4ECE;&#x4E0A;&#x9762;&#x7684;&#x8C03;&#x8BD5;&#x6765;&#x770B;,&#x6700;&#x7EC8;&#x5230;&#x5230;&#x8FBE;&#x4E86;<code>src/runtime/asm_amd64.s:89</code>&#x7684;<a href="https://github.com/golang/go/blob/93810ac1f4574e1e2a79ea156781bafaf8b8ebe0/src/runtime/asm_amd64.s#L87" target="_blank">runtime.rt0_go</a>&#x51FD;&#x6570;.</p>
+</blockquote>
+<pre><code class="lang-sh">file /usr/lib/golang/src/runtime/rt0_linux_amd64.s, line 8. //&#x8DF3;&#x5230;&#x8FD9;&#x4E2A;&#x6587;&#x4EF6;&#x6765;
+_rt0_amd64_linux () at /usr/lib/golang/src/runtime/rt0_linux_amd64.s:8 //&#x8DF3;&#x5230;&#x8FD9;&#x4E2A;&#x6587;&#x4EF6;&#x6765;
+runtime.rt0_go () at /usr/lib/golang/src/runtime/asm_amd64.s:89 //&#x8DF3;&#x5230;&#x8FD9;&#x4E2A;&#x6587;&#x4EF6;&#x6765;
+</code></pre>
+<h3 id="&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;"><a name="&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;" class="anchor-navigation-ex-anchor" href="#&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.2. &#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;</h3>
+<p>&#x4E3B;&#x8981;&#x662F;<code>rt0_go()</code>&#x51FD;&#x6570;</p>
+<h4 id="&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0"><a name="&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0" class="anchor-navigation-ex-anchor" href="#&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0"><i class="fa fa-link" aria-hidden="true"></i></a>&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0</h4>
+<pre><code class="lang-go">TEXT runtime&#xB7;rt0_go(SB),NOSPLIT,$<span class="hljs-number">0</span>
+    <span class="hljs-comment">// copy arguments forward on an even stack</span>
+    MOVQ    DI, AX        <span class="hljs-comment">// argc</span>
+    MOVQ    SI, BX        <span class="hljs-comment">// argv</span>
+    SUBQ    $(<span class="hljs-number">4</span>*<span class="hljs-number">8</span>+<span class="hljs-number">7</span>), SP        <span class="hljs-comment">// 2args 2auto</span>
+    ANDQ    $~<span class="hljs-number">15</span>, SP
+    MOVQ    AX, <span class="hljs-number">16</span>(SP)
+    MOVQ    BX, <span class="hljs-number">24</span>(SP)
+
+    <span class="hljs-comment">//TODO zxc &#x8C03;&#x6574;&#x6808;&#x9876;&#x5BC4;&#x5B58;&#x5668;&#x4F7F;&#x5176;&#x6309;16&#x5B57;&#x8282;&#x5BF9;&#x9F50;; argc&#x653E;&#x5728;SP + 16&#x5B57;&#x8282;&#x5904;; argv&#x653E;&#x5728;SP + 24&#x5B57;&#x8282;&#x5904;</span>
+
+    <span class="hljs-comment">// create istack out of the given (operating system) stack.</span>
+    <span class="hljs-comment">// _cgo_init may update stackguard.</span>
+    MOVQ    $runtime&#xB7;g0(SB), DI     <span class="hljs-comment">//&#x5168;&#x5C40;&#x7684;&#x53D8;&#x91CF;g0&#x7684;&#x5730;&#x5740;&#x653E;&#x5165;DI&#x5BC4;&#x5B58;&#x5668;</span>
+    LEAQ    (<span class="hljs-number">-64</span>*<span class="hljs-number">1024</span>+<span class="hljs-number">104</span>)(SP), BX
+    MOVQ    BX, g_stackguard0(DI)
+    MOVQ    BX, g_stackguard1(DI)
+    MOVQ    BX, (g_stack+stack_lo)(DI)
+    MOVQ    SP, (g_stack+stack_hi)(DI)
+
+    <span class="hljs-comment">// TODO zxc &#x59CB;&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0, g0&#x7684;&#x6808;&#x5927;&#x7EA6;&#x6709;64K&#xFF0C;&#x5730;&#x5740;&#x8303;&#x56F4;&#x4E3A; SP - 64*1024 + 104 &#xFF5E; SP</span>
+
+    <span class="hljs-comment">/*
+    ...&#x7701;&#x7565;&#x4E00;&#x4E9B;CPU&#x76F8;&#x5173;&#x7684;&#x6C47;&#x7F16;
+    */</span>
+
+    LEAQ    runtime&#xB7;m0+m_tls(SB), DI  <span class="hljs-comment">// //DI = &amp;m0.tls&#xFF0C;&#x53D6;m0&#x7684;tls&#x6210;&#x5458;&#x7684;&#x5730;&#x5740;&#x5230;DI&#x5BC4;&#x5B58;&#x5668;</span>
+    CALL    runtime&#xB7;settls(SB)        <span class="hljs-comment">// &#x8C03;&#x7528;settls&#x8BBE;&#x7F6E;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x5B58;&#x50A8;&#xFF0C;settls&#x51FD;&#x6570;&#x7684;&#x53C2;&#x6570;&#x5728;DI&#x5BC4;&#x5B58;&#x5668;&#x4E2D;</span>
+    <span class="hljs-comment">// store through it, to make sure it works // &#x53EF;&#x4EE5;&#x770B;&#x505A;&#x662F;&#x5355;&#x5143;&#x6D4B;&#x8BD5;</span>
+    get_tls(BX)
+    MOVQ    $<span class="hljs-number">0x123</span>, g(BX)
+    MOVQ    runtime&#xB7;m0+m_tls(SB), AX
+    CMPQ    AX, $<span class="hljs-number">0x123</span>
+    JEQ <span class="hljs-number">2</span>(PC)
+    CALL    runtime&#xB7;abort(SB)
+</code></pre>
+<p>&#x5206;&#x6790;&#x4E0B;&#x8FD9;&#x4E2A;<code>runtime&#xB7;settls()</code>&#x51FD;&#x6570;,&#x56E0;&#x4E3A;&#x8FD9;&#x4E2A;ELF&#x9700;&#x8981;-8,&#x6240;&#x4EE5;&#x63D0;&#x524D;+8,&#x90A3;&#x4E48;&#x6700;&#x7EC8;&#x6267;&#x884C;&#x5B8C;&#x8FD9;&#x4E2A;&#x51FD;&#x6570;,&#x5B83;&#x662F;&#x8BBE;&#x7F6E;&#x5728;&#x5168;&#x5C40;&#x7684;m0&#x7684;tls[0]&#x91CC;&#x9762;,&#x8FD8;&#x662F;tls[1]&#x91CC;&#x9762;&#x5462;?
+&#x89C2;&#x5BDF;&#x4E0B;&#x8FD9;&#x4E2A;<code>MOVQ    runtime&#xB7;m0+m_tls(SB), AX</code>,&#x53EF;&#x4EE5;&#x77E5;&#x9053;&#x5C31;&#x662F;m0&#x4E2D;&#x7684;tls[0]&#x7684;&#x5730;&#x5740;</p>
+<pre><code class="lang-go"><span class="hljs-comment">// set tls base to DI</span>
+TEXT runtime&#xB7;settls(SB),NOSPLIT,$<span class="hljs-number">32</span>
+    ADDQ    $<span class="hljs-number">8</span>, DI    <span class="hljs-comment">// ELF wants to use -8(FS) //&#x56E0;&#x4E3A;&#x540E;&#x9762;&#x8981;-8,&#x6240;&#x4EE5;&#x5148;&#x52A0;+8</span>
+    MOVQ    DI, SI  <span class="hljs-comment">// is SI parameter?</span>
+    MOVQ    $<span class="hljs-number">0x1002</span>, DI    <span class="hljs-comment">// ARCH_SET_FS</span>
+    MOVQ    $SYS_arch_prctl, AX
+    SYSCALL
+    CMPQ    AX, $<span class="hljs-number">0xfffffffffffff001</span>
+    JLS    <span class="hljs-number">2</span>(PC)
+    MOVL    $<span class="hljs-number">0xf1</span>, <span class="hljs-number">0xf1</span>  <span class="hljs-comment">// crash</span>
+    RET
+</code></pre>
+<blockquote>
+<p>&#x53EA;&#x662F;&#x4E00;&#x4E2A;&#x5B8F;&#x5B9A;&#x4E49;<code>src/runtime/go_tls.h</code>,<code>get_tls(BX)</code>&#x628A;TLS&#x5730;&#x5740;&#x653E;&#x5165;BX&#x5BC4;&#x5B58;&#x5668;.</p>
+</blockquote>
+<pre><code class="lang-go">#ifdef GOARCH_amd64
+#define    get_tls(r)    MOVQ TLS, r
+#define    g(r)    <span class="hljs-number">0</span>(r)(TLS*<span class="hljs-number">1</span>)
+#endif
+</code></pre>
+<pre><code class="lang-go"><span class="hljs-comment">// Thread-local storage references use the TLS pseudo-register.</span>
+<span class="hljs-comment">// As a register, TLS refers to the thread-local storage base, and it</span>
+<span class="hljs-comment">// can only be loaded into another register:</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//         MOVQ TLS, AX</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// An offset from the thread-local storage base is written off(reg)(TLS*1).</span>
+<span class="hljs-comment">// Semantically it is off(reg), but the (TLS*1) annotation marks this as</span>
+<span class="hljs-comment">// indexing from the loaded TLS base. This emits a relocation so that</span>
+<span class="hljs-comment">// if the linker needs to adjust the offset, it can. For example:</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//         MOVQ TLS, AX</span>
+<span class="hljs-comment">//         MOVQ 0(AX)(TLS*1), CX // load g into CX</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// On systems that support direct access to the TLS memory, this</span>
+<span class="hljs-comment">// pair of instructions can be reduced to a direct TLS memory reference:</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//         MOVQ 0(TLS), CX // load g into CX</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// The 2-instruction and 1-instruction forms correspond to the two code</span>
+<span class="hljs-comment">// sequences for loading a TLS variable in the local exec model given in &quot;ELF</span>
+<span class="hljs-comment">// Handling For Thread-Local Storage&quot;.</span>
+
+    <span class="hljs-comment">// When building for inclusion into a shared library, an instruction of the form</span>
+    <span class="hljs-comment">//     MOV off(CX)(TLS*1), AX</span>
+    <span class="hljs-comment">// becomes</span>
+    <span class="hljs-comment">//     mov %fs:off(%rcx), %rax</span>
+    <span class="hljs-comment">// which assumes that the correct TLS offset has been loaded into %rcx (today</span>
+    <span class="hljs-comment">// there is only one TLS variable -- g -- so this is OK). When not building for</span>
+    <span class="hljs-comment">// a shared library the instruction does not require a prefix.</span>
+</code></pre>
+<h4 id="m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;"><a name="m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;" class="anchor-navigation-ex-anchor" href="#m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;"><i class="fa fa-link" aria-hidden="true"></i></a>m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;</h4>
+<p>&#x6211;&#x4EEC;&#x7EE7;&#x7EED;&#x4E0B;&#x9762;&#x7684;<code>runtime&#xB7;rt0_go</code>&#x51FD;&#x6570;.</p>
+<pre><code class="lang-go">ok:
+    <span class="hljs-comment">// set the per-goroutine and per-mach &quot;registers&quot;</span>
+    get_tls(BX)
+    LEAQ    runtime&#xB7;g0(SB), CX <span class="hljs-comment">//&#x53D6;&#x7684;g0&#x7684;&#x5728;&#x5806;&#x4E0A;&#x7684;&#x5730;&#x5740;&#x653E;&#x5165;CX--&gt;CX = g0&#x7684;&#x5730;&#x5740;</span>
+    MOVQ    CX, g(BX)          <span class="hljs-comment">//&#x628A;g0&#x7684;&#x5730;&#x5740;&#x4FDD;&#x5B58;&#x5728;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x5B58;&#x50A8;&#x91CC;&#x9762;&#xFF0C;&#x4E5F;&#x5C31;&#x662F;*TLS=&amp;g0 --&gt; m0.tls[0]=&amp;g0</span>
+    LEAQ    runtime&#xB7;m0(SB), AX <span class="hljs-comment">//AX=&amp;m0</span>
+
+    <span class="hljs-comment">// save m-&gt;g0 = g0</span>
+    MOVQ    CX, m_g0(AX)
+    <span class="hljs-comment">// save m0 to g0-&gt;m</span>
+    MOVQ    AX, g_m(CX)
+</code></pre>
+<p>m0&#x548C;g0&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;&#xFF0C;&#x8FD9;&#x6837;&#xFF0C;&#x4E4B;&#x540E;&#x5728;&#x4E3B;&#x7EBF;&#x7A0B;&#x4E2D;&#x901A;&#x8FC7;get_tls&#x53EF;&#x4EE5;&#x83B7;&#x53D6;&#x5230;g0&#xFF0C;&#x901A;&#x8FC7;g0&#x7684;m&#x6210;&#x5458;&#x53C8;&#x53EF;&#x4EE5;&#x627E;&#x5230;m0&#xFF0C;&#x4E8E;&#x662F;&#x8FD9;&#x91CC;&#x5C31;&#x5B9E;&#x73B0;&#x4E86;m0&#x548C;g0&#x4E0E;&#x4E3B;&#x7EBF;&#x7A0B;&#x4E4B;&#x95F4;&#x7684;&#x5173;&#x8054;&#x3002;
+&#x4ECE;&#x8FD9;&#x91CC;&#x8FD8;&#x53EF;&#x4EE5;&#x770B;&#x5230;&#xFF0C;&#x4FDD;&#x5B58;&#x5728;&#x4E3B;&#x7EBF;&#x7A0B;&#x672C;&#x5730;&#x5B58;&#x50A8;&#x4E2D;&#x7684;&#x503C;&#x662F;g0&#x7684;&#x5730;&#x5740;&#xFF0C;&#x4E5F;&#x5C31;&#x662F;&#x8BF4;&#x5DE5;&#x4F5C;&#x7EBF;&#x7A0B;&#x7684;&#x79C1;&#x6709;&#x5168;&#x5C40;&#x53D8;&#x91CF;&#x5176;&#x5B9E;&#x662F;&#x4E00;&#x4E2A;&#x6307;&#x5411;g&#x7684;&#x6307;&#x9488;&#x800C;&#x4E0D;&#x662F;&#x6307;&#x5411;m&#x7684;&#x6307;&#x9488;</p>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200907151844.png" alt="20200907151844"></p>
+<h4 id="&#x8BBE;&#x7F6E;&#x4E00;&#x4E9B;ncpucpu&#x6838;&#x6570;-mp&#x7684;&#x4E2A;&#x6570;-&#x521D;&#x59CB;&#x5316;m0"><a name="&#x8BBE;&#x7F6E;&#x4E00;&#x4E9B;ncpucpu&#x6838;&#x6570;-mp&#x7684;&#x4E2A;&#x6570;-&#x521D;&#x59CB;&#x5316;m0" class="anchor-navigation-ex-anchor" href="#&#x8BBE;&#x7F6E;&#x4E00;&#x4E9B;ncpucpu&#x6838;&#x6570;-mp&#x7684;&#x4E2A;&#x6570;-&#x521D;&#x59CB;&#x5316;m0"><i class="fa fa-link" aria-hidden="true"></i></a>&#x8BBE;&#x7F6E;&#x4E00;&#x4E9B;ncpu(CPU&#x6838;&#x6570;), M,P&#x7684;&#x4E2A;&#x6570;, &#x521D;&#x59CB;&#x5316;m0</h4>
+<p>&#x6211;&#x4EEC;&#x7EE7;&#x7EED;&#x4E0B;&#x9762;&#x7684;<code>runtime&#xB7;rt0_go</code>&#x51FD;&#x6570;.</p>
+<pre><code class="lang-go">      CLD                <span class="hljs-comment">// convention is D is always left cleared &#x4E0D;&#x9700;&#x8981;&#x5173;&#x5FC3;</span>
+    CALL    runtime&#xB7;check(SB) <span class="hljs-comment">//&#x4E0D;&#x9700;&#x8981;&#x5173;&#x5FC3;</span>
+
+    MOVL    <span class="hljs-number">16</span>(SP), AX        <span class="hljs-comment">// copy argc;  AX = argc</span>
+    MOVL    AX, <span class="hljs-number">0</span>(SP)       <span class="hljs-comment">// argc&#x653E;&#x5728;&#x6808;&#x9876;</span>
+    MOVQ    <span class="hljs-number">24</span>(SP), AX        <span class="hljs-comment">// copy argv;  AX = argv</span>
+    MOVQ    AX, <span class="hljs-number">8</span>(SP)       <span class="hljs-comment">// argv&#x653E;&#x5728;SP + 8&#x7684;&#x4F4D;&#x7F6E;</span>
+    CALL    runtime&#xB7;args(SB)
+    CALL    runtime&#xB7;osinit(SB) <span class="hljs-comment">//&#x5168;&#x5C40;&#x53D8;&#x91CF; ncpu = CPU&#x6838;&#x6570;</span>
+    CALL    runtime&#xB7;schedinit(SB)
+</code></pre>
+<h5 id="schedinit"><a name="schedinit" class="anchor-navigation-ex-anchor" href="#schedinit"><i class="fa fa-link" aria-hidden="true"></i></a>schedinit</h5>
+<p>schedinit&#x4E3B;&#x8981;&#x662F;&#x8FDB;&#x884C;&#x4E00;&#x4E9B;&#x521D;&#x59CB;&#x5316;&#x5DE5;&#x4F5C;, &#x5FC5;&#x8FC7;&#x8BBE;&#x7F6E;M&#x7684;&#x6700;&#x5927;&#x4E2A;&#x6570;,P&#x7684;&#x4E2A;&#x6570;,&#x8FD8;&#x6709;&#x521D;&#x59CB;&#x5316;&#x8FD9;m0,&#x53E6;&#x5916;&#x8FD9;&#x4E2A;getg()&#x4E5F;&#x5F88;&#x6709;&#x8DA3;,&#x5206;&#x4E3A;our G, system G</p>
+<blockquote>
+<p><a href="https://github.com/golang/go/blob/5c2c6d3fbf4f0a1299b5e41463847d242eae19ca/src/runtime/proc.go#L535" target="_blank">sr/runtime/proc.go</a></p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-comment">// The bootstrap sequence is:</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//    call osinit</span>
+<span class="hljs-comment">//    call schedinit</span>
+<span class="hljs-comment">//    make &amp; queue new G</span>
+<span class="hljs-comment">//    call runtime&#xB7;mstart</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// The new G calls runtime&#xB7;main.</span>
+<span class="hljs-keyword">func</span> schedinit() {
+    <span class="hljs-comment">// raceinit must be the first call to race detector.</span>
+    <span class="hljs-comment">// In particular, it must be done before mallocinit below calls racemapshadow.</span>
+    _g_ := getg()
+    <span class="hljs-comment">/*
+    getg&#x51FD;&#x6570;&#x5728;&#x6E90;&#x4EE3;&#x7801;&#x4E2D;&#x6CA1;&#x6709;&#x5BF9;&#x5E94;&#x7684;&#x5B9A;&#x4E49;&#xFF0C;&#x7531;&#x7F16;&#x8BD1;&#x5668;&#x63D2;&#x5165;&#x7C7B;&#x4F3C;&#x4E0B;&#x9762;&#x4E24;&#x884C;&#x4EE3;&#x7801;
+    get_tls(CX) // CX=TLS
+    MOVQ g(CX), BX; BX&#x5B58;&#x5668;&#x91CC;&#x9762;&#x73B0;&#x5728;&#x653E;&#x7684;&#x662F;&#x5F53;&#x524D;g&#x7ED3;&#x6784;&#x4F53;&#x5BF9;&#x8C61;&#x7684;&#x5730;&#x5740;
+    &#x53EF;&#x4EE5;&#x53C2;&#x8003;&#x8FD9;&#x4E2A;,&#x6839;&#x636E;https://github.com/golang/go/blob/d029058b5912312963225c40ae4bf44e3cb4be76/src/runtime/HACKING.md
+    */</span>
+
+    <span class="hljs-comment">//...</span>
+    sched.maxmcount = <span class="hljs-number">10000</span> <span class="hljs-comment">// &#x6700;&#x591A;&#x542F;&#x52A8;10000&#x4E2A;&#x64CD;&#x4F5C;&#x7CFB;&#x7EDF;&#x7EBF;&#x7A0B;&#xFF0C;&#x4E5F;&#x662F;&#x6700;&#x591A;10000&#x4E2A;M</span>
+    <span class="hljs-comment">//...</span>
+
+    mcommoninit(_g_.m) <span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;m0&#xFF0C;&#x56E0;&#x4E3A;&#x4ECE;&#x524D;&#x9762;&#x7684;&#x4EE3;&#x7801;&#x6211;&#x4EEC;&#x77E5;&#x9053;g0-&gt;m = &amp;m0</span>
+    <span class="hljs-comment">//...</span>
+    procs := ncpu  <span class="hljs-comment">//&#x7CFB;&#x7EDF;&#x4E2D;&#x6709;&#x591A;&#x5C11;&#x6838;&#xFF0C;&#x5C31;&#x521B;&#x5EFA;&#x548C;&#x521D;&#x59CB;&#x5316;&#x591A;&#x5C11;&#x4E2A;p&#x7ED3;&#x6784;&#x4F53;&#x5BF9;&#x8C61;</span>
+    <span class="hljs-keyword">if</span> n, ok := atoi32(gogetenv(<span class="hljs-string">&quot;GOMAXPROCS&quot;</span>)); ok &amp;&amp; n &gt; <span class="hljs-number">0</span> {
+        procs = n  <span class="hljs-comment">//&#x5982;&#x679C;&#x6307;&#x5B9A;&#x4E86;GOMAXPROCS&#x5927;&#x4E8E;0&#xFF0C;&#x5219;&#x521B;&#x5EFA;&#x6307;&#x5B9A;&#x6570;&#x91CF;&#x7684;p</span>
+    }
+    <span class="hljs-keyword">if</span> procresize(procs) != <span class="hljs-literal">nil</span> {
+        throw(<span class="hljs-string">&quot;unknown runnable goroutine during bootstrap&quot;</span>)
+    }
+    <span class="hljs-comment">//...</span>
+}
+</code></pre>
+<h6 id="mcommoninit"><a name="mcommoninit" class="anchor-navigation-ex-anchor" href="#mcommoninit"><i class="fa fa-link" aria-hidden="true"></i></a>mcommoninit</h6>
+<blockquote>
+<p>mcommoninit&#x4E3B;&#x8981;&#x662F;&#x5224;&#x65AD;m&#x662F;&#x5426;&#x8D85;&#x8FC7;&#x4E2A;&#x6570;,&#x7136;&#x540E;&#x653E;&#x5165;&#x5168;&#x5C40;m&#x94FE;&#x8868;,&#x9632;&#x6B62;&#x5783;&#x573E;&#x56DE;&#x6536;</p>
+</blockquote>
+<pre><code class="lang-go">m0.p = allp[<span class="hljs-number">0</span>]
+allp[<span class="hljs-number">0</span>].m = &amp;m0
+</code></pre>
+<blockquote>
+<p><a href="https://github.com/golang/go/blob/5c2c6d3fbf4f0a1299b5e41463847d242eae19ca/src/runtime/proc.go#L641" target="_blank">sr/runtime/proc.go</a></p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">func</span> mcommoninit(mp *m) {
+    _g_ := getg()
+
+    <span class="hljs-comment">// g0 stack won&apos;t make sense for user (and is not necessary unwindable).</span>
+    <span class="hljs-keyword">if</span> _g_ != _g_.m.g0 {
+        callers(<span class="hljs-number">1</span>, mp.createstack[:])
+    }
+
+    lock(&amp;sched.lock)
+    <span class="hljs-keyword">if</span> sched.mnext+<span class="hljs-number">1</span> &lt; sched.mnext {
+        throw(<span class="hljs-string">&quot;runtime: thread ID overflow&quot;</span>)
+    }
+    mp.id = sched.mnext
+    sched.mnext++
+    checkmcount() <span class="hljs-comment">//&#x68C0;&#x67E5;m&#x7684;&#x4E2A;&#x6570;&#x662F;&#x5426;&#x8D85;&#x8FC7;sched.maxmcoun</span>
+
+    <span class="hljs-comment">//...</span>
+
+    <span class="hljs-comment">// Add to allm so garbage collector doesn&apos;t free g-&gt;m</span>
+    <span class="hljs-comment">// when it is just in a register or thread-local storage.</span>
+    mp.alllink = allm <span class="hljs-comment">//m&#x653E;&#x5165;&#x5168;&#x5C40;&#x94FE;&#x8868;allm, &#x9632;&#x6B62;&#x5783;&#x573E;&#x56DE;&#x6536;</span>
+
+    <span class="hljs-comment">// NumCgoCall() iterates over allm w/o schedlock,</span>
+    <span class="hljs-comment">// so we need to publish it safely.</span>
+    atomicstorep(unsafe.Pointer(&amp;allm), unsafe.Pointer(mp))
+    unlock(&amp;sched.lock)
+    <span class="hljs-comment">//...</span>
+}
+</code></pre>
+<h6 id="&#x521D;&#x59CB;&#x5316;allp-m0&#x548C;allp0&#x7ED1;&#x5B9A;"><a name="&#x521D;&#x59CB;&#x5316;allp-m0&#x548C;allp0&#x7ED1;&#x5B9A;" class="anchor-navigation-ex-anchor" href="#&#x521D;&#x59CB;&#x5316;allp-m0&#x548C;allp0&#x7ED1;&#x5B9A;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x521D;&#x59CB;&#x5316;allp, m0&#x548C;allp[0]&#x7ED1;&#x5B9A;</h6>
+<blockquote>
+<p>procresize&#x51FD;&#x6570;&#xFF0C;&#x6211;&#x4EEC;&#x5148;&#x770B;&#x4E0B;&#x521D;&#x59CB;&#x5316;&#x65F6;&#x4F1A;&#x6267;&#x884C;&#x7684;&#x4EE3;&#x7801;&#x8DEF;&#x5F84;.</p>
+<blockquote>
+<p>&#x8003;&#x8651;&#x5230;&#x521D;&#x59CB;&#x5316;&#x5B8C;&#x6210;&#x4E4B;&#x540E;, &#x7528;&#x6237;&#x4EE3;&#x7801;&#x8FD8;&#x53EF;&#x4EE5;&#x901A;&#x8FC7;<code>GOMAXPROCS()</code>&#x51FD;&#x6570;&#x8C03;&#x7528;&#x5B83;&#x91CD;&#x65B0;&#x521B;&#x5EFA;&#x548C;&#x521D;&#x59CB;&#x5316;p&#x7ED3;&#x6784;&#x4F53;&#x5BF9;&#x8C61;&#xFF0C;&#x6211;&#x4EEC;&#x9996;&#x5148;&#x53EA;&#x8003;&#x8651;&#x521D;&#x59CB;&#x5316;.</p>
+</blockquote>
+</blockquote>
+<ul>
+<li>&#x4F7F;&#x7528;<code>make([]*p, nprocs)</code>&#x521D;&#x59CB;&#x5316;&#x5168;&#x5C40;&#x53D8;&#x91CF;<code>allp</code>&#xFF0C;&#x628A;&#x65E7;&#x7684;allp&#x62F7;&#x8D1D;&#x5230;&#x65B0;&#x7684;nallp&#x91CC;&#x9762;,&#x7136;&#x540E;<code>allp = make([]*p, nprocs)</code></li>
+<li>&#x5FAA;&#x73AF;<code>allp</code>&#x4E2D;&#x7684;&#x6BCF;&#x4E2A;p,&#x5982;&#x679C;&#x662F;nill&#x7684;&#x5C31;&#x8FDB;&#x884C;&#x521B;&#x5EFA;, &#x7136;&#x540E;&#x6BCF;&#x4E2A;&#x90FD;&#x521D;&#x59CB;&#x5316;,&#x4E0D;&#x7BA1;&#x662F;&#x65B0;&#x7684;&#x8FD8;&#x662F;&#x65E7;&#x7684;.</li>
+<li>&#x628A;<code>m0</code>&#x548C;<code>allp[0]</code>&#x7ED1;&#x5B9A;&#x5728;&#x4E00;&#x8D77;&#xFF0C;&#x5373;<code>m0.p = allp[0], allp[0].m = m0</code></li>
+<li>&#x628A;&#x9664;&#x4E86;<code>allp[0]</code>&#x4E4B;&#x5916;&#x7684;&#x6240;&#x6709;<code>p</code>&#x653E;&#x5165;&#x5230;&#x5168;&#x5C40;&#x53D8;&#x91CF;<code>sched</code>&#x7684;<code>pidle</code>&#x7A7A;&#x95F2;&#x961F;&#x5217;&#x4E4B;&#x4E2D;</li>
+</ul>
+<blockquote>
+<p><a href="https://github.com/golang/go/blob/5c2c6d3fbf4f0a1299b5e41463847d242eae19ca/src/runtime/proc.go#L4319" target="_blank">src/runtime/proc.go</a></p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">func</span> procresize(nprocs <span class="hljs-keyword">int32</span>) *p {
+    old := gomaxprocs <span class="hljs-comment">//&#x7CFB;&#x7EDF;&#x521D;&#x59CB;&#x5316;&#x65F6; gomaxprocs = 0</span>
+    <span class="hljs-keyword">if</span> old &lt; <span class="hljs-number">0</span> || nprocs &lt;= <span class="hljs-number">0</span> {
+        throw(<span class="hljs-string">&quot;procresize: invalid arg&quot;</span>)
+    }
+    <span class="hljs-comment">//...</span>
+
+    <span class="hljs-comment">// Grow allp if necessary.</span>
+    <span class="hljs-keyword">if</span> nprocs &gt; <span class="hljs-keyword">int32</span>(<span class="hljs-built_in">len</span>(allp)) { <span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x65F6; len(allp) == 0</span>
+        <span class="hljs-comment">// Synchronize with retake, which could be running</span>
+        <span class="hljs-comment">// concurrently since it doesn&apos;t run on a P.</span>
+        lock(&amp;allpLock)
+        <span class="hljs-keyword">if</span> nprocs &lt;= <span class="hljs-keyword">int32</span>(<span class="hljs-built_in">cap</span>(allp)) {
+            allp = allp[:nprocs]
+        } <span class="hljs-keyword">else</span> { <span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x65F6;&#x8FDB;&#x5165;&#x6B64;&#x5206;&#x652F;&#xFF0C;&#x521B;&#x5EFA;allp &#x5207;&#x7247;</span>
+            nallp := <span class="hljs-built_in">make</span>([]*p, nprocs)
+            <span class="hljs-comment">// Copy everything up to allp&apos;s cap so we</span>
+            <span class="hljs-comment">// never lose old allocated Ps.</span>
+            <span class="hljs-built_in">copy</span>(nallp, allp[:<span class="hljs-built_in">cap</span>(allp)]) <span class="hljs-comment">//&#x628A;&#x65E7;&#x7684;allp&#x62F7;&#x8D1D;&#x5230;&#x65B0;&#x7684;nallp&#x91CC;&#x9762;</span>
+            allp = nallp
+        }
+        unlock(&amp;allpLock)
+    }
+
+    <span class="hljs-comment">// initialize new P&apos;s</span>
+    <span class="hljs-keyword">for</span> i := old; i &lt; nprocs; i++ {
+        pp := allp[i]
+        <span class="hljs-keyword">if</span> pp == <span class="hljs-literal">nil</span> {
+            pp = <span class="hljs-built_in">new</span>(p)
+        }
+        pp.init(i) <span class="hljs-comment">//&#x6BCF;&#x4E2A;p&#x7136;&#x540E;&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316; &#x65E7;&#x7684;&#x4E5F;&#x9700;&#x8981;&#x91CD;&#x65B0;&#x8FDB;&#x884C;&#x521D;&#x59CB;&#x5316;</span>
+        atomicstorep(unsafe.Pointer(&amp;allp[i]), unsafe.Pointer(pp))
+    }
+    <span class="hljs-comment">//...</span>
+
+    _g_ := getg()  <span class="hljs-comment">// _g_ = g0</span>
+    <span class="hljs-keyword">if</span> _g_.m.p != <span class="hljs-number">0</span> &amp;&amp; _g_.m.p.ptr().id &lt; nprocs {<span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x65F6;m0-&gt;p&#x8FD8;&#x672A;&#x521D;&#x59CB;&#x5316;&#xFF0C;&#x6240;&#x4EE5;&#x4E0D;&#x4F1A;&#x6267;&#x884C;&#x8FD9;&#x4E2A;&#x5206;&#x652F;</span>
+        <span class="hljs-comment">// continue to use the current P</span>
+        _g_.m.p.ptr().status = _Prunning
+        _g_.m.p.ptr().mcache.prepareForSweep()
+    } <span class="hljs-keyword">else</span> {<span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x65F6;&#x6267;&#x884C;&#x8FD9;&#x4E2A;&#x5206;&#x652F;</span>
+        <span class="hljs-comment">// release the current P and acquire allp[0]</span>
+        <span class="hljs-keyword">if</span> _g_.m.p != <span class="hljs-number">0</span> {<span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x65F6;&#x8FD9;&#x91CC;&#x4E0D;&#x6267;&#x884C;</span>
+            _g_.m.p.ptr().m = <span class="hljs-number">0</span>
+        }
+        _g_.m.p = <span class="hljs-number">0</span>
+        _g_.m.mcache = <span class="hljs-literal">nil</span>
+        p := allp[<span class="hljs-number">0</span>]
+        p.m = <span class="hljs-number">0</span>
+        p.status = _Pidle
+        acquirep(p) <span class="hljs-comment">// --&gt; Associate p and the current m; &#x5728;&#x521D;&#x59CB;&#x5316;&#x7684;&#x65F6;&#x5019;&#x5C31;&#x662F;&#x628A;p&#x548C;m0&#x5173;&#x8054;&#x8D77;&#x6765;,&#x5176;&#x5B9E;&#x662F;&#x8FD9;&#x4E24;&#x4E2A;strct&#x7684;&#x6210;&#x5458;&#x76F8;&#x4E92;&#x8D4B;&#x503C;</span>
+        <span class="hljs-keyword">if</span> trace.enabled {
+            traceGoStart()
+        }
+    }
+
+    <span class="hljs-comment">// release resources from unused P&apos;s --&gt; zxc &#x5C31;&#x662F;&#x91CA;&#x653E;&#x591A;&#x4F59;&#x7684;P</span>
+    <span class="hljs-keyword">for</span> i := nprocs; i &lt; old; i++ {
+        p := allp[i]
+        p.destroy()
+        <span class="hljs-comment">// TODO zxc can&apos;t free P itself because it can be referenced by an M in syscall</span>
+    }
+
+    <span class="hljs-comment">//&#x4E0B;&#x9762;&#x8FD9;&#x4E2A;for &#x5FAA;&#x73AF;&#x628A;&#x6240;&#x6709;&#x7A7A;&#x95F2;&#x7684;p&#x653E;&#x5165;&#x7A7A;&#x95F2;&#x94FE;&#x8868;</span>
+    <span class="hljs-keyword">var</span> runnablePs *p
+    <span class="hljs-keyword">for</span> i := nprocs - <span class="hljs-number">1</span>; i &gt;= <span class="hljs-number">0</span>; i-- {
+        p := allp[i]
+        <span class="hljs-keyword">if</span> _g_.m.p.ptr() == p {<span class="hljs-comment">//&#x4E0D;&#x653E;allp[0],&#x56E0;&#x4E3A;&#x5B83;&#x8DDF;m0&#x5728;&#x4E0A;&#x9762;&#x5DF2;&#x7ECF;&#x5173;&#x8054;&#x4E86;</span>
+            <span class="hljs-keyword">continue</span>
+        }
+        p.status = _Pidle
+        <span class="hljs-keyword">if</span> runqempty(p) {<span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x65F6;&#x9664;&#x4E86;allp[0]&#x5176;&#x5B83;p&#x5168;&#x90E8;&#x6267;&#x884C;&#x8FD9;&#x4E2A;&#x5206;&#x652F;&#xFF0C;&#x653E;&#x5165;&#x7A7A;&#x95F2;&#x94FE;&#x8868;</span>
+            pidleput(p)
+        } <span class="hljs-keyword">else</span> {
+            <span class="hljs-comment">//...</span>
+        }
+    }
+    <span class="hljs-comment">//...</span>
+    <span class="hljs-keyword">return</span> runnablePs
+}
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200907153347.png" alt="&#x5185;&#x5B58;&#x5173;&#x7CFB;&#x56FE;"></p>
+<h4 id="&#x521B;&#x9020;&#x4E00;&#x4E2A;&#x5C06;&#x8981;&#x8FD0;&#x884C;main&#x7684;goroutine"><a name="&#x521B;&#x9020;&#x4E00;&#x4E2A;&#x5C06;&#x8981;&#x8FD0;&#x884C;main&#x7684;goroutine" class="anchor-navigation-ex-anchor" href="#&#x521B;&#x9020;&#x4E00;&#x4E2A;&#x5C06;&#x8981;&#x8FD0;&#x884C;main&#x7684;goroutine"><i class="fa fa-link" aria-hidden="true"></i></a>&#x521B;&#x9020;&#x4E00;&#x4E2A;&#x5C06;&#x8981;&#x8FD0;&#x884C;main&#x7684;goroutine</h4>
+<p>&#x6211;&#x4EEC;&#x7EE7;&#x7EED;&#x4E0B;&#x9762;&#x7684;<a href="https://github.com/golang/go/blob/93810ac1f4574e1e2a79ea156781bafaf8b8ebe0/src/runtime/asm_amd64.s#L87" target="_blank">runtime&#xB7;rt0_go</a>&#x51FD;&#x6570;.</p>
+<pre><code class="lang-go">    <span class="hljs-comment">// create a new goroutine to start program</span>
+    MOVQ    $runtime&#xB7;mainPC(SB), AX<span class="hljs-comment">// entry</span>
+    PUSHQ    AX
+    PUSHQ    $<span class="hljs-number">0</span><span class="hljs-comment">// arg size</span>
+    CALL    runtime&#xB7;newproc(SB)
+    POPQ    AX
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200909112003.png" alt="main goroutine,&#x7B2C;&#x4E00;&#x6761;&#x6307;&#x4EE4;"></p>
+<h5 id="newproc"><a name="newproc" class="anchor-navigation-ex-anchor" href="#newproc"><i class="fa fa-link" aria-hidden="true"></i></a>newproc</h5>
+<blockquote>
+<p><a href="https://github.com/golang/go/blob/93810ac1f4574e1e2a79ea156781bafaf8b8ebe0/src/runtime/proc.go#L3528" target="_blank">src/runtime/proc.go</a></p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-comment">// Create a new g running fn with siz bytes of arguments.</span>
+<span class="hljs-comment">// Put it on the queue of g&apos;s waiting to run.</span>
+<span class="hljs-comment">// The compiler turns a go statement into a call to this.</span>
+<span class="hljs-comment">// Cannot split the stack because it assumes that the arguments</span>
+<span class="hljs-comment">// are available sequentially after &amp;fn; they would not be</span>
+<span class="hljs-comment">// copied if a stack split occurred.</span>
+<span class="hljs-comment">//go:nosplit</span>
+<span class="hljs-keyword">func</span> newproc(siz <span class="hljs-keyword">int32</span>, fn *funcval) {
+    argp := add(unsafe.Pointer(&amp;fn), sys.PtrSize)
+    gp := getg()
+    pc := getcallerpc() <span class="hljs-comment">//getcallerpc:&#x8FD4;&#x56DE;&#x5176;&#x8C03;&#x7528;&#x8005;&#x7684;&#x7A0B;&#x5E8F;&#x8BA1;&#x6570;&#x5668;&#xFF08;PC&#xFF09;---getcallersp&#x8FD4;&#x56DE;&#x5176;&#x8C03;&#x7528;&#x8005;&#x7684;&#x5806;&#x6808;&#x6307;&#x9488;&#xFF08;SP&#xFF09;</span>
+    systemstack(<span class="hljs-keyword">func</span>() {  <span class="hljs-comment">// systemstack &#x5207;&#x5230;g0&#x7684;&#x6808;&#x548C;CPU&#x5BC4;&#x5B58;&#x5668;&#x53BB;&#x6267;&#x884C;, &#x6267;&#x884C;&#x5B8C;&#x4E86;, &#x518D;&#x5207;&#x6362;&#x539F;&#x6765;&#x7684;&#x6808;&#x548C;CPU&#x5BC4;&#x5B58;&#x5668;</span>
+        newproc1(fn, (*<span class="hljs-keyword">uint8</span>)(argp), siz, gp, pc) 
+         <span class="hljs-comment">/*
+
+         &#x521B;&#x5EFA;&#x4E00;&#x4E2A;&#x65B0;&#x7684;g&#x8FD0;&#x884C;&#x7684;fn&#xFF0C;&#x53C2;&#x6570;&#x7684;&#x5B57;&#x8282;&#x6570;&#x4ECE;argp&#x5F00;&#x59CB;; 
+         siz: &#x53C2;&#x6570;&#x7684;&#x5927;&#x5C0F;
+         callergp: &#x8C03;&#x7528;&#x8005;&#x7684;goroutine pointer[caller-callee]
+         callerpc: &#x8C03;&#x7528;&#x8005;&#x7684;&#x7A0B;&#x5E8F;&#x8BA1;&#x6570;&#x5668;
+         */</span> 
+    })
+}
+</code></pre>
+<pre><code class="lang-go"><span class="hljs-comment">// Create a new g running fn with narg bytes of arguments starting</span>
+<span class="hljs-comment">// at argp. callerpc is the address of the go statement that created</span>
+<span class="hljs-comment">// this. The new g is put on the queue of g&apos;s waiting to run.</span>
+<span class="hljs-keyword">func</span> newproc1(fn *funcval, argp *<span class="hljs-keyword">uint8</span>, narg <span class="hljs-keyword">int32</span>, callergp *g, callerpc <span class="hljs-keyword">uintptr</span>) {
+    _g_ := getg()
+
+    <span class="hljs-keyword">if</span> fn == <span class="hljs-literal">nil</span> {
+        _g_.m.throwing = <span class="hljs-number">-1</span> <span class="hljs-comment">// do not dump full stacks</span>
+        throw(<span class="hljs-string">&quot;go of nil func value&quot;</span>)
+    }
+    acquirem() <span class="hljs-comment">// disable preemption because it can be holding p in a local var // TODO zxc &#x7981;&#x6B62;&#x62A2;&#x5360;</span>
+    siz := narg
+    siz = (siz + <span class="hljs-number">7</span>) &amp;^ <span class="hljs-number">7</span>
+
+    <span class="hljs-comment">// We could allocate a larger initial stack if necessary.</span>
+    <span class="hljs-comment">// Not worth it: this is almost always an error.</span>
+    <span class="hljs-comment">// 4*sizeof(uintreg): extra space added below</span>
+    <span class="hljs-comment">// sizeof(uintreg): caller&apos;s LR (arm) or return address (x86, in gostartcall).</span>
+    <span class="hljs-keyword">if</span> siz &gt;= _StackMin<span class="hljs-number">-4</span>*sys.RegSize-sys.RegSize {
+        throw(<span class="hljs-string">&quot;newproc: function arguments too large for new goroutine&quot;</span>)
+    }
+
+    _p_ := _g_.m.p.ptr() <span class="hljs-comment">// &#x7684;&#x5230;m&#x4E0A;&#x7684;p,&#x5728;&#x8FD9;&#x91CC;&#x5C31;&#x662F;allp[0]</span>
+    newg := gfget(_p_) <span class="hljs-comment">// &#x4ECE;&#x672C;&#x5730;&#x6216;&#x8005;&#x5168;&#x5C40;&#x961F;&#x5217;&#x5C1D;&#x8BD5;&#x83B7;&#x53D6;g</span>
+    <span class="hljs-keyword">if</span> newg == <span class="hljs-literal">nil</span> {<span class="hljs-comment">// &#x5982;&#x679C;&#x83B7;&#x53D6;&#x5931;&#x8D25;&#x5C31;&#x6784;&#x9020;&#x4E00;&#x4E2A;g</span>
+        newg = malg(_StackMin) <span class="hljs-comment">// &#x8DF3;&#x8F6C;&#x5230;g0&#x7684;&#x6808;,&#x7136;&#x540E;&#x518D;&#x5806;&#x4E0A;&#x5206;&#x914D;,</span>
+        casgstatus(newg, _Gidle, _Gdead) <span class="hljs-comment">//_Gidle=iota //0 &#x65B0;&#x521B;&#x5EFA;&#x7684;&#x9ED8;&#x8BA4;&#x662F;0,&#x6240;&#x4EE5;&#x5C31;&#x662F;idle;&#x4FEE;&#x6539;&#x72B6;&#x6001;&#x4E3A;Gdead,&#x8FD9;&#x6837;gc&#x5C31;&#x662F;&#x626B;&#x63CF;newg&#x4E0A;&#x9762;&#x7684;&#x6808;,&#x6765;&#x5C1D;&#x8BD5;&#x8981;&#x4E0D;&#x8981;&#x56DE;&#x6536;.</span>
+        allgadd(newg) <span class="hljs-comment">// publishes with a g-&gt;status of Gdead so GC scanner doesn&apos;t look at uninitialized stack. &#x8FD9;&#x91CC;&#x7684;&#x628A;&#x751F;&#x6210;&#x7684;g&#x653E;&#x5165;&#x5168;&#x5C40;allgs []*g//&#x4FDD;&#x5B58;&#x6240;&#x6709;&#x7684;g</span>
+    }
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200907161241.png" alt="&#x4E3A;main&#x51FD;&#x6570;&#x521B;&#x5EFA;&#x4E00;&#x4E2A;&#x65B0;&#x7684;goroutine"></p>
+<pre><code class="lang-go">    <span class="hljs-keyword">if</span> newg.stack.hi == <span class="hljs-number">0</span> {
+        throw(<span class="hljs-string">&quot;newproc1: newg missing stack&quot;</span>)
+    }
+
+    <span class="hljs-keyword">if</span> readgstatus(newg) != _Gdead { <span class="hljs-comment">//&#x4E0D;&#x662F;Gdead&#x5C31;panic</span>
+        throw(<span class="hljs-string">&quot;newproc1: new g is not Gdead&quot;</span>)
+    }
+
+    totalSize := <span class="hljs-number">4</span>*sys.RegSize + <span class="hljs-keyword">uintptr</span>(siz) + sys.MinFrameSize <span class="hljs-comment">// extra space in case of reads slightly beyond frame</span>
+    totalSize += -totalSize &amp; (sys.SpAlign - <span class="hljs-number">1</span>)                  <span class="hljs-comment">// align to spAlign</span>
+    sp := newg.stack.hi - totalSize
+    spArg := sp
+    <span class="hljs-keyword">if</span> usesLR {
+        <span class="hljs-comment">// caller&apos;s LR</span>
+        *(*<span class="hljs-keyword">uintptr</span>)(unsafe.Pointer(sp)) = <span class="hljs-number">0</span>
+        prepGoExitFrame(sp)
+        spArg += sys.MinFrameSize
+    }
+    <span class="hljs-keyword">if</span> narg &gt; <span class="hljs-number">0</span> {
+        <span class="hljs-comment">//memmove copies n bytes from &quot;from&quot; to &quot;to&quot;,&#x628A;&#x5728;&#x8C03;&#x7528;&#x8005;&#x7684;&#x6808;&#x4E0A;&#x7684;,callee</span>
+        memmove(unsafe.Pointer(spArg), unsafe.Pointer(argp), <span class="hljs-keyword">uintptr</span>(narg))
+        <span class="hljs-comment">// This is a stack-to-stack copy. If write barriers</span>
+        <span class="hljs-comment">// are enabled and the source stack is grey (the</span>
+        <span class="hljs-comment">// destination is always black), then perform a</span>
+        <span class="hljs-comment">// barrier copy. We do this *after* the memmove</span>
+        <span class="hljs-comment">// because the destination stack may have garbage on</span>
+        <span class="hljs-comment">// it.</span>
+        <span class="hljs-keyword">if</span> writeBarrier.needed &amp;&amp; !_g_.m.curg.gcscandone {
+            f := findfunc(fn.fn)
+            stkmap := (*stackmap)(funcdata(f, _FUNCDATA_ArgsPointerMaps))
+            <span class="hljs-keyword">if</span> stkmap.nbit &gt; <span class="hljs-number">0</span> {
+                <span class="hljs-comment">// We&apos;re in the prologue, so it&apos;s always stack map index 0.</span>
+                bv := stackmapdata(stkmap, <span class="hljs-number">0</span>)
+                bulkBarrierBitmap(spArg, spArg, <span class="hljs-keyword">uintptr</span>(bv.n)*sys.PtrSize, <span class="hljs-number">0</span>, bv.bytedata)
+            }
+        }
+    }
+
+    memclrNoHeapPointers(unsafe.Pointer(&amp;newg.sched), unsafe.Sizeof(newg.sched)) <span class="hljs-comment">//newg.sched &#x7A7A;&#x95F4;&#x7F6E;&#x96F6;</span>
+    newg.sched.sp = sp
+    newg.stktopsp = sp
+    newg.sched.pc = funcPC(goexit) + sys.PCQuantum <span class="hljs-comment">// +PCQuantum=1 so that previous instruction is in same function</span>
+    newg.sched.g = guintptr(unsafe.Pointer(newg))
+    gostartcallfn(&amp;newg.sched, fn)
+    <span class="hljs-comment">/*      &#x8FD9;&#x4E2A;&#x51FD;&#x6570;
+                1. &#x8C03;&#x6574;newg&#x7684;&#x6808;&#x7A7A;&#x95F4;&#xFF0C;&#x628A;goexit&#x51FD;&#x6570;&#x7684;&#x7B2C;&#x4E8C;&#x6761;&#x6307;&#x4EE4;&#x7684;&#x5730;&#x5740;&#x5165;&#x6808;&#xFF0C;&#x4F2A;&#x9020;&#x6210;goexit&#x51FD;&#x6570;&#x8C03;&#x7528;&#x4E86;fn&#xFF0C;
+                    &#x4ECE;&#x800C;&#x4F7F;fn&#x6267;&#x884C;&#x5B8C;&#x6210;&#x540E;&#x6267;&#x884C;ret&#x6307;&#x4EE4;&#x65F6;&#x8FD4;&#x56DE;&#x5230;goexit&#x7EE7;&#x7EED;&#x6267;&#x884C;&#x5B8C;&#x6210;&#x6700;&#x540E;&#x7684;&#x6E05;&#x7406;&#x5DE5;&#x4F5C;&#xFF1B;
+                2. &#x91CD;&#x65B0;&#x8BBE;&#x7F6E;newg.buf.pc &#x4E3A;&#x9700;&#x8981;&#x6267;&#x884C;&#x7684;&#x51FD;&#x6570;&#x7684;&#x5730;&#x5740;&#xFF0C;&#x5373;fn&#xFF0C;&#x6211;&#x4EEC;&#x8FD9;&#x4E2A;&#x573A;&#x666F;&#x4E3A;runtime.main&#x51FD;&#x6570;&#x7684;&#x5730;&#x5740;&#x3002;
+
+            // adjust Gobuf as if it executed a call to fn
+            // and then did an immediate gosave.
+            func gostartcallfn(gobuf *gobuf, fv *funcval) {
+                var fn unsafe.Pointer
+                if fv != nil {
+                    fn = unsafe.Pointer(fv.fn)
+                } else {
+                    fn = unsafe.Pointer(funcPC(nilfunc))
+                }
+                gostartcall(gobuf, fn, unsafe.Pointer(fv))
+            }
+
+            // adjust Gobuf as if it executed a call to fn with context ctxt
+            // and then did an immediate gosave.
+            func gostartcall(buf *gobuf, fn, ctxt unsafe.Pointer) {
+                sp := buf.sp
+                if sys.RegSize &gt; sys.PtrSize {
+                    sp -= sys.PtrSize
+                    *(*uintptr)(unsafe.Pointer(sp)) = 0
+                }
+                sp -= sys.PtrSize
+                *(*uintptr)(unsafe.Pointer(sp)) = buf.pc
+                buf.sp = sp
+                buf.pc = uintptr(fn)
+                buf.ctxt = ctxt
+            }
+    */</span>
+    newg.gopc = callerpc
+    newg.ancestors = saveAncestors(callergp)
+    newg.startpc = fn.fn
+
+    <span class="hljs-comment">//...</span>
+    casgstatus(newg, _Gdead, _Grunnable) <span class="hljs-comment">//&#x4FEE;&#x6539;goroutine&#x72B6;&#x6001;</span>
+
+    <span class="hljs-keyword">if</span> _p_.goidcache == _p_.goidcacheend {
+        <span class="hljs-comment">// Sched.goidgen is the last allocated id,</span>
+        <span class="hljs-comment">// this batch must be [sched.goidgen+1, sched.goidgen+GoidCacheBatch].</span>
+        <span class="hljs-comment">// At startup sched.goidgen=0, so main goroutine receives goid=1.</span>
+        _p_.goidcache = atomic.Xadd64(&amp;sched.goidgen, _GoidCacheBatch)
+        _p_.goidcache -= _GoidCacheBatch - <span class="hljs-number">1</span>
+        _p_.goidcacheend = _p_.goidcache + _GoidCacheBatch
+    }
+    newg.goid = <span class="hljs-keyword">int64</span>(_p_.goidcache)
+    _p_.goidcache++
+    <span class="hljs-keyword">if</span> raceenabled {
+        newg.racectx = racegostart(callerpc)
+    }
+    <span class="hljs-keyword">if</span> trace.enabled {
+        traceGoCreate(newg, newg.startpc)
+    }
+    runqput(_p_, newg, <span class="hljs-literal">true</span>) <span class="hljs-comment">//&#x653E;&#x5165;&#x672C;&#x5730;&#x961F;&#x5217;&#xFF0C; &#x6216;&#x8005;&#x5168;&#x5C40;&#x961F;&#x5217;  </span>
+
+    <span class="hljs-keyword">if</span> atomic.Load(&amp;sched.npidle) != <span class="hljs-number">0</span> &amp;&amp; atomic.Load(&amp;sched.nmspinning) == <span class="hljs-number">0</span> &amp;&amp; mainStarted {
+        wakep()
+    }
+    releasem(_g_.m)
+} <span class="hljs-comment">//end newproc1 function</span>
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200907185424.png" alt="20200907185424"></p>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200907194223.png" alt="20200907194223"></p>
+<h6 id="rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x8FD8;&#x6709;&#x7528;"><a name="rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x8FD8;&#x6709;&#x7528;" class="anchor-navigation-ex-anchor" href="#rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x8FD8;&#x6709;&#x7528;"><i class="fa fa-link" aria-hidden="true"></i></a>rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x8FD8;&#x6709;&#x7528;?</h6>
+<blockquote>
+<p>rbp&#x8FD9;&#x4E2A;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;,&#x4F1A;&#x4FDD;&#x5B58;&#x5230;&#x65B0;&#x521B;&#x5EFA;&#x7684;goroutine&#x91CC;&#x7684;<code>sched.bp</code>&#x5B57;&#x6BB5;?</p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">type</span> g <span class="hljs-keyword">struct</span> {
+    stack       stack   <span class="hljs-comment">// offset known to runtime/cgo</span>
+    stackguard0 <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// offset known to liblink</span>
+    stackguard1 <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// offset known to liblink</span>
+
+    _panic         *_panic <span class="hljs-comment">// innermost panic - offset known to liblink</span>
+    _defer         *_defer <span class="hljs-comment">// innermost defer</span>
+    m              *m      <span class="hljs-comment">// current m; offset known to arm liblink</span>
+    sched          gobuf
+    <span class="hljs-comment">//...</span>
+}
+
+<span class="hljs-keyword">type</span> gobuf <span class="hljs-keyword">struct</span> {
+    sp   <span class="hljs-keyword">uintptr</span>
+    pc   <span class="hljs-keyword">uintptr</span>
+    g    guintptr
+    ctxt unsafe.Pointer
+    ret  sys.Uintreg
+    lr   <span class="hljs-keyword">uintptr</span>
+    bp   <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// for GOEXPERIMENT=framepointer   ------------------------here</span>
+}
+</code></pre>
+<ul>
+<li>&#x6CA1;&#x6709;&#x4FDD;&#x5B58;,&#x5F53;&#x91CD;&#x65B0;&#x8C03;&#x5EA6;&#x8FD9;&#x4E2A;goroutine,<code>&#x91CD;&#x65B0;&#x89C2;&#x5BDF;BP&#x5BC4;&#x5B58;&#x5668;</code>&#x8FD9;&#x4E00;&#x7AE0;&#x4E2D;&#x6211;&#x4EEC;&#x4F1A;&#x770B;&#x5230;&#x91CC;&#x9762;&#x662F;&#x7A7A;&#x7684;</li>
+<li><code>&#x8FDB;&#x5165;main&#x51FD;&#x6570;</code>&#x91CC;&#x9762;&#x6709;rpb&#x662F;&#x5426;&#x4F1A;&#x5165;&#x6808;</li>
+</ul>
+<h4 id="mstart"><a name="mstart" class="anchor-navigation-ex-anchor" href="#mstart"><i class="fa fa-link" aria-hidden="true"></i></a>mstart</h4>
+<p>&#x6211;&#x4EEC;&#x7EE7;&#x7EED;&#x4E0B;&#x9762;&#x7684;<a href="https://github.com/golang/go/blob/93810ac1f4574e1e2a79ea156781bafaf8b8ebe0/src/runtime/asm_amd64.s#L87" target="_blank">runtime&#xB7;rt0_go</a>&#x51FD;&#x6570;.</p>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200908200455.png" alt="mstart1&#x51FD;&#x6570;,&#x5230;&#x4FDD;&#x5B58;pc,sp&#x5230;g0"></p>
+<pre><code class="lang-go">    <span class="hljs-comment">// start this M</span>
+    CALL    runtime&#xB7;mstart(SB)
+
+    CALL    runtime&#xB7;abort(SB)    <span class="hljs-comment">// mstart should never return</span>
+    RET
+
+    <span class="hljs-comment">// Prevent dead-code elimination of debugCallV1, which is</span>
+    <span class="hljs-comment">// intended to be called by debuggers.</span>
+    MOVQ    $runtime&#xB7;debugCallV1(SB), AX
+    RET
+</code></pre>
+<pre><code class="lang-go"><span class="hljs-comment">// mstart is the entry-point for new Ms.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// This must not split the stack because we may not even have stack</span>
+<span class="hljs-comment">// bounds set up yet.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// May run during STW (because it doesn&apos;t have a P yet), so write</span>
+<span class="hljs-comment">// barriers are not allowed.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//go:nosplit</span>
+<span class="hljs-comment">//go:nowritebarrierrec</span>
+<span class="hljs-keyword">func</span> mstart() {
+    _g_ := getg()  <span class="hljs-comment">// g0</span>
+
+    osStack := _g_.stack.lo == <span class="hljs-number">0</span>
+    <span class="hljs-comment">/*  ? linux&#x7684;&#x8BDD;&#xFF0C; &#x4ECE;runtime&#xB7;rt0_go&#x6211;&#x4EEC;&#x77E5;&#x9053;&#xFF0C;g0&#x7684;stack.lo,&#x4E0D;&#x662F;&#x4E3A;0&#x7684;.
+        // create istack out of the given (operating system) stack.
+        // _cgo_init may update stackguard.
+        MOVQ    $runtime&#xB7;g0(SB), DI
+        LEAQ    (-64*1024+104)(SP), BX
+        MOVQ    BX, g_stackguard0(DI)
+        MOVQ    BX, g_stackguard1(DI)
+        MOVQ    BX, (g_stack+stack_lo)(DI)
+        MOVQ    SP, (g_stack+stack_hi)(DI)
+    */</span>
+    <span class="hljs-keyword">if</span> osStack {
+        <span class="hljs-comment">// Initialize stack bounds from system stack.</span>
+        <span class="hljs-comment">// Cgo may have left stack size in stack.hi.</span>
+        <span class="hljs-comment">// minit may update the stack bounds.</span>
+        size := _g_.stack.hi
+        <span class="hljs-keyword">if</span> size == <span class="hljs-number">0</span> {
+            size = <span class="hljs-number">8192</span> * sys.StackGuardMultiplier
+        }
+        _g_.stack.hi = <span class="hljs-keyword">uintptr</span>(noescape(unsafe.Pointer(&amp;size)))
+        _g_.stack.lo = _g_.stack.hi - size + <span class="hljs-number">1024</span>
+    }
+    <span class="hljs-comment">// Initialize stack guard so that we can start calling regular</span>
+    <span class="hljs-comment">// Go code.</span>
+    _g_.stackguard0 = _g_.stack.lo + _StackGuard  <span class="hljs-comment">//&#x8FD9;&#x4E2A;stackguard0&#x6BD4;stack.lo&#x5927;&#xFF0C;&#x9632;&#x6B62;&#x8D8A;&#x754C;</span>
+    <span class="hljs-comment">// This is the g0, so we can also call go:systemstack</span>
+    <span class="hljs-comment">// functions, which check stackguard1.</span>
+    _g_.stackguard1 = _g_.stackguard0 <span class="hljs-comment">//stackguard1&#x7684;&#x4F5C;&#x7528;&#x662F;&#x6808;&#x6EA2;&#x51FA;&#x68C0;&#x67E5;&#xFF0C;&#x5982;&#x679C;&#x662F;stackguard0&#x4E0E;stackguard1&#x76F8;&#x7B49;&#xFF0C;&#x90A3;&#x4E48;&#x662F;&#x4E0D;&#x80FD;&#x653E;&#x6570;&#x636E;&#x5230;g0&#x6808;&#x4E2D;&#x4E86;&#x5417;</span>
+    mstart1()
+
+    <span class="hljs-comment">// Exit this thread.</span>
+    <span class="hljs-keyword">if</span> GOOS == <span class="hljs-string">&quot;windows&quot;</span> || GOOS == <span class="hljs-string">&quot;solaris&quot;</span> || GOOS == <span class="hljs-string">&quot;illumos&quot;</span> || GOOS == <span class="hljs-string">&quot;plan9&quot;</span> || GOOS == <span class="hljs-string">&quot;darwin&quot;</span> || GOOS == <span class="hljs-string">&quot;aix&quot;</span> {
+        <span class="hljs-comment">// Windows, Solaris, illumos, Darwin, AIX and Plan 9 always system-allocate</span>
+        <span class="hljs-comment">// the stack, but put it in _g_.stack before mstart,</span>
+        <span class="hljs-comment">// so the logic above hasn&apos;t set osStack yet.</span>
+        osStack = <span class="hljs-literal">true</span>
+    }
+    mexit(osStack)
+}
+</code></pre>
+<pre><code class="lang-go"><span class="hljs-keyword">func</span> mstart1() {
+    _g_ := getg()   <span class="hljs-comment">//g0</span>
+
+    <span class="hljs-keyword">if</span> _g_ != _g_.m.g0 {
+        throw(<span class="hljs-string">&quot;bad runtime&#xB7;mstart&quot;</span>)
+    }
+
+    <span class="hljs-comment">// Record the caller for use as the top of stack in mcall and</span>
+    <span class="hljs-comment">// for terminating the thread.</span>
+    <span class="hljs-comment">// We&apos;re never coming back to mstart1 after we call schedule,</span>
+    <span class="hljs-comment">// so other calls can reuse the current frame.</span>
+    save(getcallerpc(), getcallersp()) <span class="hljs-comment">//&#x5C31;&#x662F;&#x628A;pc, sp&#x4FDD;&#x5B58;&#x5230;&#x81EA;&#x5DF1;&#x7684;sched&#x91CC;&#x9762;&#xFF0C; &#x4F46;&#x662F;bp&#x5BC4;&#x5B58;&#x5668;&#x6CA1;&#x6709;&#x4FDD;&#x5B58;&#xFF0C;&#x56E0;&#x4E3A;&#x4F1A;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x8FD9;&#x4E2A;&#x6808;&#xFF1F;</span>
+    <span class="hljs-comment">/*
+    TODO zxc &#x8FD9;&#x91CC;&#x4E3A;&#x4EC0;&#x4E48;&#x4E0D;&#x662F;&#x5F53;&#x524D;&#x7684;, gdb&#x67E5;&#x770B;&#x4E0B;.
+        getcallerpc()&#x8FD4;&#x56DE;&#x7684;&#x662F;mstart&#x8C03;&#x7528;mstart1&#x65F6;&#x88AB;call&#x6307;&#x4EE4;&#x538B;&#x6808;&#x7684;&#x8FD4;&#x56DE;&#x5730;&#x5740;&#xFF0C; bp+1 ?
+        getcallersp()&#x51FD;&#x6570;&#x8FD4;&#x56DE;&#x7684;&#x662F;&#x8C03;&#x7528;mstart1&#x51FD;&#x6570;&#x4E4B;&#x524D;mstart&#x51FD;&#x6570;&#x7684;&#x6808;&#x9876;&#x5730;&#x5740;    bp ?
+    */</span>
+    asminit()
+    minit() <span class="hljs-comment">//&#x521D;&#x59CB;&#x5316;&#x4FE1;&#x53F7;</span>
+
+    <span class="hljs-comment">// Install signal handlers; after minit so that minit can</span>
+    <span class="hljs-comment">// prepare the thread to be able to handle the signals.</span>
+    <span class="hljs-comment">// &#x5B89;&#x88C5;&#x4FE1;&#x53F7;&#x5904;&#x7406;&#x7A0B;&#x5E8F;;&#x6240;&#x4EE5;minit&#x53EF;&#x4EE5;&#x51C6;&#x5907;&#x7EBF;&#x7A0B;&#x4EE5;&#x4FBF;&#x80FD;&#x591F;&#x5904;&#x7406;&#x4FE1;&#x53F7;, &#x5728;minit&#x4E4B;&#x540E;&#x6267;&#x884C;</span>
+    <span class="hljs-keyword">if</span> _g_.m == &amp;m0 {
+        mstartm0()
+    }
+
+    <span class="hljs-keyword">if</span> fn := _g_.m.mstartfn; fn != <span class="hljs-literal">nil</span> {   <span class="hljs-comment">//&#x5982;&#x679C;m&#x7684;mstartfn&#x4E0D;&#x662F;&#x7A7A;&#x7684;&#xFF0C;&#x5148;&#x6267;&#x884C;&#x5B83;</span>
+        fn()
+    }
+
+    <span class="hljs-keyword">if</span> _g_.m != &amp;m0 { <span class="hljs-comment">// &#x5982;&#x679C;m&#x4E0D;&#x7B49;&#x4E8E;m0  &#x5C31;&#x662F;m0&#x7684;&#x8BDD;,&#x524D;&#x9762;m0&#x548C;allp[0]&#x5DF2;&#x7ECF;&#x7ED1;&#x5B9A;&#x4E86;</span>
+        acquirep(_g_.m.nextp.ptr()) <span class="hljs-comment">//TODO zxc &#x8FD9;&#x4E2A;acquirep&#x51FD;&#x6570;&#x662F;&#x628A;m&#x548C;m.nextp&#x8FDB;&#x884C;&#x7ED1;&#x5B9A;,&#x5982;&#x679C;&#x5230;&#x8FD9;&#x91CC;&#x7684;&#x65F6;&#x5019;,nextp&#x5DF2;&#x7ECF;&#x72B6;&#x6001;&#x4E0D;&#x662F;&#x7A7A;&#x95F2;&#x7684;&#x72B6;&#x6001;,</span>
+                                    <span class="hljs-comment">//&#x90A3;&#x4E48;&#x4F1A;&#x629B;&#x51FA;&#x9519;&#x8BEF;?</span>
+        _g_.m.nextp = <span class="hljs-number">0</span>
+    }
+    schedule() <span class="hljs-comment">//&#x8FDB;&#x5165;&#x8C03;&#x5EA6;</span>
+}
+</code></pre>
+<h5 id="save&#x51FD;&#x6570;&#x4FDD;&#x5B58;pcsp&#x5230;g0&#x65B9;&#x4FBF;&#x4E0B;&#x6B21;&#x518D;&#x5EA6;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;g0"><a name="save&#x51FD;&#x6570;&#x4FDD;&#x5B58;pcsp&#x5230;g0&#x65B9;&#x4FBF;&#x4E0B;&#x6B21;&#x518D;&#x5EA6;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;g0" class="anchor-navigation-ex-anchor" href="#save&#x51FD;&#x6570;&#x4FDD;&#x5B58;pcsp&#x5230;g0&#x65B9;&#x4FBF;&#x4E0B;&#x6B21;&#x518D;&#x5EA6;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;g0"><i class="fa fa-link" aria-hidden="true"></i></a>save&#x51FD;&#x6570;&#x4FDD;&#x5B58;pc,sp&#x5230;g0,&#x65B9;&#x4FBF;&#x4E0B;&#x6B21;&#x518D;&#x5EA6;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;g0</h5>
+<pre><code class="lang-sh">list /usr/lib/golang/src/runtime/proc.go:1167
+list /usr/lib/golang/src/runtime/proc.go:1179
+list /usr/lib/golang/src/runtime/proc.go:1190
+</code></pre>
+<pre><code class="lang-sh">[root@gitlab kubernets]<span class="hljs-comment"># gdb test</span>
+GNU gdb (GDB) Red Hat Enterprise Linux 7.6.1-119.el7
+Copyright (C) 2013 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;http://gnu.org/licenses/gpl.html&gt;
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type <span class="hljs-string">&quot;show copying&quot;</span>
+and <span class="hljs-string">&quot;show warranty&quot;</span> <span class="hljs-keyword">for</span> details.
+This GDB was configured as <span class="hljs-string">&quot;x86_64-redhat-linux-gnu&quot;</span>.
+For bug reporting instructions, please see:
+&lt;http://www.gnu.org/software/gdb/bugs/&gt;...
+Reading symbols from /tmp/kubernets/test...done.
+Loading Go Runtime support.
+(gdb) list /usr/lib/golang/src/runtime/proc.go:1167
+1162        // Go code.
+1163        _g_.stackguard0 = _g_.stack.lo + _StackGuard
+1164        // This is the g0, so we can also call go:systemstack
+1165        // <span class="hljs-built_in">functions</span>, <span class="hljs-built_in">which</span> check stackguard1.
+1166        _g_.stackguard1 = _g_.stackguard0
+1167        mstart1()
+1168
+1169        // Exit this thread.
+1170        <span class="hljs-keyword">if</span> GOOS == <span class="hljs-string">&quot;windows&quot;</span> || GOOS == <span class="hljs-string">&quot;solaris&quot;</span> || GOOS == <span class="hljs-string">&quot;illumos&quot;</span> || GOOS == <span class="hljs-string">&quot;plan9&quot;</span> || GOOS == <span class="hljs-string">&quot;darwin&quot;</span> || GOOS == <span class="hljs-string">&quot;aix&quot;</span> {
+1171            // Windows, Solaris, illumos, Darwin, AIX and Plan 9 always system-allocate
+(gdb) b 1167
+Breakpoint 1 at 0x42dd09: file /usr/lib/golang/src/runtime/proc.go, line 1167.
+(gdb) list /usr/lib/golang/src/runtime/proc.go:1179
+1174            osStack = <span class="hljs-literal">true</span>
+1175        }
+1176        mexit(osStack)
+1177    }
+1178
+1179    func <span class="hljs-function"><span class="hljs-title">mstart1</span></span>() {
+1180        _g_ := getg()
+1181
+1182        <span class="hljs-keyword">if</span> _g_ != _g_.m.g0 {
+1183            throw(<span class="hljs-string">&quot;bad runtime&#xB7;mstart&quot;</span>)
+(gdb) b 1179
+Breakpoint 2 at 0x42dd30: file /usr/lib/golang/src/runtime/proc.go, line 1179.
+(gdb) list /usr/lib/golang/src/runtime/proc.go:1190
+1185
+1186        // Record the <span class="hljs-built_in">caller</span> <span class="hljs-keyword">for</span> use as the top of stack <span class="hljs-keyword">in</span> mcall and
+1187        // <span class="hljs-keyword">for</span> terminating the thread.
+1188        // We<span class="hljs-string">&apos;re never coming back to mstart1 after we call schedule,
+1189        // so other calls can reuse the current frame.
+1190        save(getcallerpc(), getcallersp())
+1191        asminit()
+1192        minit()
+1193
+1194        // Install signal handlers; after minit so that minit can
+(gdb) b 1190
+Breakpoint 3 at 0x42dd7f: file /usr/lib/golang/src/runtime/proc.go, line 1190.
+(gdb) info breakpoint
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x000000000042dd09 in runtime.mstart at /usr/lib/golang/src/runtime/proc.go:1167
+2       breakpoint     keep y   0x000000000042dd30 in runtime.mstart1 at /usr/lib/golang/src/runtime/proc.go:1179
+3       breakpoint     keep y   0x000000000042dd7f in runtime.mstart1 at /usr/lib/golang/src/runtime/proc.go:1190
+(gdb) run
+Starting program: /tmp/kubernets/test
+
+Breakpoint 1, runtime.mstart () at /usr/lib/golang/src/runtime/proc.go:1167
+1167        mstart1()
+(gdb) list
+1162        // Go code.
+1163        _g_.stackguard0 = _g_.stack.lo + _StackGuard
+1164        // This is the g0, so we can also call go:systemstack
+1165        // functions, which check stackguard1.
+1166        _g_.stackguard1 = _g_.stackguard0
+1167        mstart1()
+1168
+1169        // Exit this thread.
+1170        if GOOS == &quot;windows&quot; || GOOS == &quot;solaris&quot; || GOOS == &quot;illumos&quot; || GOOS == &quot;plan9&quot; || GOOS == &quot;darwin&quot; || GOOS == &quot;aix&quot; {
+1171            // Windows, Solaris, illumos, Darwin, AIX and Plan 9 always system-allocate
+(gdb) info register rbp rsp pc
+rbp            0x7fffffffe490    0x7fffffffe490
+rsp            0x7fffffffe478    0x7fffffffe478
+pc             0x42dd09    0x42dd09 &lt;runtime.mstart+105&gt;
+(gdb) continue
+Continuing.
+
+Breakpoint 2, runtime.mstart1 () at /usr/lib/golang/src/runtime/proc.go:1179
+1179    func mstart1() {
+(gdb) info register rbp rsp pc
+rbp            0x7fffffffe490    0x7fffffffe490
+rsp            0x7fffffffe470    0x7fffffffe470
+pc             0x42dd30    0x42dd30 &lt;runtime.mstart1&gt;
+(gdb) x/8xb 0x7fffffffe470
+0x7fffffffe470:    0x0e    0xdd    0x42    0x00    0x00    0x00    0x00    0x00
+(gdb) info frame 0
+Stack frame at 0x7fffffffe478:
+ rip = 0x42dd30 in runtime.mstart1 (/usr/lib/golang/src/runtime/proc.go:1179); saved rip 0x42dd0e
+ called by frame at 0x7fffffffe4a0
+ source language unknown.
+ Arglist at 0x7fffffffe468, args:
+ Locals at 0x7fffffffe468, Previous frame&apos;</span>s sp is 0x7fffffffe478
+ Saved registers:
+  rip at 0x7fffffffe470
+(gdb)
+</code></pre>
+<h6 id="&#x53CD;&#x6C47;&#x7F16;&#x770B;&#x4E0B;mstart1&#x5230;save&#x51FD;&#x6570;&#x7684;&#x6C47;&#x7F16;&#x4EE3;&#x7801;"><a name="&#x53CD;&#x6C47;&#x7F16;&#x770B;&#x4E0B;mstart1&#x5230;save&#x51FD;&#x6570;&#x7684;&#x6C47;&#x7F16;&#x4EE3;&#x7801;" class="anchor-navigation-ex-anchor" href="#&#x53CD;&#x6C47;&#x7F16;&#x770B;&#x4E0B;mstart1&#x5230;save&#x51FD;&#x6570;&#x7684;&#x6C47;&#x7F16;&#x4EE3;&#x7801;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x53CD;&#x6C47;&#x7F16;&#x770B;&#x4E0B;mstart1&#x5230;save&#x51FD;&#x6570;&#x7684;&#x6C47;&#x7F16;&#x4EE3;&#x7801;</h6>
+<pre><code class="lang-sh">(gdb) disass
+Dump of assembler code <span class="hljs-keyword">for</span> <span class="hljs-keyword">function</span> runtime.mstart1:
+=&gt; 0x000000000042dd30 &lt;+0&gt;:    mov    %fs:0xfffffffffffffff8,%rcx // rcx = &amp;g0
+   0x000000000042dd39 &lt;+9&gt;:    cmp    0x10(%rcx),%rsp             // g0.stackguard0&#x4E0E;rsp(0x7fffffffe470)&#x5224;&#x65AD;&#x662F;&#x5426;&#x8FBE;&#x5230;&#x6808;&#x9876;&#x90E8;
+   0x000000000042dd3d &lt;+13&gt;:    jbe    0x42de2e &lt;runtime.mstart1+254&gt;  // jump below equal &lt;=, &#x5C31;panic
+   0x000000000042dd43 &lt;+19&gt;:    sub    <span class="hljs-variable">$0x20</span>,%rsp // rsp=0x7fffffffe470-0x20=0x7fffffffe450
+   0x000000000042dd47 &lt;+23&gt;:    mov    %rbp,0x18(%rsp) //rsp(0x7fffffffe450)+0x18 = rbp ==&gt; <span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s&#x6808;&#x5E95;(rbp)&#x5165;callee&#x7684;&#x6808;
+   /*
+         (gdb) x/8xb 0x7fffffffe468
+        0x7fffffffe468:    0x90    0xe4    0xff    0xff    0xff    0x7f    0x00    0x00 
+        &#x4ECE;&#x524D;&#x9762; info register rbp rsp pc&#x8FD4;&#x56DE;&#x53EF;&#x4EE5;&#x770B;&#x5230;,&#x5C31;&#x662F;rbp&#x7684;&#x503C;
+   */
+   0x000000000042dd4c &lt;+28&gt;:    lea    0x18(%rsp),%rbp //&#x53D6;&#x5730;&#x5740;&#x4E0D;&#x53D6;&#x5F15;&#x7528;,&#x5F97;&#x5230;rbp=0x7fffffffe468; &#x6240;&#x4EE5;callee[mstart1&#x51FD;&#x6570;]&#x65B0;&#x7684;&#x6808;&#x5E95;rbp&#x5C31;&#x6307;&#x5411;&#x8FD9;
+   /*
+         (gdb) info register rbp
+        rbp            0x7fffffffe468    0x7fffffffe468
+   */
+   0x000000000042dd51 &lt;+33&gt;:    mov    %fs:0xfffffffffffffff8,%rax // rax = &amp;g0
+   0x000000000042dd5a &lt;+42&gt;:    mov    0x30(%rax),%rcx //rcx = g0.m.g0
+   0x000000000042dd5e &lt;+46&gt;:    cmp    %rax,(%rcx)     // g0&#x662F;&#x5426;&#x4E0E;g0.m.g0&#x76F8;&#x7B49;
+   0x000000000042dd61 &lt;+49&gt;:    jne    0x42de14 &lt;runtime.mstart1+228&gt; //&#x8DF3;&#x8F6C;&#x5230;...&#x5982;&#x679C;&#x4E0D;&#x7B49;&#x4E8E;
+   0x000000000042dd67 &lt;+55&gt;:    mov    %rax,0x10(%rsp) // rsp(0x7fffffffe450)+0x10 = 0x7fffffffe460&#x7684;&#x5730;&#x65B9;&#x4FDD;&#x5B58;g0&#x7684;&#x5730;&#x5740;
+
+   0x000000000042dd6c &lt;+60&gt;:    mov    0x20(%rsp),%rax //rsp(0x7fffffffe450)+0x20 = 0x7fffffffe470&#x7684;&#x5730;&#x5740;&#x5185;&#x5BB9;&#x653E;&#x5230;rax //&#x8FD9;&#x91CC;&#x5C31;&#x662F;caller&apos;</span>s pc
+   0x000000000042dd71 &lt;+65&gt;:    mov    %rax,(%rsp) //&#x6240;&#x4EE5;&#x4ECE;&#x4E0B;&#x9762;&#x53EF;&#x4EE5;&#x770B;&#x51FA;0x7fffffffe470&#x4E0E;0x7fffffffe450&#x5185;&#x5BB9;&#x662F;&#x4E00;&#x6837;&#x7684;&#x90FD;&#x662F;<span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s pc
+   0x000000000042dd75 &lt;+69&gt;:    lea    0x28(%rsp),%rax //rsp(0x7fffffffe450)+0x28 = 0x7fffffffe478&#x8FD9;&#x4E2A;&#x503C;,&#x4E0D;&#x662F;&#x91CC;&#x9762;&#x7684;&#x503C;&#x653E;&#x5230;rax
+   0x000000000042dd7a &lt;+74&gt;:    mov    %rax,0x8(%rsp) //rsp(0x7fffffffe450)+0x8 = 0x7fffffffe458 ==&gt;&#x6240;&#x4EE5;&#x8FD9;&#x4E2A;go&#x8BED;&#x8A00;&#x91CC;&#x9762;&#x7684;sp&#x662F;&#x4ECE;&#x81EA;&#x8C03;&#x7528;&#x8FD4;&#x56DE;&#x540E;,sp&#x91CC;&#x7684;&#x503C;,&#x5B83;&#x4E0D;&#x5305;&#x62EC;caller&#x8C03;&#x7528;callee&#x7684;&#x65F6;&#x5019;,call&#x6307;&#x4EE4;&#x4E34;&#x65F6;&#x4FDD;&#x5B58;&#x7684;pc,&#x6240;&#x4EE5;&#x5730;&#x5740;&#x662F;0x7fffffffe478&#x800C;&#x4E0D;&#x662F;0x7fffffffe470
+   /*
+         (gdb) info register rsp
+        rsp            0x7fffffffe450    0x7fffffffe450
+        (gdb) x/64xb 0x7fffffffe450
+        0x7fffffffe450:    0x0e    0xdd    0x42    0x00    0x00    0x00    0x00    0x00 //caller&apos;</span>s pc
+        0x7fffffffe458:    0x78    0xe4    0xff    0xff    0xff    0x7f    0x00    0x00 //<span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s sp
+        0x7fffffffe460:    0xc0    0xda    0x55    0x00    0x00    0x00    0x00    0x00 //&#x5C40;&#x90E8;&#x53D8;&#x91CF;_g_&#x4E5F;&#x5C31;&#x662F;&#x5168;&#x5C40;&#x53D8;&#x91CF;g0&#x7684;&#x5730;&#x5740;
+        0x7fffffffe468:    0x90    0xe4    0xff    0xff    0xff    0x7f    0x00    0x00 // caller&apos;</span>s rbp
+        0x7fffffffe470:    0x0e    0xdd    0x42    0x00    0x00    0x00    0x00    0x00 // <span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s pc
+        0x7fffffffe478:    0x74    0x15    0x45    0x00    0x00    0x00    0x00    0x00
+        0x7fffffffe480:    0x00    0x00    0x00    0x00    0x00    0x00    0x00    0x00
+        0x7fffffffe488:    0x08    0xe5    0xfe    0xff    0xff    0x7f    0x00    0x00 
+   */
+   0x000000000042dd7f &lt;+79&gt;:    callq  0x431bd0 &lt;runtime.save&gt; // save(getcallerpc(), getcallersp())
+</span></code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200908170921.png" alt="gdb&#x8C03;&#x8BD5;&#x7684;&#x65F6;&#x5019;&#x53D1;&#x73B0;,info frame&#x4E2D;sp&#x6CA1;&#x6709;&#x5305;&#x62EC;pc"></p>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200908193623.png" alt="20200908193623"></p>
+<h5 id="schedule"><a name="schedule" class="anchor-navigation-ex-anchor" href="#schedule"><i class="fa fa-link" aria-hidden="true"></i></a>schedule</h5>
+<pre><code class="lang-go"><span class="hljs-comment">// One round of scheduler: find a runnable goroutine and execute it.</span>
+<span class="hljs-comment">// Never returns.</span>
+<span class="hljs-keyword">func</span> schedule() {
+    _g_ := getg() <span class="hljs-comment">// get g0</span>
+
+    <span class="hljs-comment">//....</span>
+
+top:
+    <span class="hljs-comment">//...</span>
+
+    <span class="hljs-keyword">var</span> gp *g
+    <span class="hljs-keyword">var</span> inheritTime <span class="hljs-keyword">bool</span>
+
+    <span class="hljs-comment">// Normal goroutines will check for need to wakeP in ready,</span>
+    <span class="hljs-comment">// but GCworkers and tracereaders will not, so the check must</span>
+    <span class="hljs-comment">// be done here instead.</span>
+    tryWakeP := <span class="hljs-literal">false</span> <span class="hljs-comment">//&#x4E00;&#x822C;&#x7684;goroutines&#x4F1A;&#x5728;&#x51C6;&#x5907;&#x597D;&#x7684;&#x65F6;&#x5019;&#x68C0;&#x67E5;&#x662F;&#x5426;&#x9700;&#x8981;wakeP&#x3002;gcworker, tracereaders&#x9700;&#x8981;&#x73B0;&#x5728;&#x5524;&#x9192;P.</span>
+    <span class="hljs-keyword">if</span> trace.enabled || trace.shutdown {
+        gp = traceReader()
+        <span class="hljs-keyword">if</span> gp != <span class="hljs-literal">nil</span> {
+            casgstatus(gp, _Gwaiting, _Grunnable)
+            traceGoUnpark(gp, <span class="hljs-number">0</span>)
+            tryWakeP = <span class="hljs-literal">true</span>
+        }
+    }
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> &amp;&amp; gcBlackenEnabled != <span class="hljs-number">0</span> {
+        gp = gcController.findRunnableGCWorker(_g_.m.p.ptr())
+        tryWakeP = tryWakeP || gp != <span class="hljs-literal">nil</span>
+    }
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> {
+        <span class="hljs-comment">// Check the global runnable queue once in a while to ensure fairness.</span>
+        <span class="hljs-comment">// Otherwise two goroutines can completely occupy the local runqueue</span>
+        <span class="hljs-comment">// by constantly respawning each other.</span>
+        <span class="hljs-keyword">if</span> _g_.m.p.ptr().schedtick%<span class="hljs-number">61</span> == <span class="hljs-number">0</span> &amp;&amp; sched.runqsize &gt; <span class="hljs-number">0</span> {
+            lock(&amp;sched.lock)
+            gp = globrunqget(_g_.m.p.ptr(), <span class="hljs-number">1</span>)
+            unlock(&amp;sched.lock)
+        }
+    }
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> {
+        gp, inheritTime = runqget(_g_.m.p.ptr())
+        <span class="hljs-keyword">if</span> gp != <span class="hljs-literal">nil</span> &amp;&amp; _g_.m.spinning {
+            throw(<span class="hljs-string">&quot;schedule: spinning with local work&quot;</span>)
+        }
+    }
+    <span class="hljs-keyword">if</span> gp == <span class="hljs-literal">nil</span> {
+        gp, inheritTime = findrunnable() <span class="hljs-comment">// blocks until work is available</span>
+    }
+
+    <span class="hljs-comment">// This thread is going to run a goroutine and is not spinning anymore,</span>
+    <span class="hljs-comment">// so if it was marked as spinning we need to reset it now and potentially</span>
+    <span class="hljs-comment">// start a new spinning M.</span>
+    <span class="hljs-keyword">if</span> _g_.m.spinning {
+        resetspinning()
+    }
+
+    <span class="hljs-keyword">if</span> sched.disable.user &amp;&amp; !schedEnabled(gp) {
+        <span class="hljs-comment">// Scheduling of this goroutine is disabled. Put it on</span>
+        <span class="hljs-comment">// the list of pending runnable goroutines for when we</span>
+        <span class="hljs-comment">// re-enable user scheduling and look again.</span>
+        lock(&amp;sched.lock)
+        <span class="hljs-keyword">if</span> schedEnabled(gp) {
+            <span class="hljs-comment">// Something re-enabled scheduling while we</span>
+            <span class="hljs-comment">// were acquiring the lock.</span>
+            unlock(&amp;sched.lock)
+        } <span class="hljs-keyword">else</span> {
+            sched.disable.runnable.pushBack(gp)
+            sched.disable.n++
+            unlock(&amp;sched.lock)
+            <span class="hljs-keyword">goto</span> top
+        }
+    }
+
+    <span class="hljs-comment">// If about to schedule a not-normal goroutine (a GCworker or tracereader),</span>
+    <span class="hljs-comment">// wake a P if there is one.</span>
+    <span class="hljs-keyword">if</span> tryWakeP { <span class="hljs-comment">//a GCworker or tracereader,&#x9700;&#x8981;&#x5524;&#x9192;P</span>
+        <span class="hljs-keyword">if</span> atomic.Load(&amp;sched.npidle) != <span class="hljs-number">0</span> &amp;&amp; atomic.Load(&amp;sched.nmspinning) == <span class="hljs-number">0</span> {
+            wakep()
+        }
+    }
+    <span class="hljs-comment">//...</span>
+
+    execute(gp, inheritTime) <span class="hljs-comment">// &#x6267;&#x884C;G</span>
+}
+</code></pre>
+<ul>
+<li><p>schedule()&#x51FD;&#x6570;&#x4E3B;&#x8981;&#x662F;&#x83B7;&#x53D6;&#x4E00;&#x4E2A;Goroutine.</p>
+<ul>
+<li>schedule&#x51FD;&#x6570;&#x901A;&#x8FC7;&#x8C03;&#x7528;<code>globrunqget()</code>&#x548C;<code>runqget()</code>&#x51FD;&#x6570;&#x5206;&#x522B;&#x4ECE;&#x5168;&#x5C40;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x548C;&#x5F53;&#x524D;&#x5DE5;&#x4F5C;&#x7EBF;&#x7A0B;&#x7684;&#x672C;&#x5730;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x9009;&#x53D6;&#x4E0B;&#x4E00;&#x4E2A;&#x9700;&#x8981;&#x8FD0;&#x884C;&#x7684;goroutine;</li>
+<li>&#x5982;&#x679C;&#x8FD9;&#x4E24;&#x4E2A;&#x961F;&#x5217;&#x90FD;&#x6CA1;&#x6709;&#x9700;&#x8981;&#x8FD0;&#x884C;&#x7684;goroutine&#x5219;&#x901A;&#x8FC7;<code>findrunnable()</code>&#x51FD;&#x6570;&#x4ECE;&#x5176;&#x5B83;p&#x7684;&#x8FD0;&#x884C;&#x961F;&#x5217;&#x4E2D;&#x76D7;&#x53D6;goroutine.</li>
+</ul>
+</li>
+<li><p>&#x4E00;&#x65E6;&#x627E;&#x5230;&#x4E0B;&#x4E00;&#x4E2A;&#x9700;&#x8981;&#x8FD0;&#x884C;&#x7684;goroutine&#xFF0C;&#x5219;&#x8C03;&#x7528;excute&#x51FD;&#x6570;&#x4ECE;g0&#x5207;&#x6362;&#x5230;&#x8BE5;goroutine&#x53BB;&#x8FD0;&#x884C;.</p>
+<ul>
+<li>&#x5426;&#x5219;<code>gp, inheritTime = findrunnable() // blocks until work is available</code>,&#x4E00;&#x76F4;&#x963B;&#x585E;&#x5728;findrunnable()&#x4E0A;&#x9762;</li>
+</ul>
+</li>
+</ul>
+<h6 id="execute&#x51FD;&#x6570;"><a name="execute&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#execute&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>execute&#x51FD;&#x6570;</h6>
+<pre><code class="lang-go"><span class="hljs-comment">// Schedules gp to run on the current M.</span>
+<span class="hljs-comment">// If inheritTime is true, gp inherits the remaining time in the</span>
+<span class="hljs-comment">// current time slice. Otherwise, it starts a new time slice.</span>
+<span class="hljs-comment">// Never returns.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">// Write barriers are allowed because this is called immediately after</span>
+<span class="hljs-comment">// acquiring a P in several places.</span>
+<span class="hljs-comment">//</span>
+<span class="hljs-comment">//go:yeswritebarrierrec</span>
+
+<span class="hljs-keyword">func</span> execute(gp *g, inheritTime <span class="hljs-keyword">bool</span>) {
+    _g_ := getg() <span class="hljs-comment">// g0</span>
+
+    casgstatus(gp, _Grunnable, _Grunning) <span class="hljs-comment">//&#x4FEE;&#x6539;&#x5C06;&#x8981;&#x8FD0;&#x884C;&#x7684;gp&#x7684;&#x72B6;&#x6001;.</span>
+    gp.waitsince = <span class="hljs-number">0</span>
+    gp.preempt = <span class="hljs-literal">false</span> <span class="hljs-comment">//&#x62A2;&#x5360;&#x6807;&#x5FD7;&#x4F4D;</span>
+    gp.stackguard0 = gp.stack.lo + _StackGuard <span class="hljs-comment">//&#x8BBE;&#x7F6E;&#x6808;&#x9876;&#x7684;&#x4FDD;&#x62A4;,&#x6BD4;&#x6808;&#x5730;&#x5740;&#x7684;&#x6700;&#x4F4E;&#x4F4D;&#x9AD8;&#x70B9;,&#x9632;&#x6B62;&#x6808;&#x8D8A;&#x754C;</span>
+    <span class="hljs-keyword">if</span> !inheritTime {
+        _g_.m.p.ptr().schedtick++
+    }
+    _g_.m.curg = gp <span class="hljs-comment">//&#x8FD9;&#x91CC;&#x5C31;&#x5F00;&#x59CB;&#x8BBE;&#x7F6E;M&#x7684;curg&#x4E3A;gp,&#x800C;&#x4E0D;&#x662F;g0&#x4E86;</span>
+    gp.m = _g_.m  <span class="hljs-comment">// m.curg = gp and gp.m = m</span>
+
+    <span class="hljs-comment">//...</span>
+    gogo(&amp;gp.sched)
+}
+</code></pre>
+<p>execute&#x51FD;&#x6570;&#x4E3B;&#x8981;&#x4E3A;&#x5C06;&#x8981;&#x88AB;&#x8C03;&#x5EA6;&#x8FD0;&#x884C;&#x7684;gp&#x8BBE;&#x7F6E;&#x72B6;&#x6001;,&#x4E0E;M&#x76F8;&#x4E92;&#x5173;&#x8054;</p>
+<h6 id="gogo"><a name="gogo" class="anchor-navigation-ex-anchor" href="#gogo"><i class="fa fa-link" aria-hidden="true"></i></a>gogo</h6>
+<p>&#x5BFB;&#x627E;&#x5728;&#x90A3;&#x4E2A;&#x6587;&#x4EF6;&#x91CC;&#x9762;:<code>list /usr/lib/golang/src/runtime/proc.go:2165</code></p>
+<blockquote>
+<p>gdb&#x67E5;&#x770B;&#x53D1;&#x73B0;&#x53C8;&#x5230;&#x4E86;asm_amd64.s&#x6587;&#x4EF6;</p>
+<pre><code class="lang-asm">(gdb) step
+runtime.gogo () at /usr/lib/golang/src/runtime/asm_amd64.s:272
+272    TEXT runtime&#xB7;gogo(SB), NOSPLIT, $16-8
+(gdb) list
+</code></pre>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-comment">// func gogo(buf *gobuf)</span>
+<span class="hljs-comment">// restore state from Gobuf; longjmp</span>
+TEXT runtime&#xB7;gogo(SB), NOSPLIT, $<span class="hljs-number">16</span><span class="hljs-number">-8</span>
+    MOVQ    buf+<span class="hljs-number">0</span>(FP), BX        <span class="hljs-comment">// gobuf</span>
+    MOVQ    gobuf_g(BX), DX
+    MOVQ    <span class="hljs-number">0</span>(DX), CX        <span class="hljs-comment">// make sure g != nil //&#x9632;&#x6B62;g.gobuf.g&#x91CC;&#x9762;&#x7684;&#x503C;&#x662F;&#x7A7A;&#x7684;,&#x7A7A;&#x7684;&#x53D6;&#x5730;&#x5740;&#x4F1A;panic</span>
+    get_tls(CX)
+    MOVQ    DX, g(CX)
+    MOVQ    gobuf_sp(BX), SP    <span class="hljs-comment">// restore SP</span>
+    MOVQ    gobuf_ret(BX), AX
+    MOVQ    gobuf_ctxt(BX), DX
+    MOVQ    gobuf_bp(BX), BP
+    MOVQ    $<span class="hljs-number">0</span>, gobuf_sp(BX)    <span class="hljs-comment">// clear to help garbage collector</span>
+    MOVQ    $<span class="hljs-number">0</span>, gobuf_ret(BX)
+    MOVQ    $<span class="hljs-number">0</span>, gobuf_ctxt(BX)
+    MOVQ    $<span class="hljs-number">0</span>, gobuf_bp(BX)
+    MOVQ    gobuf_pc(BX), BX
+    JMP    BX
+</code></pre>
+<p>gogo&#x628A;&#x5C06;&#x8981;&#x8FD0;&#x884C;&#x7684;main&#x51FD;&#x6570;&#x7684;goroutine&#x4ECE;gobuf&#x4E2D;&#x53D6;&#x51FA;&#x5230;&#x5BC4;&#x5B58;&#x5668;&#x4E2D;,&#x540C;&#x65F6;&#x6E05;0,&#x6709;&#x52A9;&#x4E8E;&#x5783;&#x573E;&#x56DE;&#x6536;.</p>
+<h6 id="&#x91CD;&#x65B0;&#x89C2;&#x5BDF;bp&#x5BC4;&#x5B58;&#x5668;"><a name="&#x91CD;&#x65B0;&#x89C2;&#x5BDF;bp&#x5BC4;&#x5B58;&#x5668;" class="anchor-navigation-ex-anchor" href="#&#x91CD;&#x65B0;&#x89C2;&#x5BDF;bp&#x5BC4;&#x5B58;&#x5668;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x91CD;&#x65B0;&#x89C2;&#x5BDF;BP&#x5BC4;&#x5B58;&#x5668;</h6>
+<blockquote>
+<p>&#x5F53;&#x8C03;&#x5EA6;&#x8FD9;&#x4E2A;main&#x51FD;&#x6570;&#x7684;goroutine,&#x4ECE;g.sched&#x4E2D;&#x6062;&#x590D;&#x7684;&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;,&#x5176;&#x4E2D;&#x6062;&#x590D;&#x540E;BP&#x5BC4;&#x5B58;&#x5668;&#x7684;&#x503C;&#x5C31;&#x662F;0</p>
+</blockquote>
+<pre><code class="lang-asm">(gdb) info breakpoints
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x000000000042fe3e in runtime.execute at /usr/lib/golang/src/runtime/proc.go:2171
+    breakpoint already hit 1 time
+2       breakpoint     keep y   0x00000000004515ce in runtime.gogo at /usr/lib/golang/src/runtime/asm_amd64.s:281
+3       breakpoint     keep y   0x00000000004515d2 in runtime.gogo at /usr/lib/golang/src/runtime/asm_amd64.s:282
+(gdb) run
+The program being debugged has been started already.
+Start it from the beginning? (y or n) y
+Starting program: /tmp/kubernets/./test
+
+Breakpoint 1, runtime.execute (gp=0xc000000300, inheritTime=true) at /usr/lib/golang/src/runtime/proc.go:2171
+2171        gogo(&amp;gp.sched)
+(gdb) continue
+Continuing.
+
+Breakpoint 2, runtime.gogo () at /usr/lib/golang/src/runtime/asm_amd64.s:281
+281        MOVQ    gobuf_bp(BX), BP //&#x8FD9;&#x91CC;&#x6253;&#x4E86;&#x65AD;&#x70B9;,&#x89C2;&#x5BDF;&#x4E0B;
+(gdb) list
+276        get_tls(CX)
+277        MOVQ    DX, g(CX)
+278        MOVQ    gobuf_sp(BX), SP    // restore SP
+279        MOVQ    gobuf_ret(BX), AX
+280        MOVQ    gobuf_ctxt(BX), DX
+281        MOVQ    gobuf_bp(BX), BP     //&#x8FD9;&#x91CC;&#x6253;&#x4E86;&#x65AD;&#x70B9;,&#x89C2;&#x5BDF;&#x4E0B;  ------------------here
+282        MOVQ    $0, gobuf_sp(BX)     //&#x8FD9;&#x91CC;&#x6253;&#x4E86;&#x65AD;&#x70B9;,&#x89C2;&#x5BDF;&#x4E0B;  ------------------here
+283        MOVQ    $0, gobuf_ret(BX)
+284        MOVQ    $0, gobuf_ctxt(BX)
+285        MOVQ    $0, gobuf_bp(BX)
+(gdb) info register rbp rsp pc bp sp
+rbp            0x7fffffffe3c8    0x7fffffffe3c8
+rsp            0xc0000307d8    0xc0000307d8
+pc             0x4515ce    0x4515ce &lt;runtime.gogo+46&gt;
+bp             0xe3c8    -7224 //&#x5176;&#x503C;&#x5F00;&#x59CB;&#x4E0D;&#x662F;0  ------------------here
+sp             0xc0000307d8    0xc0000307d8
+(gdb) step
+
+Breakpoint 3, runtime.gogo () at /usr/lib/golang/src/runtime/asm_amd64.s:282
+282        MOVQ    $0, gobuf_sp(BX)    //&#x8FD9;&#x91CC;&#x6253;&#x4E86;&#x65AD;&#x70B9;,&#x89C2;&#x5BDF;&#x4E0B;
+(gdb) info register rbp rsp pc bp sp
+rbp            0x0    0x0
+rsp            0xc0000307d8    0xc0000307d8
+pc             0x4515d2    0x4515d2 &lt;runtime.gogo+50&gt;
+bp             0x0    0//&#x5176;&#x503C;&#x7684;&#x786E;&#x662F;&#x4E3A;0  ------------------here
+sp             0xc0000307d8    0xc0000307d8
+(gdb)
+</code></pre>
+<h3 id="&#x8FDB;&#x5165;main&#x51FD;&#x6570;"><a name="&#x8FDB;&#x5165;main&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#&#x8FDB;&#x5165;main&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1.3. &#x8FDB;&#x5165;main&#x51FD;&#x6570;</h3>
+<blockquote>
+<p>&#x6587;&#x4EF6;&#x91CC;&#x9762;<code>func main() {</code>:<code>list /usr/lib/golang/src/runtime/proc.go:113</code></p>
+<blockquote>
+<p>&#x6211;&#x4EEC;&#x6253;&#x4E0B;&#x65AD;&#x70B9;&#x5230;&#x8FD9;&#x4E2A;&#x51FD;&#x6570;,&#x7136;&#x540E;&#x67E5;&#x770B;&#x5B83;&#x524D;&#x51E0;&#x4E2A;&#x6C47;&#x7F16;&#x4EE3;&#x7801;</p>
+</blockquote>
+</blockquote>
+<pre><code class="lang-sh">(gdb) list /usr/lib/golang/src/runtime/proc.go:113
+108
+109    // Value to use <span class="hljs-keyword">for</span> signal mask <span class="hljs-keyword">for</span> newly created M<span class="hljs-string">&apos;s.
+110    var initSigmask sigset
+111
+112    // The main goroutine.
+113    func main() {
+114        g := getg()
+115
+116        // Racectx of m0-&gt;g0 is used only as the parent of the main goroutine.
+117        // It must not be used for anything else.
+(gdb) b 113
+Breakpoint 4 at 0x42aea0: file /usr/lib/golang/src/runtime/proc.go, line 113.
+(gdb) c
+Continuing.
+
+Breakpoint 4, runtime.main () at /usr/lib/golang/src/runtime/proc.go:113
+113    func main() {
+(gdb) list
+108
+109    // Value to use for signal mask for newly created M&apos;</span>s.
+110    var initSigmask sigset
+111
+112    // The main goroutine.
+113    func <span class="hljs-function"><span class="hljs-title">main</span></span>() {
+114        g := getg()
+115
+116        // Racectx of m0-&gt;g0 is used only as the parent of the main goroutine.
+117        // It must not be used <span class="hljs-keyword">for</span> anything else.
+(gdb) info register rbp rsp pc bp sp
+rbp            0x0    0x0
+rsp            0xc0000307d8    0xc0000307d8
+pc             0x42aea0    0x42aea0 &lt;runtime.main&gt;
+bp             0x0    0
+sp             0xc0000307d8    0xc0000307d8
+(gdb) disas
+Dump of assembler code <span class="hljs-keyword">for</span> <span class="hljs-keyword">function</span> runtime.main:
+=&gt; 0x000000000042aea0 &lt;+0&gt;:        mov    %fs:0xfffffffffffffff8,%rcx
+   0x000000000042aea9 &lt;+9&gt;:        cmp    0x10(%rcx),%rsp
+   0x000000000042aead &lt;+13&gt;:    jbe    0x42b1ea &lt;runtime.main+842&gt;
+   0x000000000042aeb3 &lt;+19&gt;:    sub    <span class="hljs-variable">$0x78</span>,%rsp
+   0x000000000042aeb7 &lt;+23&gt;:    mov    %rbp,0x70(%rsp)
+   0x000000000042aebc &lt;+28&gt;:    lea    0x70(%rsp),%rbp
+   0x000000000042aec1 &lt;+33&gt;:    mov    %fs:0xfffffffffffffff8,%rax
+   0x000000000042aeca &lt;+42&gt;:    mov    %rax,0x68(%rsp)
+   0x000000000042aecf &lt;+47&gt;:    mov    0x30(%rax),%rcx
+   0x000000000042aed3 &lt;+51&gt;:    mov    (%rcx),%rcx
+   0x000000000042aed6 &lt;+54&gt;:    movq   <span class="hljs-variable">$0x0</span>,0x130(%rcx)
+   0x000000000042aee1 &lt;+65&gt;:    movq   <span class="hljs-variable">$0x3b9aca00</span>,0x11e234(%rip)        <span class="hljs-comment"># 0x549120 &lt;runtime.maxstacksize&gt;</span>
+   0x000000000042aeec &lt;+76&gt;:    movb   <span class="hljs-variable">$0x1</span>,0x14dabc(%rip)        <span class="hljs-comment"># 0x5789af &lt;runtime.mainStarted&gt;</span>
+</code></pre>
+<ul>
+<li>&#x524D;&#x9762;&#x4E09;&#x6761;&#x6211;&#x4EEC;&#x524D;&#x9762;&#x8BE6;&#x7EC6;&#x89E3;&#x91CA;&#x8FC7;.<pre><code>Dump of assembler code for function runtime.main:
+=&gt; 0x000000000042aea0 &lt;+0&gt;:        mov    %fs:0xfffffffffffffff8,%rcx
+ 0x000000000042aea9 &lt;+9&gt;:        cmp    0x10(%rcx),%rsp
+ 0x000000000042aead &lt;+13&gt;:    jbe    0x42b1ea &lt;runtime.main+842&gt;
+</code></pre></li>
+<li>&#x867D;&#x7136;&#x8FD9;&#x4E2A;rbp&#x662F;0,&#x662F;&#x7A7A;&#x7684;,&#x4F46;&#x662F;&#x8FD8;&#x662F;&#x4FDD;&#x5B58;&#x5230;&#x6808;&#x91CC;&#x9762;&#x53BB;&#x4E86;.<pre><code> 0x000000000042aeb3 &lt;+19&gt;:    sub    $0x78,%rsp
+ 0x000000000042aeb7 &lt;+23&gt;:    mov    %rbp,0x70(%rsp)
+ 0x000000000042aebc &lt;+28&gt;:    lea    0x70(%rsp),%rbp
+</code></pre></li>
+</ul>
+<p>TODO systemstack</p>
+<p><a href="http://www.mit.edu/afs.new/sipb/project/golang/doc/asm.html" target="_blank">http://www.mit.edu/afs.new/sipb/project/golang/doc/asm.html</a></p>
+<p>// ------------------- need deleted ----------------</p>
+<p>// -------------------------------------------------------------
+  // &#x83B7;&#x53D6;&#x8BFE;&#x5802;&#x3001;&#x4F5C;&#x4E1A;&#x5B8C;&#x6210;&#x60C5;&#x51B5;
+  rpc GetStudyReport (GetStudyReportRequest) returns (GetStudyReportResponse);
+  // &#x83B7;&#x53D6;&#x8BFE;&#x5802;&#x3001;&#x4F5C;&#x4E1A;&#x5B8C;&#x6210;&#x60C5;&#x51B5;Json
+  rpc GetStudyReportJson (GetStudyReportRequest) returns (GetStudyReportResponse);
+  // &#x901A;&#x8FC7;&#x5206;&#x4EAB;ID, &#x83B7;&#x53D6;&#x8BFE;&#x7A0B;&#x62A5;&#x544A;&#x60C5;&#x51B5;
+  rpc GetStudyReportByShare (GetStudyReportByShareRequest) returns (GetStudyReportResponse);
+  // &#x901A;&#x8FC7;&#x5206;&#x4EAB;ID, &#x83B7;&#x53D6;&#x8BFE;&#x7A0B;&#x62A5;&#x544A;&#x60C5;&#x51B5;Json
+  rpc GetStudyReportByShareJson (GetStudyReportByShareRequest) returns (GetStudyReportResponse);</p>
+<p>  //&#x83B7;&#x53D6;&#x8001;&#x5E08;&#x70B9;&#x8BC4;&#x4FE1;&#x606F;
+  rpc GetCourseEvaluate (GetCourseEvaluateRequest) returns (GetCourseEvaluateResponse);
+  //&#x83B7;&#x53D6;&#x8001;&#x5E08;&#x70B9;&#x8BC4;&#x4FE1;&#x606F;json
+  rpc GetCourseEvaluateJson (GetCourseEvaluateRequest) returns (GetCourseEvaluateResponse);</p>
+<p>project</p>
+<p>//-------------------------------------------------------------</p>
+<p>  //&#x63D0;&#x4EA4;AI&#x8BFE;&#x4EFB;&#x52A1;&#x4E2D;&#x7684;&#x5DE5;&#x7A0B;  todo 9.2 zxc
+  rpc SubmitAIMission (SubmitMissionProjectRequest) returns (SubmitMissionProjectResponse);</p>
+<p>// -------------------------------------------------------------</p>
+<p>  //&#x83B7;&#x53D6;&#x5DE5;&#x7A0B;&#x4FE1;&#x606F;
+  rpc GetProjectInfo (GetProjectInfoRequest) returns (GetProjectInfoResponse);</p>
+<p>  //&#x83B7;&#x53D6;&#x5DE5;&#x7A0B;&#x4FE1;&#x606F;by&#x5206;&#x4EAB;ID, &#x4E0D;&#x9700;&#x8981;token&#x6821;&#x9A8C;
+  rpc GetTaskInClassByShare (GetTaskInClassByShareRequest) returns (GetTaskInClassByShareResponse);</p>
+<p>  //&#x83B7;&#x53D6;&#x5DE5;&#x7A0B;&#x4FE1;&#x606F;by userID, serialID, courseID, missionID
+  rpc GetProjectInfoByUnique (GetProjectInfoByUniqueRequest) returns (GetProjectInfoByUniqueResponse);</p>
+<p>message GetCourseEvaluateResponse {
+  Project project = 1; //&#x5DE5;&#x7A0B;&#x4FE1;&#x606F;
+  repeated Comment comments = 2; //&#x6240;&#x6709;&#x70B9;&#x8BC4;&#x4FE1;&#x606F;
+  string shareUUID = 3; //&#x5982;&#x679C;&#x5206;&#x4EAB;&#x8BFE;&#x7A0B;&#x62A5;&#x544A;&#x51FA;&#x53BB;,&#x901A;&#x8FC7;&#x8FD9;&#x4E2A;ID&#x6765;&#x83B7;&#x53D6;&#x5DE5;&#x7A0B;&#x8BE6;&#x7EC6;&#x4FE1;&#x606F;.
+}</p>
+<p>//&#x83B7;&#x53D6;&#x5DE5;&#x7A0B;&#x4FE1;&#x606F;
+func (p <em>AIProjectModel) GetProject(author uint32, seriesID uint32, courseID uint32) (define.RetCode, </em>worker.Project) {</p>
+<p>// Array returns the optimal driver.Valuer and sql.Scanner for an array or
+// slice of any dimension.
+//
+// For example:
+//  db.Query(<code>SELECT * FROM t WHERE id = ANY($1)</code>, pq.Array([]int{235, 401}))
+//
+//  var x []sql.NullInt64
+//  db.QueryRow(&apos;SELECT ARRAY[235, 401]&apos;).Scan(pq.Array(&amp;x))
+//
+// Scanning multi-dimensional arrays is not supported.  Arrays where the lower
+// bound is not one (such as `[0:0]={1}&apos;) are not supported.</p>
+<pre><code>aiCommentProject := define.AICommentProject{
+    ResourceID: resourceID,
+    CoverURL:   coverUrl,
+    ResourceIDs: resourceIDs,
+}
+</code></pre><p>alter table ai_course_project
+    add resource_ids integer[] default array[]::integer[]</p>
+<p>alter table ai_course_project
+    add read_aloud_time int default 0 not null;</p>
+<p>alter table share_action_record
+    add resource_ids integer[] default array[]::integer[]</p>
+<p>alter table share_action_record
+    add read_aloud_time int default 0 not null;</p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="../part0.基础知识/2.内存.html" class="navigation navigation-prev " aria-label="Previous page: 内存">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="1.进入main函数之前的初始化.html" class="navigation navigation-next " aria-label="Next page: 进入main函数之前的初始化">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"第二部分 进入main函数之前的初始化","date":"2020-01-20T10:03:00.000Z","tags":["golang","goroutine"],"categories":["golang调度"],"toc":true,"level":"1.4","depth":1,"next":{"title":"进入main函数之前的初始化","level":"1.4.1","depth":2,"path":"part1.进入main函数之前的初始化/1.进入main函数之前的初始化.md","ref":"part1.进入main函数之前的初始化/1.进入main函数之前的初始化.md","articles":[]},"previous":{"title":"内存","level":"1.3.2","depth":2,"path":"part0.基础知识/2.内存.md","ref":"part0.基础知识/2.内存.md","articles":[]},"dir":"ltr"},"config":{"plugins":["-page-toc-button","-toc2","anchor-navigation-ex"],"styles":{"website":"./styles/website.css"},"pluginsConfig":{"search":{},"toc2":{"addClass":true,"className":"toc"},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"fontsettings":{"theme":"white","family":"sans","size":2},"highlight":{},"anchor-navigation-ex":{"associatedWithSummary":true,"float":{"floatIcon":"fa fa-navicon","level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"mode":"float","multipleH1":true,"pageTop":{"level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"printLog":false,"showGoTop":true,"showLevel":true},"page-toc-button":{"maxTocDepth":2,"minTocSize":2},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"theme":"default","author":"zput","pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"variables":{},"title":"golang goroutine详解","language":"zh-hans","links":{"sidebar":{"zput|堆排序":"https://zput.github.io"}},"gitbook":"3.2.3","description":"select * from learn"},"file":{"path":"part1.进入main函数之前的初始化/1.进入main函数之前的初始化.md","mtime":"2021-03-28T09:04:44.792Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2021-03-28T09:05:35.583Z"},"basePath":"..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../gitbook/gitbook.js"></script>
+    <script src="../gitbook/theme.js"></script>
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+

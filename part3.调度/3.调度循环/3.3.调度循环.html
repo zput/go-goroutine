@@ -1,0 +1,1054 @@
+
+<!DOCTYPE HTML>
+<html lang="zh-hans" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>3.调度循环 · golang goroutine详解</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        <meta name="author" content="zput">
+        
+        
+    
+    <link rel="stylesheet" href="../../gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-anchor-navigation-ex/style/plugin.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="../../gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="../../gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="../../gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    <link rel="next" href="3.3.调度循环.html" />
+    
+    
+    <link rel="prev" href="../2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="输入并搜索" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+    
+        
+        <li>
+            <a href="https://zput.github.io" target="_blank" class="custom-link">zput|堆排序</a>
+        </li>
+    
+    
+
+    
+    <li class="divider"></li>
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="../../">
+            
+                <a href="../../">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="../../">
+            
+                <a href="../../">
+            
+                    
+                    大纲
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3" data-path="../../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    第一部分 基础知识
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.3.1" data-path="../../part0.基础知识/1.汇编基础.html">
+            
+                <a href="../../part0.基础知识/1.汇编基础.html">
+            
+                    
+                    汇编基础
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.3.2" data-path="../../part0.基础知识/2.内存.html">
+            
+                <a href="../../part0.基础知识/2.内存.html">
+            
+                    
+                    内存
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.4" data-path="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    第二部分 进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.4.1" data-path="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                <a href="../../part1.进入main函数之前的初始化/1.进入main函数之前的初始化.html">
+            
+                    
+                    进入main函数之前的初始化
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.5" data-path="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    第三部分 退出goroutine
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.5.1" data-path="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                <a href="../../part2.退出goroutine/1.退出goroutine.html">
+            
+                    
+                    退出goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6" >
+            
+                <span>
+            
+                    
+                    第四部分 调度
+            
+                </span>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1" data-path="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    1.调度策略
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.1.1" data-path="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                <a href="../1.调度策略/1.1.从本地队列或全局队列获取goroutine.html">
+            
+                    
+                    从本地队列或全局队列获取goroutine
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.1.2" data-path="../1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                <a href="../1.调度策略/1.2.盗取goroutine从其他队列.html">
+            
+                    
+                    盗取goroutine从其他队列
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2" data-path="../2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    2.调度的时机
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter " data-level="1.6.2.1" data-path="../2.调度的时机/2.1.主动调度.html">
+            
+                <a href="../2.调度的时机/2.1.主动调度.html">
+            
+                    
+                    主动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.2" data-path="../2.调度的时机/2.2.被动调度.html">
+            
+                <a href="../2.调度的时机/2.2.被动调度.html">
+            
+                    
+                    被动调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.3" data-path="../2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                <a href="../2.调度的时机/2.3.1.运行用户代码时间过长调度.html">
+            
+                    
+                    运行用户代码时间过长调度
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.2.4" data-path="../2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                <a href="../2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html">
+            
+                    
+                    系统调用收尾,如果从系统调用返回,如何重新得到P
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.6.3" data-path="3.3.调度循环.html">
+            
+                <a href="3.3.调度循环.html">
+            
+                    
+                    3.调度循环
+            
+                </a>
+            
+
+            
+            <ul class="articles">
+                
+    
+        <li class="chapter active" data-level="1.6.3.1" data-path="3.3.调度循环.html">
+            
+                <a href="3.3.调度循环.html">
+            
+                    
+                    调度循环
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+        <li class="chapter " data-level="1.6.4" data-path="../总结.html">
+            
+                <a href="../总结.html">
+            
+                    
+                    总结
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+            </ul>
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            本书使用 GitBook 发布
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="../.." >3.调度循环</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <div id="anchor-navigation-ex-navbar"><i class="fa fa-navicon"></i><ul><ul><li><span class="title-icon "></span><a href="#g0&#x6808;&#x662F;&#x5426;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x521D;&#x59CB;&#x65F6;&#x5019;mstart1&#x51FD;&#x6570;&#x7684;&#x6808;"><b>1.1. </b>g0&#x6808;&#x662F;&#x5426;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x521D;&#x59CB;&#x65F6;&#x5019;mstart1&#x51FD;&#x6570;&#x7684;&#x6808;</a></li><li><span class="title-icon "></span><a href="#&#x6BCF;&#x4E2A;&#x7EBF;&#x7A0B;&#x5BF9;&#x5E94;g0&#x4E2D;g0schedsp&#x4F1A;&#x4E00;&#x76F4;&#x6539;&#x53D8;"><b>1.2. </b>&#x6BCF;&#x4E2A;&#x7EBF;&#x7A0B;&#x5BF9;&#x5E94;g0&#x4E2D;g0.sched.SP&#x4F1A;&#x4E00;&#x76F4;&#x6539;&#x53D8;?</a></li><ul><li><span class="title-icon "></span><a href="#&#x793A;&#x4F8B;"><b>1.2.1. </b>&#x793A;&#x4F8B;:</a></li></ul></ul></ul></div><a href="#" id="anchorNavigationExGoTop"><i class="fa fa-arrow-up"></i></a><ul>
+<li>&#x5F53;go&#x7A0B;&#x5E8F;&#x521D;&#x59CB;&#x5316;&#x5230;&#x8FD0;&#x884C;<code>package main</code>&#x91CC;&#x9762;&#x7684;<code>main</code>&#x51FD;&#x6570;,<code>g0</code>&#x5DF2;&#x7ECF;&#x88AB;&#x521D;&#x59CB;&#x5316;,g.sched&#x548C;stack&#x88AB;&#x8D4B;&#x503C;,&#x5F53;&#x4E0B;&#x6B21;&#x5207;&#x6362;<code>Goroutine</code>&#x7684;&#x65F6;&#x5019;,&#x6216;&#x8005;&#x8BF4;&#x518D;&#x6B21;&#x8C03;&#x5EA6;&#x7684;&#x65F6;&#x5019;,<ul>
+<li>&#x5FC5;&#x7136;&#x8981;&#x91CD;&#x65B0;&#x4F7F;&#x7528;g0,&#x90A3;&#x4E48;&#x4F1A;&#x91CD;&#x65B0;&#x4F7F;&#x7528;g.sched.PC,g.sched.SP?</li>
+</ul>
+</li>
+</ul>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200910134925.png" alt="&#x4FEE;&#x6B63;&#x540E;&#x8C03;&#x5EA6;&#x56FE;"></p>
+<h2 id="g0&#x6808;&#x662F;&#x5426;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x521D;&#x59CB;&#x65F6;&#x5019;mstart1&#x51FD;&#x6570;&#x7684;&#x6808;"><a name="g0&#x6808;&#x662F;&#x5426;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x521D;&#x59CB;&#x65F6;&#x5019;mstart1&#x51FD;&#x6570;&#x7684;&#x6808;" class="anchor-navigation-ex-anchor" href="#g0&#x6808;&#x662F;&#x5426;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x521D;&#x59CB;&#x65F6;&#x5019;mstart1&#x51FD;&#x6570;&#x7684;&#x6808;"><i class="fa fa-link" aria-hidden="true"></i></a>1.1. g0&#x6808;&#x662F;&#x5426;&#x91CD;&#x65B0;&#x4F7F;&#x7528;&#x521D;&#x59CB;&#x65F6;&#x5019;mstart1&#x51FD;&#x6570;&#x7684;&#x6808;</h2>
+<blockquote>
+<p>main.go
+```go
+package main</p>
+</blockquote>
+<p>import &quot;fmt&quot;</p>
+<p>// the function&apos;s body is empty
+func add(x, y int64) int64</p>
+<p>func main() {
+    gg:=add(2, 3)
+    fmt.Println(gg)
+}</p>
+<pre><code>
+&gt; add_amd.s
+```go
+TEXT &#xB7;add(SB),$0-24
+    MOVQ x+0(FP), BX
+    MOVQ y+8(FP), BP
+    ADDQ BP, BX
+    MOVQ BX, ret+16(FP)
+    RET
+</code></pre><p>&#x7F16;&#x8BD1;&#x4E00;&#x4E0B;&#x6E90;&#x4EE3;&#x7801;: <code>go build  -gcflags &quot;-N -l&quot; -o test .</code>.</p>
+<pre><code class="lang-go">[root@gitlab kubernets]# gdb test
+GNU gdb (GDB) Red Hat Enterprise Linux <span class="hljs-number">7.6</span><span class="hljs-number">.1</span><span class="hljs-number">-119.</span>el7
+Copyright (C) <span class="hljs-number">2013</span> Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version <span class="hljs-number">3</span> or later &lt;http:<span class="hljs-comment">//gnu.org/licenses/gpl.html&gt;</span>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type <span class="hljs-string">&quot;show copying&quot;</span>
+and <span class="hljs-string">&quot;show warranty&quot;</span> <span class="hljs-keyword">for</span> details.
+This GDB was configured as <span class="hljs-string">&quot;x86_64-redhat-linux-gnu&quot;</span>.
+For bug reporting instructions, please see:
+&lt;http:<span class="hljs-comment">//www.gnu.org/software/gdb/bugs/&gt;...</span>
+Reading symbols from /tmp/kubernets/test...done.
+Loading Go Runtime support.
+(gdb) list /usr/lib/golang/src/runtime/asm_amd64.s:<span class="hljs-number">294</span>
+<span class="hljs-number">289</span>    <span class="hljs-comment">// func mcall(fn func(*g))</span>
+<span class="hljs-number">290</span>    <span class="hljs-comment">// Switch to m-&gt;g0&apos;s stack, call fn(g).</span>
+<span class="hljs-number">291</span>    <span class="hljs-comment">// Fn must never return. It should gogo(&amp;g-&gt;sched)</span>
+<span class="hljs-number">292</span>    <span class="hljs-comment">// to keep running g.</span>
+<span class="hljs-number">293</span>    TEXT runtime&#xB7;mcall(SB), NOSPLIT, $<span class="hljs-number">0</span><span class="hljs-number">-8</span>
+<span class="hljs-number">294</span>        MOVQ    fn+<span class="hljs-number">0</span>(FP), DI
+<span class="hljs-number">295</span>
+<span class="hljs-number">296</span>        get_tls(CX)
+<span class="hljs-number">297</span>        MOVQ    g(CX), AX    <span class="hljs-comment">// save state in g-&gt;sched</span>
+<span class="hljs-number">298</span>        MOVQ    <span class="hljs-number">0</span>(SP), BX    <span class="hljs-comment">// caller&apos;s PC</span>
+(gdb)
+<span class="hljs-number">299</span>        MOVQ    BX, (g_sched+gobuf_pc)(AX)
+<span class="hljs-number">300</span>        LEAQ    fn+<span class="hljs-number">0</span>(FP), BX    <span class="hljs-comment">// caller&apos;s SP</span>
+<span class="hljs-number">301</span>        MOVQ    BX, (g_sched+gobuf_sp)(AX)
+<span class="hljs-number">302</span>        MOVQ    AX, (g_sched+gobuf_g)(AX)
+<span class="hljs-number">303</span>        MOVQ    BP, (g_sched+gobuf_bp)(AX)
+<span class="hljs-number">304</span>
+<span class="hljs-number">305</span>        <span class="hljs-comment">// switch to m-&gt;g0 &amp; its stack, call fn</span>
+<span class="hljs-number">306</span>        MOVQ    g(CX), BX
+<span class="hljs-number">307</span>        MOVQ    g_m(BX), BX
+<span class="hljs-number">308</span>        MOVQ    m_g0(BX), SI
+(gdb)
+<span class="hljs-number">309</span>        CMPQ    SI, AX    <span class="hljs-comment">// if g == m-&gt;g0 call badmcall</span>
+<span class="hljs-number">310</span>        JNE    <span class="hljs-number">3</span>(PC)
+<span class="hljs-number">311</span>        MOVQ    $runtime&#xB7;badmcall(SB), AX
+<span class="hljs-number">312</span>        JMP    AX
+<span class="hljs-number">313</span>        MOVQ    SI, g(CX)    <span class="hljs-comment">// g = m-&gt;g0</span>
+<span class="hljs-number">314</span>        MOVQ    (g_sched+gobuf_sp)(SI), SP    <span class="hljs-comment">// sp = m-&gt;g0-&gt;sched.sp</span>
+<span class="hljs-number">315</span>        PUSHQ    AX
+<span class="hljs-number">316</span>        MOVQ    DI, DX
+<span class="hljs-number">317</span>        MOVQ    <span class="hljs-number">0</span>(DI), DI
+<span class="hljs-number">318</span>        CALL    DI
+(gdb)
+<span class="hljs-number">319</span>        POPQ    AX
+<span class="hljs-number">320</span>        MOVQ    $runtime&#xB7;badmcall2(SB), AX
+<span class="hljs-number">321</span>        JMP    AX
+<span class="hljs-number">322</span>        RET
+<span class="hljs-number">323</span>
+<span class="hljs-number">324</span>    <span class="hljs-comment">// systemstack_switch is a dummy routine that systemstack leaves at the bottom</span>
+<span class="hljs-number">325</span>    <span class="hljs-comment">// of the G stack. We need to distinguish the routine that</span>
+<span class="hljs-number">326</span>    <span class="hljs-comment">// lives at the bottom of the G stack from the one that lives</span>
+<span class="hljs-number">327</span>    <span class="hljs-comment">// at the top of the system stack because the one at the top of</span>
+<span class="hljs-number">328</span>    <span class="hljs-comment">// the system stack terminates the stack walk (see topofstack()).</span>
+(gdb) b <span class="hljs-number">318</span>
+Breakpoint <span class="hljs-number">1</span> at <span class="hljs-number">0x44b229</span>: file /usr/lib/golang/src/runtime/asm_amd64.s, line <span class="hljs-number">318.</span>
+(gdb) c
+The program is not being run.
+(gdb) run
+Starting program: /tmp/kubernets/test
+[New LWP <span class="hljs-number">29827</span>]
+[Switching to LWP <span class="hljs-number">29827</span>]
+
+Breakpoint <span class="hljs-number">1</span>, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:<span class="hljs-number">318</span>
+<span class="hljs-number">318</span>        CALL    DI
+(gdb) info register rbp rsp pc
+rbp            <span class="hljs-number">0xc000030fa0</span>    <span class="hljs-number">0xc000030fa0</span>
+rsp            <span class="hljs-number">0xc000045fd0</span>    <span class="hljs-number">0xc000045fd0</span>
+pc             <span class="hljs-number">0x44b229</span>    <span class="hljs-number">0x44b229</span> &lt;runtime.mcall+<span class="hljs-number">89</span>&gt;
+(gdb) disas
+Dump of assembler code <span class="hljs-keyword">for</span> function runtime.mcall:
+   <span class="hljs-number">0x000000000044b1d0</span> &lt;+<span class="hljs-number">0</span>&gt;:    mov    <span class="hljs-number">0x8</span>(%rsp),%rdi
+   <span class="hljs-number">0x000000000044b1d5</span> &lt;+<span class="hljs-number">5</span>&gt;:    mov    %fs:<span class="hljs-number">0xfffffffffffffff8</span>,%rax
+   <span class="hljs-number">0x000000000044b1de</span> &lt;+<span class="hljs-number">14</span>&gt;:    mov    (%rsp),%rbx
+   <span class="hljs-number">0x000000000044b1e2</span> &lt;+<span class="hljs-number">18</span>&gt;:    mov    %rbx,<span class="hljs-number">0x40</span>(%rax)
+   <span class="hljs-number">0x000000000044b1e6</span> &lt;+<span class="hljs-number">22</span>&gt;:    lea    <span class="hljs-number">0x8</span>(%rsp),%rbx
+   <span class="hljs-number">0x000000000044b1eb</span> &lt;+<span class="hljs-number">27</span>&gt;:    mov    %rbx,<span class="hljs-number">0x38</span>(%rax)
+   <span class="hljs-number">0x000000000044b1ef</span> &lt;+<span class="hljs-number">31</span>&gt;:    mov    %rax,<span class="hljs-number">0x48</span>(%rax)
+   <span class="hljs-number">0x000000000044b1f3</span> &lt;+<span class="hljs-number">35</span>&gt;:    mov    %rbp,<span class="hljs-number">0x68</span>(%rax)
+   <span class="hljs-number">0x000000000044b1f7</span> &lt;+<span class="hljs-number">39</span>&gt;:    mov    %fs:<span class="hljs-number">0xfffffffffffffff8</span>,%rbx
+   <span class="hljs-number">0x000000000044b200</span> &lt;+<span class="hljs-number">48</span>&gt;:    mov    <span class="hljs-number">0x30</span>(%rbx),%rbx
+   <span class="hljs-number">0x000000000044b204</span> &lt;+<span class="hljs-number">52</span>&gt;:    mov    (%rbx),%rsi
+   <span class="hljs-number">0x000000000044b207</span> &lt;+<span class="hljs-number">55</span>&gt;:    cmp    %rax,%rsi
+   <span class="hljs-number">0x000000000044b20a</span> &lt;+<span class="hljs-number">58</span>&gt;:    jne    <span class="hljs-number">0x44b215</span> &lt;runtime.mcall+<span class="hljs-number">69</span>&gt;
+   <span class="hljs-number">0x000000000044b20c</span> &lt;+<span class="hljs-number">60</span>&gt;:    lea    <span class="hljs-number">-0x23343</span>(%rip),%rax        # <span class="hljs-number">0x427ed0</span> &lt;runtime.badmcall&gt;
+   <span class="hljs-number">0x000000000044b213</span> &lt;+<span class="hljs-number">67</span>&gt;:    jmpq   *%rax
+   <span class="hljs-number">0x000000000044b215</span> &lt;+<span class="hljs-number">69</span>&gt;:    mov    %rsi,%fs:<span class="hljs-number">0xfffffffffffffff8</span>
+   <span class="hljs-number">0x000000000044b21e</span> &lt;+<span class="hljs-number">78</span>&gt;:    mov    <span class="hljs-number">0x38</span>(%rsi),%rsp
+   <span class="hljs-number">0x000000000044b222</span> &lt;+<span class="hljs-number">82</span>&gt;:    push   %rax
+   <span class="hljs-number">0x000000000044b223</span> &lt;+<span class="hljs-number">83</span>&gt;:    mov    %rdi,%rdx
+   <span class="hljs-number">0x000000000044b226</span> &lt;+<span class="hljs-number">86</span>&gt;:    mov    (%rdi),%rdi
+=&gt; <span class="hljs-number">0x000000000044b229</span> &lt;+<span class="hljs-number">89</span>&gt;:    callq  *%rdi
+   <span class="hljs-number">0x000000000044b22b</span> &lt;+<span class="hljs-number">91</span>&gt;:    pop    %rax <span class="hljs-comment">// callq&#x7684;&#x4E0B;&#x4E00;&#x4E2A;&#x6307;&#x4EE4; 0x000000000044b22b -------------------here</span>
+   <span class="hljs-number">0x000000000044b22c</span> &lt;+<span class="hljs-number">92</span>&gt;:    lea    <span class="hljs-number">-0x23323</span>(%rip),%rax        # <span class="hljs-number">0x427f10</span> &lt;runtime.badmcall2&gt;
+   <span class="hljs-number">0x000000000044b233</span> &lt;+<span class="hljs-number">99</span>&gt;:    jmpq   *%rax
+   <span class="hljs-number">0x000000000044b235</span> &lt;+<span class="hljs-number">101</span>&gt;:    retq
+End of assembler dump.
+(gdb) step
+runtime.park_m (gp=<span class="hljs-number">0xc000000780</span>) at /usr/lib/golang/src/runtime/proc.<span class="hljs-keyword">go</span>:<span class="hljs-number">2594</span>
+<span class="hljs-number">2594</span>    <span class="hljs-keyword">func</span> park_m(gp *g) {
+(gdb) info register rbp rsp pc
+rbp            <span class="hljs-number">0xc000030fa0</span>    <span class="hljs-number">0xc000030fa0</span>
+rsp            <span class="hljs-number">0xc000045fc8</span>    <span class="hljs-number">0xc000045fc8</span>
+pc             <span class="hljs-number">0x42d490</span>    <span class="hljs-number">0x42d490</span> &lt;runtime.park_m&gt;
+(gdb) x/<span class="hljs-number">32</span>xb <span class="hljs-number">0xc000045fc0</span>
+<span class="hljs-number">0xc000045fc0</span>:    <span class="hljs-number">0x80</span>    <span class="hljs-number">0x0a</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0xc0</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>
+<span class="hljs-number">0xc000045fc8</span>:    <span class="hljs-number">0x2b</span>    <span class="hljs-number">0xb2</span>    <span class="hljs-number">0x44</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span> <span class="hljs-comment">// 0x000000000044b22b -------------------here</span>
+<span class="hljs-number">0xc000045fd0</span>:    <span class="hljs-number">0x80</span>    <span class="hljs-number">0x07</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0xc0</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>
+<span class="hljs-number">0xc000045fd8</span>:    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>    <span class="hljs-number">0x00</span>
+(gdb) disas
+Dump of assembler code <span class="hljs-keyword">for</span> function runtime.park_m:
+=&gt; <span class="hljs-number">0x000000000042d490</span> &lt;+<span class="hljs-number">0</span>&gt;:        mov    %fs:<span class="hljs-number">0xfffffffffffffff8</span>,%rcx
+   <span class="hljs-number">0x000000000042d499</span> &lt;+<span class="hljs-number">9</span>&gt;:        cmp    <span class="hljs-number">0x10</span>(%rcx),%rsp
+   <span class="hljs-number">0x000000000042d49d</span> &lt;+<span class="hljs-number">13</span>&gt;:    jbe    <span class="hljs-number">0x42d642</span> &lt;runtime.park_m+<span class="hljs-number">434</span>&gt; <span class="hljs-comment">//&#x5224;&#x65AD;&#x662F;&#x5426;&#x8D8A;&#x754C;</span>
+   <span class="hljs-number">0x000000000042d4a3</span> &lt;+<span class="hljs-number">19</span>&gt;:    sub    $<span class="hljs-number">0x28</span>,%rsp
+   <span class="hljs-number">0x000000000042d4a7</span> &lt;+<span class="hljs-number">23</span>&gt;:    mov    %rbp,<span class="hljs-number">0x20</span>(%rsp)
+   <span class="hljs-number">0x000000000042d4ac</span> &lt;+<span class="hljs-number">28</span>&gt;:    lea    <span class="hljs-number">0x20</span>(%rsp),%rbp
+   <span class="hljs-number">0x000000000042d4b1</span> &lt;+<span class="hljs-number">33</span>&gt;:    mov    %fs:<span class="hljs-number">0xfffffffffffffff8</span>,%rax
+   <span class="hljs-number">0x000000000042d4ba</span> &lt;+<span class="hljs-number">42</span>&gt;:    mov    %rax,<span class="hljs-number">0x18</span>(%rsp)
+   <span class="hljs-number">0x000000000042d4bf</span> &lt;+<span class="hljs-number">47</span>&gt;:    cmpb   $<span class="hljs-number">0x0</span>,<span class="hljs-number">0xaf4ca</span>(%rip)        # <span class="hljs-number">0x4dc990</span> &lt;runtime.trace+<span class="hljs-number">16</span>&gt;
+   <span class="hljs-number">0x000000000042d4c6</span> &lt;+<span class="hljs-number">54</span>&gt;:    jne    <span class="hljs-number">0x42d61e</span> &lt;runtime.park_m+<span class="hljs-number">398</span>&gt;
+---Type &lt;<span class="hljs-keyword">return</span>&gt; to <span class="hljs-keyword">continue</span>, or q &lt;<span class="hljs-keyword">return</span>&gt; to quit---q
+Quit
+(gdb)
+</code></pre>
+<p>&#x4ECE;----here&#x53EF;&#x4EE5;&#x770B;&#x51FA;&#x6765;,&#x5F53;&#x4F7F;&#x7528;mcall<switch to="" m-="">g0&apos;s stack&gt;,&#x53EA;&#x662F;&#x4F7F;&#x7528;&#x4E86;g0&#x7684;&#x6808;,&#x6CA1;&#x6709;&#x7528;g.sched.pc,&#x800C;&#x662F;&#x7528;&#x7684;mcall&#x91CC;&#x9762;&#x7684;<code>callq&#x7684;&#x4E0B;&#x4E00;&#x4E2A;&#x6307;&#x4EE4; 0x000000000044b22b -------------------here</code></switch></p>
+<blockquote>
+<p>&#x6587;&#x4EF6;<code>src/runtime/proc.go</code></p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-comment">// park continuation on g0.</span>
+<span class="hljs-keyword">func</span> park_m(gp *g) {
+    _g_ := getg()
+
+    <span class="hljs-keyword">if</span> trace.enabled {
+        traceGoPark(_g_.m.waittraceev, _g_.m.waittraceskip)
+    }
+
+    casgstatus(gp, _Grunning, _Gwaiting)
+    dropg()
+
+    <span class="hljs-keyword">if</span> fn := _g_.m.waitunlockf; fn != <span class="hljs-literal">nil</span> {
+        ok := fn(gp, _g_.m.waitlock)
+        _g_.m.waitunlockf = <span class="hljs-literal">nil</span>
+        _g_.m.waitlock = <span class="hljs-literal">nil</span>
+        <span class="hljs-keyword">if</span> !ok {
+            <span class="hljs-keyword">if</span> trace.enabled {
+                traceGoUnpark(gp, <span class="hljs-number">2</span>)
+            }
+            casgstatus(gp, _Gwaiting, _Grunnable)
+            execute(gp, <span class="hljs-literal">true</span>) <span class="hljs-comment">// Schedule it back, never returns.</span>
+        }
+    }
+    schedule()
+}
+</code></pre>
+<h2 id="&#x6BCF;&#x4E2A;&#x7EBF;&#x7A0B;&#x5BF9;&#x5E94;g0&#x4E2D;g0schedsp&#x4F1A;&#x4E00;&#x76F4;&#x6539;&#x53D8;"><a name="&#x6BCF;&#x4E2A;&#x7EBF;&#x7A0B;&#x5BF9;&#x5E94;g0&#x4E2D;g0schedsp&#x4F1A;&#x4E00;&#x76F4;&#x6539;&#x53D8;" class="anchor-navigation-ex-anchor" href="#&#x6BCF;&#x4E2A;&#x7EBF;&#x7A0B;&#x5BF9;&#x5E94;g0&#x4E2D;g0schedsp&#x4F1A;&#x4E00;&#x76F4;&#x6539;&#x53D8;"><i class="fa fa-link" aria-hidden="true"></i></a>1.2. &#x6BCF;&#x4E2A;&#x7EBF;&#x7A0B;&#x5BF9;&#x5E94;g0&#x4E2D;g0.sched.SP&#x4F1A;&#x4E00;&#x76F4;&#x6539;&#x53D8;?</h2>
+<blockquote>
+<p>&#x5728;&#x521D;&#x59CB;&#x5316;&#x540E;&#x5C31;&#x4E0D;&#x4F1A;&#x6539;&#x53D8;&#x4E86;,&#x4E0B;&#x6B21;&#x8C03;&#x5EA6;,&#x76F4;&#x63A5;&#x628A;<code>g0.sched.SP</code>&#x91CD;&#x65B0;&#x8D4B;&#x503C;&#x7ED9;&#x5BC4;&#x5B58;&#x5668;<code>SP</code>.</p>
+</blockquote>
+<pre><code class="lang-go"><span class="hljs-keyword">type</span> g <span class="hljs-keyword">struct</span> {
+    <span class="hljs-comment">//...</span>
+    sched          gobuf
+    <span class="hljs-comment">//...</span>
+}
+
+<span class="hljs-keyword">type</span> gobuf <span class="hljs-keyword">struct</span> {
+    sp   <span class="hljs-keyword">uintptr</span>   -------------------------------here
+    pc   <span class="hljs-keyword">uintptr</span>
+    g    guintptr
+    ctxt unsafe.Pointer
+    ret  sys.Uintreg
+    lr   <span class="hljs-keyword">uintptr</span>
+    bp   <span class="hljs-keyword">uintptr</span> <span class="hljs-comment">// for GOEXPERIMENT=framepointer</span>
+}
+</code></pre>
+<h3 id="&#x793A;&#x4F8B;"><a name="&#x793A;&#x4F8B;" class="anchor-navigation-ex-anchor" href="#&#x793A;&#x4F8B;"><i class="fa fa-link" aria-hidden="true"></i></a>1.2.1. &#x793A;&#x4F8B;:</h3>
+<h4 id="&#x5B9E;&#x8DF5;&#x60F3;&#x6CD5;"><a name="&#x5B9E;&#x8DF5;&#x60F3;&#x6CD5;" class="anchor-navigation-ex-anchor" href="#&#x5B9E;&#x8DF5;&#x60F3;&#x6CD5;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x5B9E;&#x8DF5;&#x60F3;&#x6CD5;</h4>
+<ul>
+<li>&#x6709;&#x4E24;&#x4E2A;go&#x5173;&#x952E;&#x5B57;&#x8FD0;&#x884C;&#x8D77;&#x6765;&#x7684;Goroutine<ul>
+<li>&#x5F53;main goroutine&#x7761;&#x7720;&#x7684;&#x65F6;&#x5019;----[&#x5207;&#x6362;&#x5230;g0&#x6808;]-----&gt;&#x5176;&#x4E2D;&#x4E00;&#x4E2A;Goroutine----[&#x5207;&#x6362;&#x5230;g0&#x6808;]--&gt;&#x53E6;&#x4E00;&#x4E2A;Goroutine&#x6216;&#x8005;main goroutine<ul>
+<li>&#x6240;&#x4EE5;&#x53EA;&#x8981;&#x770B;&#x4E0B;&#x8FD9;&#x4E2A;&#x5207;&#x6362;&#x7684;&#x65F6;&#x5019;,mcall&#x51FD;&#x6570;&#x4E2D;(&#x5177;&#x4F53;&#x53EF;&#x770B;part2&#x4E2D;:&#x975E;main goroutine&#x9000;&#x51FA;)<code>MOVQ    (g_sched+gobuf_sp)(SI), SP</code>&#x662F;&#x5426;&#x4E00;&#x76F4;&#x4E0D;&#x53D8;</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<pre><code class="lang-go"><span class="hljs-comment">// func mcall(fn func(*g))   </span>
+<span class="hljs-comment">// Switch to m-&gt;g0&apos;s stack, call fn(g).    ------------------------here</span>
+TEXT runtime&#xB7;mcall(SB), NOSPLIT, $<span class="hljs-number">0</span><span class="hljs-number">-8</span>
+    MOVQ    fn+<span class="hljs-number">0</span>(FP), DI
+
+    get_tls(CX)
+    MOVQ    g(CX), AX    <span class="hljs-comment">// save state in g-&gt;sched</span>
+    MOVQ    <span class="hljs-number">0</span>(SP), BX    <span class="hljs-comment">// caller&apos;s PC</span>
+    MOVQ    BX, (g_sched+gobuf_pc)(AX)
+    LEAQ    fn+<span class="hljs-number">0</span>(FP), BX    <span class="hljs-comment">// caller&apos;s SP</span>
+    MOVQ    BX, (g_sched+gobuf_sp)(AX)
+    MOVQ    AX, (g_sched+gobuf_g)(AX)
+    MOVQ    BP, (g_sched+gobuf_bp)(AX)
+
+    <span class="hljs-comment">// switch to m-&gt;g0 &amp; its stack, call fn</span>
+    MOVQ    g(CX), BX
+    MOVQ    g_m(BX), BX
+    MOVQ    m_g0(BX), SI
+    CMPQ    SI, AX    <span class="hljs-comment">// if g == m-&gt;g0 call badmcall</span>
+    JNE    <span class="hljs-number">3</span>(PC)
+    MOVQ    $runtime&#xB7;badmcall(SB), AX
+    JMP    AX
+    MOVQ    SI, g(CX)    <span class="hljs-comment">// g = m-&gt;g0</span>
+    MOVQ    (g_sched+gobuf_sp)(SI), SP    <span class="hljs-comment">// sp = m-&gt;g0-&gt;sched.sp   -------------------here</span>
+    PUSHQ    AX
+    MOVQ    DI, DX
+    MOVQ    <span class="hljs-number">0</span>(DI), DI
+    CALL    DI
+    POPQ    AX
+    MOVQ    $runtime&#xB7;badmcall2(SB), AX
+    JMP    AX
+    RET
+</code></pre>
+<h4 id="&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;"><a name="&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;" class="anchor-navigation-ex-anchor" href="#&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x5B9A;&#x4E49;&#x7A0B;&#x5E8F;</h4>
+<blockquote>
+<p>main.go
+```go
+package main</p>
+</blockquote>
+<p>import (
+        &quot;runtime&quot;
+        &quot;sync/atomic&quot;
+)</p>
+<p>var existFlag int32 = 2</p>
+<p>// the function&apos;s body is empty
+func addAssemble(x, y int64) int64</p>
+<p>func add(a int64){
+        addAssemble(a, a)
+        atomic.AddInt32(&amp;existFlag, -1)
+}</p>
+<p>func main() {
+        runtime.GOMAXPROCS(1)
+        go add(1)
+        go add(2)</p>
+<pre><code>    for {
+            if atomic.LoadInt32(&amp;existFlag) &lt;=0{
+                    break
+            }
+            runtime.Gosched()
+    }
+</code></pre><p>}</p>
+<pre><code>
+&gt; add_amd.s
+```go
+TEXT &#xB7;addAssemble(SB),$0-24
+    MOVQ x+0(FP), BX
+    MOVQ y+8(FP), BP
+    ADDQ BP, BX
+    MOVQ BX, ret+16(FP)
+    RET
+</code></pre><h4 id="gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;"><a name="gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;" class="anchor-navigation-ex-anchor" href="#gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;"><i class="fa fa-link" aria-hidden="true"></i></a>gdb&#x8C03;&#x8BD5;&#x524D;&#x51C6;&#x5907;</h4>
+<h5 id="&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;"><a name="&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;" class="anchor-navigation-ex-anchor" href="#&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x7F16;&#x8BD1;&#x7A0B;&#x5E8F;</h5>
+<p>&#x7F16;&#x8BD1;&#x4E00;&#x4E0B;&#x6E90;&#x4EE3;&#x7801;: <code>go build  -gcflags &quot;-N -l&quot; -o test .</code>.</p>
+<h5 id="&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;"><a name="&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;" class="anchor-navigation-ex-anchor" href="#&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;"><i class="fa fa-link" aria-hidden="true"></i></a>&#x51C6;&#x5907;mcall&#x51FD;&#x6570;&#x65AD;&#x70B9;&#x7684;&#x6587;&#x4EF6;</h5>
+<ul>
+<li>gdb<ul>
+<li><code>list /usr/lib/golang/src/runtime/asm_amd64.s:300</code></li>
+<li><code>list /tmp/kubernets/test_goroutine/add_amd.s:1</code></li>
+</ul>
+</li>
+</ul>
+<h5 id="gdb&#x8C03;&#x8BD5;&#x81EA;&#x5B9A;&#x4E49;&#x51FD;&#x6570;"><a name="gdb&#x8C03;&#x8BD5;&#x81EA;&#x5B9A;&#x4E49;&#x51FD;&#x6570;" class="anchor-navigation-ex-anchor" href="#gdb&#x8C03;&#x8BD5;&#x81EA;&#x5B9A;&#x4E49;&#x51FD;&#x6570;"><i class="fa fa-link" aria-hidden="true"></i></a>gdb&#x8C03;&#x8BD5;&#x81EA;&#x5B9A;&#x4E49;&#x51FD;&#x6570;</h5>
+<pre><code class="lang-gdb">define zxc
+info threads
+info register rbp rsp pc
+step
+continue
+end
+</code></pre>
+<h4 id="gdb"><a name="gdb" class="anchor-navigation-ex-anchor" href="#gdb"><i class="fa fa-link" aria-hidden="true"></i></a>gdb</h4>
+<pre><code class="lang-sh">[root@gitlab <span class="hljs-built_in">test</span>_goroutine]<span class="hljs-comment"># gdb ./test</span>
+GNU gdb (GDB) Red Hat Enterprise Linux 7.6.1-119.el7
+Copyright (C) 2013 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;http://gnu.org/licenses/gpl.html&gt;
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type <span class="hljs-string">&quot;show copying&quot;</span>
+and <span class="hljs-string">&quot;show warranty&quot;</span> <span class="hljs-keyword">for</span> details.
+This GDB was configured as <span class="hljs-string">&quot;x86_64-redhat-linux-gnu&quot;</span>.
+For bug reporting instructions, please see:
+&lt;http://www.gnu.org/software/gdb/bugs/&gt;...
+Reading symbols from /tmp/kubernets/<span class="hljs-built_in">test</span>_goroutine/test...done.
+Loading Go Runtime support.
+(gdb) list /usr/lib/golang/src/runtime/asm_amd64.s:300
+295
+296        get_tls(CX)
+297        MOVQ    g(CX), AX    // save state <span class="hljs-keyword">in</span> g-&gt;<span class="hljs-built_in">sched</span>
+298        MOVQ    0(SP), BX    // <span class="hljs-built_in">caller</span><span class="hljs-string">&apos;s PC
+299        MOVQ    BX, (g_sched+gobuf_pc)(AX)
+300        LEAQ    fn+0(FP), BX    // caller&apos;</span>s SP
+301        MOVQ    BX, (g_<span class="hljs-built_in">sched</span>+gobuf_sp)(AX)
+302        MOVQ    AX, (g_<span class="hljs-built_in">sched</span>+gobuf_g)(AX)
+303        MOVQ    BP, (g_<span class="hljs-built_in">sched</span>+gobuf_bp)(AX)
+304
+(gdb)
+305        // switch to m-&gt;g0 &amp; its stack, call fn
+306        MOVQ    g(CX), BX
+307        MOVQ    g_m(BX), BX
+308        MOVQ    m_g0(BX), SI
+309        CMPQ    SI, AX    // <span class="hljs-keyword">if</span> g == m-&gt;g0 call badmcall
+310        JNE    3(PC)
+311        MOVQ    <span class="hljs-variable">$runtime</span>&#xB7;badmcall(SB), AX
+312        JMP    AX
+313        MOVQ    SI, g(CX)    // g = m-&gt;g0
+314        MOVQ    (g_<span class="hljs-built_in">sched</span>+gobuf_sp)(SI), SP    // sp = m-&gt;g0-&gt;sched.sp
+(gdb)
+315        PUSHQ    AX
+316        MOVQ    DI, DX
+317        MOVQ    0(DI), DI
+318        CALL    DI
+319        POPQ    AX
+320        MOVQ    <span class="hljs-variable">$runtime</span>&#xB7;badmcall2(SB), AX
+321        JMP    AX
+322        RET
+323
+324    // systemstack_switch is a dummy routine that systemstack leaves at the bottom
+(gdb) b 318
+Breakpoint 1 at 0x44a2c9: file /usr/lib/golang/src/runtime/asm_amd64.s, line 318.
+(gdb) define zxc
+Type commands <span class="hljs-keyword">for</span> definition of <span class="hljs-string">&quot;zxc&quot;</span>.
+End with a line saying just <span class="hljs-string">&quot;end&quot;</span>.
+&gt;info threads
+&gt;info register rbp rsp pc
+&gt;step
+&gt;<span class="hljs-built_in">continue</span>
+&gt;end
+(gdb) zxc
+No threads.
+The program has no registers now.
+(gdb) run
+Starting program: /tmp/kubernets/<span class="hljs-built_in">test</span>_goroutine/./<span class="hljs-built_in">test</span>
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb) zxc
+  Id   Target Id         Frame
+* 1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+rbp            0xc000030660    0xc000030660
+rsp            0x7fffffffe440    0x7fffffffe440
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.park_m (gp=0xc000000300) at /usr/lib/golang/src/runtime/proc.go:2594
+2594    func park_m(gp *g) {
+[New LWP 19129]
+[Switching to LWP 19129]
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+* 2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318                ------------------here
+  1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+rbp            0xc000031f30    0xc000031f30
+rsp            0xc00003ffd0    0xc00003ffd0         ------------------here
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.park_m (gp=0xc000000d80) at /usr/lib/golang/src/runtime/proc.go:2594
+2594    func park_m(gp *g) {
+[Switching to LWP 18958]
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+  2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+* 1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+rbp            0xc000030660    0xc000030660
+rsp            0x7fffffffe440    0x7fffffffe440
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.park_m (gp=0xc000000300) at /usr/lib/golang/src/runtime/proc.go:2594
+2594    func park_m(gp *g) {
+[Switching to LWP 19129]
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+* 2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318               ------------------here
+  1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+rbp            0xc000031798    0xc000031798
+rsp            0xc00003ffd0    0xc00003ffd0                           ------------------here
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.park_m (gp=0xc000000c00) at /usr/lib/golang/src/runtime/proc.go:2594
+2594    func park_m(gp *g) {
+[New LWP 18963]
+[Switching to LWP 18963]
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+* 3    LWP 18963 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+  2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+  1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+rbp            0xc000030fa0    0xc000030fa0
+rsp            0xc000045fd0    0xc000045fd0
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.park_m (gp=0xc000000780) at /usr/lib/golang/src/runtime/proc.go:2594
+2594    func park_m(gp *g) {
+[Switching to LWP 18958]
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+  3    LWP 18963 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+  2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+* 1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+rbp            0xc000030720    0xc000030720
+rsp            0x7fffffffe440    0x7fffffffe440
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.gosched_m (gp=0xc000000300) at /usr/lib/golang/src/runtime/proc.go:2635
+2635    func gosched_m(gp *g) {
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+  3    LWP 18963 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+  2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+* 1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+rbp            0xc000032<span class="hljs-built_in">fc</span>8    0xc000032<span class="hljs-built_in">fc</span>8
+rsp            0x7fffffffe440    0x7fffffffe440
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.goexit0 (gp=0xc000001380) at /usr/lib/golang/src/runtime/proc.go:2674
+2674    func goexit0(gp *g) {
+
+Breakpoint 1, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+318        CALL    DI
+(gdb)
+  Id   Target Id         Frame
+  3    LWP 18963 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+  2    LWP 19129 <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:536
+* 1    LWP 18958 <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:318
+rbp            0xc0000327c8    0xc0000327c8
+rsp            0x7fffffffe440    0x7fffffffe440
+pc             0x44a2c9    0x44a2c9 &lt;runtime.mcall+89&gt;
+runtime.goexit0 (gp=0xc000001200) at /usr/lib/golang/src/runtime/proc.go:2674
+2674    func goexit0(gp *g) {
+[LWP 19129 exited]
+[LWP 18963 exited]
+[Inferior 1 (process 18958) exited normally]
+(gdb)
+</code></pre>
+<ul>
+<li>&#x89C2;&#x5BDF;<code>------------------here</code>,&#x53EF;&#x4EE5;&#x77E5;&#x9053;&#x6BCF;&#x4E2A;M&#x6709;&#x81EA;&#x5DF1;&#x7684;g0,&#x5176;&#x4E2D;&#x7684;g.sched.SP&#x521D;&#x59CB;&#x5316;&#x4EE5;&#x540E;&#x5C31;&#x4E0D;&#x4F1A;&#x6539;&#x53D8;<ul>
+<li>&#x90FD;&#x662F;<code>rsp            0xc00003ffd0    0xc00003ffd0</code></li>
+</ul>
+</li>
+<li>&#x5982;&#x679C;&#x4E0D;&#x6E05;&#x695A;&#x53EF;&#x4EE5;&#x770B;&#x4E0B;&#x7EBF;&#x7A0B;1<code>* 1    LWP 18958 &quot;test&quot;</code></li>
+</ul>
+<pre><code class="lang-go"><span class="hljs-comment">//...</span>
+
+  Id   Target Id         Frame
+* <span class="hljs-number">2</span>    LWP <span class="hljs-number">19129</span> <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:<span class="hljs-number">318</span>                ------------------here
+  <span class="hljs-number">1</span>    LWP <span class="hljs-number">18958</span> <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:<span class="hljs-number">536</span>
+rbp            <span class="hljs-number">0xc000031f30</span>    <span class="hljs-number">0xc000031f30</span>
+rsp            <span class="hljs-number">0xc00003ffd0</span>    <span class="hljs-number">0xc00003ffd0</span>         ------------------here
+pc             <span class="hljs-number">0x44a2c9</span>    <span class="hljs-number">0x44a2c9</span> &lt;runtime.mcall+<span class="hljs-number">89</span>&gt;
+runtime.park_m (gp=<span class="hljs-number">0xc000000d80</span>) at /usr/lib/golang/src/runtime/proc.<span class="hljs-keyword">go</span>:<span class="hljs-number">2594</span>
+<span class="hljs-number">2594</span>    <span class="hljs-keyword">func</span> park_m(gp *g) {
+[Switching to LWP <span class="hljs-number">18958</span>]
+
+Breakpoint <span class="hljs-number">1</span>, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:<span class="hljs-number">318</span>
+<span class="hljs-number">318</span>        CALL    DI
+
+<span class="hljs-comment">//...</span>
+
+  Id   Target Id         Frame
+* <span class="hljs-number">2</span>    LWP <span class="hljs-number">19129</span> <span class="hljs-string">&quot;test&quot;</span>  runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:<span class="hljs-number">318</span>               ------------------here
+  <span class="hljs-number">1</span>    LWP <span class="hljs-number">18958</span> <span class="hljs-string">&quot;test&quot;</span>  runtime.futex () at /usr/lib/golang/src/runtime/sys_linux_amd64.s:<span class="hljs-number">536</span>
+rbp            <span class="hljs-number">0xc000031798</span>    <span class="hljs-number">0xc000031798</span>
+rsp            <span class="hljs-number">0xc00003ffd0</span>    <span class="hljs-number">0xc00003ffd0</span>                           ------------------here
+pc             <span class="hljs-number">0x44a2c9</span>    <span class="hljs-number">0x44a2c9</span> &lt;runtime.mcall+<span class="hljs-number">89</span>&gt;
+runtime.park_m (gp=<span class="hljs-number">0xc000000c00</span>) at /usr/lib/golang/src/runtime/proc.<span class="hljs-keyword">go</span>:<span class="hljs-number">2594</span>
+<span class="hljs-number">2594</span>    <span class="hljs-keyword">func</span> park_m(gp *g) {
+[New LWP <span class="hljs-number">18963</span>]
+[Switching to LWP <span class="hljs-number">18963</span>]
+
+Breakpoint <span class="hljs-number">1</span>, runtime.mcall () at /usr/lib/golang/src/runtime/asm_amd64.s:<span class="hljs-number">318</span>
+<span class="hljs-number">318</span>        CALL    DI
+
+<span class="hljs-comment">//...</span>
+</code></pre>
+<p><img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200910134925.png" alt="&#x4FEE;&#x6B63;&#x540E;&#x8C03;&#x5EA6;&#x56FE;"></p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="../2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.html" class="navigation navigation-prev " aria-label="Previous page: 系统调用收尾,如果从系统调用返回,如何重新得到P">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+                <a href="3.3.调度循环.html" class="navigation navigation-next " aria-label="Next page: 调度循环">
+                    <i class="fa fa-angle-right"></i>
+                </a>
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"3.调度循环","date":"2020-03-21T14:14:00.000Z","tags":["golang","goroutine"],"categories":["golang调度"],"toc":true,"level":"1.6.3","depth":2,"next":{"title":"调度循环","level":"1.6.3.1","depth":3,"path":"part3.调度/3.调度循环/3.3.调度循环.md","ref":"part3.调度/3.调度循环/3.3.调度循环.md","articles":[]},"previous":{"title":"系统调用收尾,如果从系统调用返回,如何重新得到P","level":"1.6.2.4","depth":3,"path":"part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.md","ref":"part3.调度/2.调度的时机/2.3.2.系统调用收尾,如果从系统调用返回,如何重新得到P.md","articles":[]},"dir":"ltr"},"config":{"plugins":["-page-toc-button","-toc2","anchor-navigation-ex"],"styles":{"website":"./styles/website.css"},"pluginsConfig":{"search":{},"toc2":{"addClass":true,"className":"toc"},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"fontsettings":{"theme":"white","family":"sans","size":2},"highlight":{},"anchor-navigation-ex":{"associatedWithSummary":true,"float":{"floatIcon":"fa fa-navicon","level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"mode":"float","multipleH1":true,"pageTop":{"level1Icon":"fa fa-hand-o-right","level2Icon":"fa fa-hand-o-right","level3Icon":"fa fa-hand-o-right","showLevelIcon":false},"printLog":false,"showGoTop":true,"showLevel":true},"page-toc-button":{"maxTocDepth":2,"minTocSize":2},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"theme":"default","author":"zput","pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"variables":{},"title":"golang goroutine详解","language":"zh-hans","links":{"sidebar":{"zput|堆排序":"https://zput.github.io"}},"gitbook":"3.2.3","description":"select * from learn"},"file":{"path":"part3.调度/3.调度循环/3.3.调度循环.md","mtime":"2021-03-28T09:04:44.796Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2021-03-28T09:05:35.583Z"},"basePath":"../..","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="../../gitbook/gitbook.js"></script>
+    <script src="../../gitbook/theme.js"></script>
+    
+        
+        <script src="../../gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="../../gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+
