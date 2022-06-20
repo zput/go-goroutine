@@ -1,0 +1,802 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="什么是被动调度 # 被动调度: goroutine执行某个操作因条件不满足需要等待而发生的调度； goroutine进入睡眠[比如是Goroutine N发送数据到无缓冲chan上面,当没有其他Goroutine从chan上面读数据的时候,Goroutine N阻塞在chan上面. 此刻睡眠含义:进入chan的缓存读取队列(goroutine链表)]; 重新运行schedule() 唤醒睡眠中的goroutine; 唤醒空闲的P和唤醒创建工作线程; goroutine(被创建出来后/创建运行了一段时间后)如何放入运行队列[P中]; 探寻被动调度,如何进入睡眠 # goroutine因某个条件而阻塞 chan waitGroup 等这些都会发生阻塞 定义程序 # 先来看一个例子,
+package main import ( &#34;fmt&#34; &#34;runtime&#34; &#34;sync&#34; &#34;sync/atomic&#34; ) func main() { var n int32 var wg sync.WaitGroup runtime.GOMAXPROCS(2) wg.Add(1) go func() { wg.Done() for{ atomic.AddInt32(&n, 1) } }() wg.Wait() fmt.Println(atomic.LoadInt32(&n)) // 1 } gdb调试前准备 # 编译程序 # 编译一下源代码: go build -gcflags &#34;-N -l&#34; -o test ..
+准备mcall函数断点的文件 # 进入wg."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="4.2.2 goroutine被动调度"><meta property="og:description" content="什么是被动调度 # 被动调度: goroutine执行某个操作因条件不满足需要等待而发生的调度； goroutine进入睡眠[比如是Goroutine N发送数据到无缓冲chan上面,当没有其他Goroutine从chan上面读数据的时候,Goroutine N阻塞在chan上面. 此刻睡眠含义:进入chan的缓存读取队列(goroutine链表)]; 重新运行schedule() 唤醒睡眠中的goroutine; 唤醒空闲的P和唤醒创建工作线程; goroutine(被创建出来后/创建运行了一段时间后)如何放入运行队列[P中]; 探寻被动调度,如何进入睡眠 # goroutine因某个条件而阻塞 chan waitGroup 等这些都会发生阻塞 定义程序 # 先来看一个例子,
+package main import ( &#34;fmt&#34; &#34;runtime&#34; &#34;sync&#34; &#34;sync/atomic&#34; ) func main() { var n int32 var wg sync.WaitGroup runtime.GOMAXPROCS(2) wg.Add(1) go func() { wg.Done() for{ atomic.AddInt32(&n, 1) } }() wg.Wait() fmt.Println(atomic.LoadInt32(&n)) // 1 } gdb调试前准备 # 编译程序 # 编译一下源代码: go build -gcflags &#34;-N -l&#34; -o test ..
+准备mcall函数断点的文件 # 进入wg."><meta property="og:type" content="article"><meta property="og:url" content="https://example.com/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.2-%E8%A2%AB%E5%8A%A8%E8%B0%83%E5%BA%A6/"><meta property="article:section" content="docs"><meta property="article:published_time" content="2020-04-15T11:33:07+00:00"><meta property="article:modified_time" content="2020-04-15T11:33:07+00:00"><title>4.2.2 goroutine被动调度 | go调度源码分析</title><link rel=manifest href=/manifest.json><link rel=icon href=/favicon.png type=image/x-icon><link rel=stylesheet href=/book.min.82c5dbd23447cee0b4c2aa3ed08ce0961faa40e1fa370eee4f8c9f02e0d46b5f.css integrity="sha256-gsXb0jRHzuC0wqo+0Izglh+qQOH6Nw7uT4yfAuDUa18=" crossorigin=anonymous><script defer src=/flexsearch.min.js></script>
+<script defer src=/en.search.min.3d89b421e6b838a0994a918daaecd083aefa9523faabd023944479b99694353b.js integrity="sha256-PYm0Iea4OKCZSpGNquzQg676lSP6q9AjlER5uZaUNTs=" crossorigin=anonymous></script>
+<script defer src=/sw.min.6f6f90fcb8eb1c49ec389838e6b801d0de19430b8e516902f8d75c3c8bd98739.js integrity="sha256-b2+Q/LjrHEnsOJg45rgB0N4ZQwuOUWkC+NdcPIvZhzk=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/><span>go调度源码分析</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><span>第一章 基础知识</span><ul><li><a href=/docs/%E7%AC%AC%E4%B8%80%E7%AB%A0-%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/1.1-%E6%B1%87%E7%BC%96%E5%9F%BA%E7%A1%80/>1.1 底层类汇编函数</a></li><li><a href=/docs/%E7%AC%AC%E4%B8%80%E7%AB%A0-%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/1.2-%E5%86%85%E5%AD%98/>1.2 内存大小端概念</a></li></ul></li><li><span>第二章 进入main函数之前的初始化</span><ul><li><a href=/docs/%E7%AC%AC%E4%BA%8C%E7%AB%A0-%E8%BF%9B%E5%85%A5main%E5%87%BD%E6%95%B0%E4%B9%8B%E5%89%8D%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96/2.1-%E8%BF%9B%E5%85%A5main%E5%87%BD%E6%95%B0%E4%B9%8B%E5%89%8D%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96/>2.1 进入main函数之前的初始化</a></li></ul></li><li><span>第三章 退出goroutine</span><ul><li><a href=/docs/%E7%AC%AC%E4%B8%89%E7%AB%A0-%E9%80%80%E5%87%BAgoroutine/3.1-%E9%80%80%E5%87%BAgoroutine/>3.1 goroutine退出过程</a></li></ul></li><li><span>第四章 调度</span><ul><li><span>一 调度策略</span><ul><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%B8%80-%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/4.1.2-%E7%9B%97%E5%8F%96goroutine%E4%BB%8E%E5%85%B6%E4%BB%96%E9%98%9F%E5%88%97/>4.1.2 盗取goroutine从其他队列</a></li><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%B8%80-%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/4.1.1-%E4%BB%8E%E6%9C%AC%E5%9C%B0%E9%98%9F%E5%88%97%E6%88%96%E5%85%A8%E5%B1%80%E9%98%9F%E5%88%97%E8%8E%B7%E5%8F%96goroutine/>4.1.1 从本地队列或全局队列获取goroutine</a></li></ul></li><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/>二 调度的时机</a><ul><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.1-%E4%B8%BB%E5%8A%A8%E8%B0%83%E5%BA%A6/>4.2.1 goroutine主动调度</a></li><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.2-%E8%A2%AB%E5%8A%A8%E8%B0%83%E5%BA%A6/ class=active>4.2.2 goroutine被动调度</a></li><li><span>4.2.3 剥夺调度</span><ul><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.1-%E8%BF%90%E8%A1%8C%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E6%97%B6%E9%97%B4%E8%BF%87%E9%95%BF%E8%B0%83%E5%BA%A6/>4.2.3.1 运行用户代码时间过长调度</a></li><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.2-%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E6%94%B6%E5%B0%BE%E5%A6%82%E6%9E%9C%E4%BB%8E%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E8%BF%94%E5%9B%9E%E5%A6%82%E4%BD%95%E9%87%8D%E6%96%B0%E5%BE%97%E5%88%B0P/>4.2.3.2 系统调用收尾,如从系统调用返回,如何重新得到P</a></li></ul></li></ul></li><li><span>三 调度循环</span><ul><li><a href=/docs/%E7%AC%AC%E5%9B%9B%E7%AB%A0-%E8%B0%83%E5%BA%A6/%E4%B8%89-%E8%B0%83%E5%BA%A6%E5%BE%AA%E7%8E%AF/4.3.1-%E8%B0%83%E5%BA%A6%E5%BE%AA%E7%8E%AF/>4.3.1 调度循环</a></li></ul></li></ul></li></ul><ul><li><a href=https://github.com/zput target=_blank rel=noopener>Github</a></li><li><a href=https://zput.github.io target=_blank rel=noopener>blog</a></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>4.2.2 goroutine被动调度</strong>
+<label for=toc-control><img src=/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#什么是被动调度>什么是被动调度</a><ul><li><a href=#探寻被动调度如何进入睡眠>探寻被动调度,如何进入睡眠</a><ul><li><a href=#定义程序>定义程序</a></li></ul></li><li><a href=#睡眠>睡眠</a><ul><li><a href=#runtime_semacquire>runtime_Semacquire</a></li></ul></li><li><a href=#唤醒睡眠中的goroutine>唤醒睡眠中的goroutine</a><ul><li><a href=#runtime_semrelease>runtime_Semrelease</a></li></ul></li><li><a href=#唤醒一个空闲p获得创建一个m开始轮询调度可能把上面已唤醒的g调度起来>唤醒一个空闲P,获得(创建)一个M,开始轮询调度,可能把上面已唤醒的G调度起来</a><ul><li><a href=#wakep--startm>wakep&ndash;>startm</a></li></ul></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></aside></header><article class=markdown><h1 id=什么是被动调度>什么是被动调度
+<a class=anchor href=#%e4%bb%80%e4%b9%88%e6%98%af%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6>#</a></h1><ul><li>被动调度: goroutine执行某个操作因条件不满足需要等待而发生的调度；<ul><li>goroutine进入睡眠[比如是Goroutine N发送数据到无缓冲chan上面,当没有其他Goroutine从chan上面读数据的时候,Goroutine N阻塞在chan上面. 此刻睡眠含义:进入chan的缓存读取队列(goroutine链表)];</li><li>重新运行schedule()</li><li>唤醒睡眠中的goroutine;</li><li>唤醒空闲的P和唤醒创建工作线程;<ul><li>goroutine(<em>被创建出来后/创建运行了一段时间后</em>)如何放入运行队列[P中];</li></ul></li></ul></li></ul><h2 id=探寻被动调度如何进入睡眠>探寻被动调度,如何进入睡眠
+<a class=anchor href=#%e6%8e%a2%e5%af%bb%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6%e5%a6%82%e4%bd%95%e8%bf%9b%e5%85%a5%e7%9d%a1%e7%9c%a0>#</a></h2><ul><li>goroutine因某个条件而阻塞</li><li>chan</li><li>waitGroup
+等这些都会发生阻塞</li></ul><h3 id=定义程序>定义程序
+<a class=anchor href=#%e5%ae%9a%e4%b9%89%e7%a8%8b%e5%ba%8f>#</a></h3><p>先来看一个例子,</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;runtime&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;sync&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;sync/atomic&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>n</span> <span style=color:#66d9ef>int32</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>wg</span> <span style=color:#a6e22e>sync</span>.<span style=color:#a6e22e>WaitGroup</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>runtime</span>.<span style=color:#a6e22e>GOMAXPROCS</span>(<span style=color:#ae81ff>2</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>wg</span>.<span style=color:#a6e22e>Add</span>(<span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>go</span> <span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>wg</span>.<span style=color:#a6e22e>Done</span>()
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>for</span>{
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>AddInt32</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>n</span>, <span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>wg</span>.<span style=color:#a6e22e>Wait</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>LoadInt32</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>n</span>)) <span style=color:#75715e>// 1
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><h4 id=gdb调试前准备>gdb调试前准备
+<a class=anchor href=#gdb%e8%b0%83%e8%af%95%e5%89%8d%e5%87%86%e5%a4%87>#</a></h4><h5 id=编译程序>编译程序
+<a class=anchor href=#%e7%bc%96%e8%af%91%e7%a8%8b%e5%ba%8f>#</a></h5><p>编译一下源代码: <code>go build -gcflags "-N -l" -o test .</code>.</p><h5 id=准备mcall函数断点的文件>准备mcall函数断点的文件
+<a class=anchor href=#%e5%87%86%e5%a4%87mcall%e5%87%bd%e6%95%b0%e6%96%ad%e7%82%b9%e7%9a%84%e6%96%87%e4%bb%b6>#</a></h5><p>进入<code>wg.Wait()</code></p><h2 id=睡眠>睡眠
+<a class=anchor href=#%e7%9d%a1%e7%9c%a0>#</a></h2><p>我们都知道main函数里面的wg.Wait()这个只有当wg的计数器到0后才会继续执行,
+我们来看看当wg还没有到0的时候,这里会发生什么呢?</p><blockquote><p>src/sync/waitgroup.go</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Wait blocks until the WaitGroup counter is zero.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>wg</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>WaitGroup</span>) <span style=color:#a6e22e>Wait</span>() {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>statep</span>, <span style=color:#a6e22e>semap</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>wg</span>.<span style=color:#a6e22e>state</span>()
+</span></span><span style=display:flex><span>    <span style=color:#75715e>//....省去race代码
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>state</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>LoadUint64</span>(<span style=color:#a6e22e>statep</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>v</span> <span style=color:#f92672>:=</span> int32(<span style=color:#a6e22e>state</span> <span style=color:#f92672>&gt;&gt;</span> <span style=color:#ae81ff>32</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>w</span> <span style=color:#f92672>:=</span> uint32(<span style=color:#a6e22e>state</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>v</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>            <span style=color:#75715e>// Counter is 0, no need to wait.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>            <span style=color:#75715e>//....省去race代码
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Increment waiters count.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>CompareAndSwapUint64</span>(<span style=color:#a6e22e>statep</span>, <span style=color:#a6e22e>state</span>, <span style=color:#a6e22e>state</span><span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>            <span style=color:#75715e>//....省去race代码
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>runtime_Semacquire</span>(<span style=color:#a6e22e>semap</span>) <span style=color:#75715e>// PV操作  ---------------------here
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#66d9ef>if</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>statep</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>				panic(<span style=color:#e6db74>&#34;sync: WaitGroup is reused before previous Wait has returned&#34;</span>)
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Enabled</span> {
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Enable</span>()
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Acquire</span>(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>wg</span>))
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h3 id=runtime_semacquire>runtime_Semacquire
+<a class=anchor href=#runtime_semacquire>#</a></h3><blockquote><p><code>src/sync/runtime.go</code></p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Semacquire waits until *s &gt; 0 and then atomically decrements it.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// It is intended as a simple sleep primitive for use by the synchronization
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// library and should not be used directly.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>runtime_Semacquire</span>(<span style=color:#a6e22e>s</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>uint32</span>)
+</span></span></code></pre></div><ul><li>这里类似PV操作, 但是:<ul><li>P:等待直到(*s)大于0, 然后才自动减. [话句话如果是等于0, 那么就会休眠];</li><li>v:首先自动增加(*s),唤醒被等待的goroutine.</li></ul></li></ul><blockquote><p>src/sync/runtime.go</p></blockquote><pre tabindex=0><code>// Semacquire waits until *s &gt; 0 and then atomically decrements it.
+// It is intended as a simple sleep primitive for use by the synchronization
+// library and should not be used directly.
+func runtime_Semacquire(s *uint32)
+</code></pre><p>继续下去发现找不到定义了, 我们gdb查找一下:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span>list /usr/lib/golang/src/sync/waitgroup.go:130
+</span></span><span style=display:flex><span>b <span style=color:#ae81ff>130</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>list /usr/lib/golang/src/sync/runtime.go:1
+</span></span><span style=display:flex><span>b <span style=color:#ae81ff>130</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> info break
+</span></span><span style=display:flex><span>Num     Type           Disp Enb Address            What
+</span></span><span style=display:flex><span><span style=color:#ae81ff>1</span>       breakpoint     keep y   0x0000000000466bfb in sync.<span style=color:#f92672>(</span>*WaitGroup<span style=color:#f92672>)</span>.Wait at /usr/lib/golang/src/sync/waitgroup.go:130
+</span></span><span style=display:flex><span><span style=color:#ae81ff>2</span>       breakpoint     keep y   0x00000000004669c0 in sync.init.1 at /usr/lib/golang/src/sync/runtime.go:14
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> step
+</span></span><span style=display:flex><span>sync.runtime_Semacquire <span style=color:#f92672>(</span>addr<span style=color:#f92672>=</span>0xc00007e014<span style=color:#f92672>)</span> at /usr/lib/golang/src/runtime/sema.go:55
+</span></span><span style=display:flex><span>55	func sync_runtime_Semacquire<span style=color:#f92672>(</span>addr *uint32<span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> frame
+</span></span><span style=display:flex><span><span style=color:#75715e>#0  sync.runtime_Semacquire (addr=0xc00007e014) at /usr/lib/golang/src/runtime/sema.go:55</span>
+</span></span><span style=display:flex><span>55	func sync_runtime_Semacquire<span style=color:#f92672>(</span>addr *uint32<span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span></code></pre></div><h4 id=sync_runtime_semacquire>sync_runtime_Semacquire
+<a class=anchor href=#sync_runtime_semacquire>#</a></h4><blockquote><p><code>/src/runtime/sema.go</code></p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>//go:linkname sync_runtime_Semacquire sync.runtime_Semacquire
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>sync_runtime_Semacquire</span>(<span style=color:#a6e22e>addr</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>uint32</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>semacquire1</span>(<span style=color:#a6e22e>addr</span>, <span style=color:#66d9ef>false</span>, <span style=color:#a6e22e>semaBlockProfile</span>, <span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>semacquire1</span>(<span style=color:#a6e22e>addr</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>uint32</span>, <span style=color:#a6e22e>lifo</span> <span style=color:#66d9ef>bool</span>, <span style=color:#a6e22e>profile</span> <span style=color:#a6e22e>semaProfileFlags</span>, <span style=color:#a6e22e>skipframes</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>gp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>gp</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>curg</span> {
+</span></span><span style=display:flex><span>       <span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;semacquire not on the G stack&#34;</span>)
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Easy case.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>cansemacquire</span>(<span style=color:#a6e22e>addr</span>) {
+</span></span><span style=display:flex><span>       <span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Harder case:
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>//	increment waiter count
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>//	try cansemacquire one more time, return if succeeded
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>//	enqueue itself as a waiter
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>//	sleep
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>//	(waiter descriptor is dequeued by signaler)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>s</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>acquireSudog</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>root</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>semroot</span>(<span style=color:#a6e22e>addr</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>t0</span> <span style=color:#f92672>:=</span> int64(<span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>releasetime</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>acquiretime</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>ticket</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>profile</span><span style=color:#f92672>&amp;</span><span style=color:#a6e22e>semaBlockProfile</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>blockprofilerate</span> &gt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>t0</span> = <span style=color:#a6e22e>cputicks</span>()
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>releasetime</span> = <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>profile</span><span style=color:#f92672>&amp;</span><span style=color:#a6e22e>semaMutexProfile</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>mutexprofilerate</span> &gt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>t0</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>t0</span> = <span style=color:#a6e22e>cputicks</span>()
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>acquiretime</span> = <span style=color:#a6e22e>t0</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Add ourselves to nwait to disable &#34;easy case&#34; in semrelease.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Xadd</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>nwait</span>, <span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Check cansemacquire to avoid missed wakeup.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>cansemacquire</span>(<span style=color:#a6e22e>addr</span>) {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Xadd</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>nwait</span>, <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Any semrelease after the cansemacquire knows we&#39;re waiting
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// (we set nwait above), so go to sleep.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>queue</span>(<span style=color:#a6e22e>addr</span>, <span style=color:#a6e22e>s</span>, <span style=color:#a6e22e>lifo</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>goparkunlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>lock</span>, <span style=color:#a6e22e>waitReasonSemacquire</span>, <span style=color:#a6e22e>traceEvGoBlockSync</span>, <span style=color:#ae81ff>4</span><span style=color:#f92672>+</span><span style=color:#a6e22e>skipframes</span>) <span style=color:#75715e>// 进入睡眠 ---------------------here
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>ticket</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>cansemacquire</span>(<span style=color:#a6e22e>addr</span>) {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>releasetime</span> &gt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>blockevent</span>(<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>releasetime</span><span style=color:#f92672>-</span><span style=color:#a6e22e>t0</span>, <span style=color:#ae81ff>3</span><span style=color:#f92672>+</span><span style=color:#a6e22e>skipframes</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>releaseSudog</span>(<span style=color:#a6e22e>s</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>这里的sema变量, 如果是等于0(它是无符号整形,不会为负数),就代表它没有获取到sema,需要等待,
+如果sema变量是大于0,可以直接运行,不需要等待</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>cansemacquire</span>(<span style=color:#a6e22e>addr</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>uint32</span>) <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>v</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#a6e22e>addr</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>v</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Cas</span>(<span style=color:#a6e22e>addr</span>, <span style=color:#a6e22e>v</span>, <span style=color:#a6e22e>v</span><span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>我们知道sync.WaitGroup()函数, 一般是先Add(), 然后Wait()等待所有任务Done()[Add(-1)]
+sema开始值是0,按照我们前面说的,他无法获得sema,会进行休眠,同理如果有多个Wait(), 那么它们都会
+休眠; 当Add(-1)后到达0后, 就是所有任务都已经完成,它会调用<code>runtime_Semrelease(semap, false, 0) // 进行V操作</code>进行sema值加一,
+然后唤醒一个goroutine, 当这个goroutine醒来[在一个loop里面], 发现sema不等于0了, 直接减一,然后跳出了<code>semacquire1</code></p><p>关于WaitGroup的分析, 参看我其他的文章.继续分析这个休眠和唤醒的;</p><h5 id=gopark>gopark
+<a class=anchor href=#gopark>#</a></h5><blockquote><p>src/runtime/proc.go</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Puts the current goroutine into a waiting state and unlocks the lock.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// The goroutine can be made runnable again by calling goready(gp).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>goparkunlock</span>(<span style=color:#a6e22e>lock</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>mutex</span>, <span style=color:#a6e22e>reason</span> <span style=color:#a6e22e>waitReason</span>, <span style=color:#a6e22e>traceEv</span> <span style=color:#66d9ef>byte</span>, <span style=color:#a6e22e>traceskip</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>gopark</span>(<span style=color:#a6e22e>parkunlock_c</span>, <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>lock</span>), <span style=color:#a6e22e>reason</span>, <span style=color:#a6e22e>traceEv</span>, <span style=color:#a6e22e>traceskip</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// Puts the current goroutine into a waiting state and calls unlockf.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// If unlockf returns false, the goroutine is resumed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// unlockf must not access this G&#39;s stack, as it may be moved between
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// the call to gopark and the call to unlockf.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Reason explains why the goroutine has been parked.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// It is displayed in stack traces and heap dumps.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Reasons should be unique and descriptive.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Do not re-use reasons, add new ones.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>gopark</span>(<span style=color:#a6e22e>unlockf</span> <span style=color:#66d9ef>func</span>(<span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>) <span style=color:#66d9ef>bool</span>, <span style=color:#a6e22e>lock</span> <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>, <span style=color:#a6e22e>reason</span> <span style=color:#a6e22e>waitReason</span>, <span style=color:#a6e22e>traceEv</span> <span style=color:#66d9ef>byte</span>, <span style=color:#a6e22e>traceskip</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>reason</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>waitReasonSleep</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>checkTimeouts</span>() <span style=color:#75715e>// timeouts may expire while two goroutines keep the scheduler busy
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>acquirem</span>() <span style=color:#75715e>// 这里的作用是什么?  ---------wait
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>gp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>curg</span>    <span style=color:#75715e>// 得到当前的Goroutine
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>status</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>readgstatus</span>(<span style=color:#a6e22e>gp</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>status</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_Grunning</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>status</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_Gscanrunning</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;gopark: bad g status&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>waitlock</span> = <span style=color:#a6e22e>lock</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>waitunlockf</span> = <span style=color:#a6e22e>unlockf</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>waitreason</span> = <span style=color:#a6e22e>reason</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>waittraceev</span> = <span style=color:#a6e22e>traceEv</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>waittraceskip</span> = <span style=color:#a6e22e>traceskip</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>releasem</span>(<span style=color:#a6e22e>mp</span>)   <span style=color:#75715e>// ---------wait
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// can&#39;t do anything that might move the G between Ms here.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>mcall</span>(<span style=color:#a6e22e>park_m</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>mcall就是切换到g0栈上去,gN的cpu寄存器等保存到g&rsquo;sched,然后把gN作为实参给mcall的fn形参,
+继续看park_m.</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// park continuation on g0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>park_m</span>(<span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()  <span style=color:#75715e>// 得到g0
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>traceGoPark</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>waittraceev</span>, <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>waittraceskip</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Grunning</span>, <span style=color:#a6e22e>_Gwaiting</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>dropg</span>()<span style=color:#75715e>//解除gN与m的关系
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>fn</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>waitunlockf</span>; <span style=color:#a6e22e>fn</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>ok</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>fn</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>waitlock</span>) <span style=color:#75715e>//解除lock
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>waitunlockf</span> = <span style=color:#66d9ef>nil</span>
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>waitlock</span> = <span style=color:#66d9ef>nil</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> !<span style=color:#a6e22e>ok</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>traceGoUnpark</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#ae81ff>2</span>)
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gwaiting</span>, <span style=color:#a6e22e>_Grunnable</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>execute</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#66d9ef>true</span>) <span style=color:#75715e>// Schedule it back, never returns.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>schedule</span>() <span style=color:#75715e>//重新进入调度
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><blockquote><p>dropg就是:<code>g0--->m--X-->curg--X-->m</code>这里的curg就是前面的gN,解除gN与m的关系.</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>dropg</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>setMNoWB</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>curg</span>.<span style=color:#a6e22e>m</span>, <span style=color:#66d9ef>nil</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>setGNoWB</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>curg</span>, <span style=color:#66d9ef>nil</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>进入睡眠的步骤:<code>goparkunlock --> gopark --> mcall(park_m) --> schedule</code>.</p><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200917094122.png alt=进入睡眠></p><h2 id=唤醒睡眠中的goroutine>唤醒睡眠中的goroutine
+<a class=anchor href=#%e5%94%a4%e9%86%92%e7%9d%a1%e7%9c%a0%e4%b8%ad%e7%9a%84goroutine>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>wg</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>WaitGroup</span>) <span style=color:#a6e22e>Add</span>(<span style=color:#a6e22e>delta</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>statep</span>, <span style=color:#a6e22e>semap</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>wg</span>.<span style=color:#a6e22e>state</span>()
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Enabled</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_</span> = <span style=color:#f92672>*</span><span style=color:#a6e22e>statep</span> <span style=color:#75715e>// trigger nil deref early
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>delta</span> &lt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// Synchronize decrements with Wait.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>ReleaseMerge</span>(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>wg</span>))
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Disable</span>()
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>defer</span> <span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Enable</span>()
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>state</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>AddUint64</span>(<span style=color:#a6e22e>statep</span>, uint64(<span style=color:#a6e22e>delta</span>)<span style=color:#f92672>&lt;&lt;</span><span style=color:#ae81ff>32</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>v</span> <span style=color:#f92672>:=</span> int32(<span style=color:#a6e22e>state</span> <span style=color:#f92672>&gt;&gt;</span> <span style=color:#ae81ff>32</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>w</span> <span style=color:#f92672>:=</span> uint32(<span style=color:#a6e22e>state</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Enabled</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>delta</span> &gt; <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>v</span> <span style=color:#f92672>==</span> int32(<span style=color:#a6e22e>delta</span>) {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// The first increment must be synchronized with Wait.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// Need to model this as a read, because there can be
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// several concurrent wg.counter transitions from 0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>race</span>.<span style=color:#a6e22e>Read</span>(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>semap</span>))
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>v</span> &lt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		panic(<span style=color:#e6db74>&#34;sync: negative WaitGroup counter&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>w</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>delta</span> &gt; <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>v</span> <span style=color:#f92672>==</span> int32(<span style=color:#a6e22e>delta</span>) {
+</span></span><span style=display:flex><span>		panic(<span style=color:#e6db74>&#34;sync: WaitGroup misuse: Add called concurrently with Wait&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>v</span> &gt; <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>w</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// This goroutine has set counter to 0 when waiters &gt; 0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Now there can&#39;t be concurrent mutations of state:
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// - Adds must not happen concurrently with Wait,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// - Wait does not increment waiters if it sees counter == 0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Still do a cheap sanity check to detect WaitGroup misuse.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>statep</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>state</span> {
+</span></span><span style=display:flex><span>		panic(<span style=color:#e6db74>&#34;sync: WaitGroup misuse: Add called concurrently with Wait&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Reset waiters count to 0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#f92672>*</span><span style=color:#a6e22e>statep</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> ; <span style=color:#a6e22e>w</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>w</span><span style=color:#f92672>--</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>runtime_Semrelease</span>(<span style=color:#a6e22e>semap</span>, <span style=color:#66d9ef>false</span>, <span style=color:#ae81ff>0</span>) <span style=color:#75715e>// 进行V操作    --------------------------------here
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h3 id=runtime_semrelease>runtime_Semrelease
+<a class=anchor href=#runtime_semrelease>#</a></h3><blockquote><p>src/sync/runtime.go</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>//go:linkname sync_runtime_Semrelease sync.runtime_Semrelease
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>sync_runtime_Semrelease</span>(<span style=color:#a6e22e>addr</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>uint32</span>, <span style=color:#a6e22e>handoff</span> <span style=color:#66d9ef>bool</span>, <span style=color:#a6e22e>skipframes</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>semrelease1</span>(<span style=color:#a6e22e>addr</span>, <span style=color:#a6e22e>handoff</span>, <span style=color:#a6e22e>skipframes</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>semrelease1</span>(<span style=color:#a6e22e>addr</span> <span style=color:#f92672>*</span><span style=color:#66d9ef>uint32</span>, <span style=color:#a6e22e>handoff</span> <span style=color:#66d9ef>bool</span>, <span style=color:#a6e22e>skipframes</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>root</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>semroot</span>(<span style=color:#a6e22e>addr</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Xadd</span>(<span style=color:#a6e22e>addr</span>, <span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Easy case: no waiters?
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// This check must happen after the xadd, to avoid a missed wakeup
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// (see loop in semacquire).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>nwait</span>) <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Harder case: search for a waiter and wake it.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>nwait</span>) <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// The count is already consumed by another goroutine,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// so no need to wake up another goroutine.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>s</span>, <span style=color:#a6e22e>t0</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>dequeue</span>(<span style=color:#a6e22e>addr</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Xadd</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>nwait</span>, <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>root</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> { <span style=color:#75715e>// May be slow, so unlock first
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>acquiretime</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>acquiretime</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>acquiretime</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>mutexevent</span>(<span style=color:#a6e22e>t0</span><span style=color:#f92672>-</span><span style=color:#a6e22e>acquiretime</span>, <span style=color:#ae81ff>3</span><span style=color:#f92672>+</span><span style=color:#a6e22e>skipframes</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>ticket</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;corrupted semaphore ticket&#34;</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>handoff</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>cansemacquire</span>(<span style=color:#a6e22e>addr</span>) {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>ticket</span> = <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>readyWithTime</span>(<span style=color:#a6e22e>s</span>, <span style=color:#ae81ff>5</span><span style=color:#f92672>+</span><span style=color:#a6e22e>skipframes</span>)    <span style=color:#75715e>// ------------------------------here
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h4 id=readywithtime>readyWithTime
+<a class=anchor href=#readywithtime>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>readyWithTime</span>(<span style=color:#a6e22e>s</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>sudog</span>, <span style=color:#a6e22e>traceskip</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>releasetime</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>releasetime</span> = <span style=color:#a6e22e>cputicks</span>()
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>goready</span>(<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>traceskip</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>goready</span>(<span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>traceskip</span> <span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>systemstack</span>(<span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>ready</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>traceskip</span>, <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>	})
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>前面都很好理解, 这里有两个函数, 一个是<code>systemstack</code>, 一个是<code>ready</code>函数</p><h5 id=ready>ready
+<a class=anchor href=#ready>#</a></h5><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Mark gp ready to run.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>ready</span>(<span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>traceskip</span> <span style=color:#66d9ef>int</span>, <span style=color:#a6e22e>next</span> <span style=color:#66d9ef>bool</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> { <span style=color:#75715e>//忽略
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>traceGoUnpark</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>traceskip</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>status</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>readgstatus</span>(<span style=color:#a6e22e>gp</span>) <span style=color:#75715e>// return atomic.Load(&amp;gp.atomicstatus)读atomicstatus的状态
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Mark runnable.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>acquirem</span>() <span style=color:#75715e>// disable preemption because it can be holding p in a local var
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>status</span><span style=color:#f92672>&amp;^</span><span style=color:#a6e22e>_Gscan</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_Gwaiting</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>dumpgstatus</span>(<span style=color:#a6e22e>gp</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;bad g-&gt;status in ready&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// status is Gwaiting or Gscanwaiting, make Grunnable and put on runq
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gwaiting</span>, <span style=color:#a6e22e>_Grunnable</span>) <span style=color:#75715e>// 修改状态到_Grunnable
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>runqput</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>(), <span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>next</span>) <span style=color:#75715e>// 放入全局或本地队列,等待调度
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>npidle</span>) <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>nmspinning</span>) <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>wakep</span>() <span style=color:#75715e>// 有空闲的P,并且没有正在自旋状态的M(偷取其他线程的goroutine);那么需要唤醒P.万一就把上面的待运行的goroutine调度起来了呢?
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>releasem</span>(<span style=color:#a6e22e>mp</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span>sync_runtime_Semrelease ---&gt; semrelease1 ---&gt; readyWithTime ---&gt; goready --systemstack-&gt; ready
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>ready---&gt; runqput ---&gt; releasem
+</span></span><span style=display:flex><span>     <span style=color:#ae81ff>\-</span>--&gt; wakep   --/&gt;
+</span></span></code></pre></div><h6 id=runqput>runqput
+<a class=anchor href=#runqput>#</a></h6><blockquote><p>其中runqput是,当从<code>s, t0 := root.dequeue(addr)</code>得到睡眠中的Goroutine,修改状态为<code>_Grunnable</code>,然后放入本地或全局队列</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// runqput tries to put g on the local runnable queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// If next is false, runqput adds g to the tail of the runnable queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// If next is true, runqput puts g in the _p_.runnext slot.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// If the run queue is full, runnext puts g on the global queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Executed only by the owner P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>runqput</span>(<span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>, <span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>next</span> <span style=color:#66d9ef>bool</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>randomizeScheduler</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>next</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>fastrand</span>()<span style=color:#f92672>%</span><span style=color:#ae81ff>2</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>next</span> = <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>next</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>retryNext</span>:
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>oldnext</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runnext</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> !<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runnext</span>.<span style=color:#a6e22e>cas</span>(<span style=color:#a6e22e>oldnext</span>, <span style=color:#a6e22e>guintptr</span>(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>gp</span>))) {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>goto</span> <span style=color:#a6e22e>retryNext</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>oldnext</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Kick the old runnext out to the regular run queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>gp</span> = <span style=color:#a6e22e>oldnext</span>.<span style=color:#a6e22e>ptr</span>()
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>retry</span>:
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>h</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>LoadAcq</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runqhead</span>) <span style=color:#75715e>// load-acquire, synchronize with consumers
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>t</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runqtail</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>t</span><span style=color:#f92672>-</span><span style=color:#a6e22e>h</span> &lt; uint32(len(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>)) { <span style=color:#75715e>// TODO计算这个
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>[<span style=color:#a6e22e>t</span><span style=color:#f92672>%</span>uint32(len(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>))].<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>gp</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>StoreRel</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runqtail</span>, <span style=color:#a6e22e>t</span><span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>) <span style=color:#75715e>// store-release, makes the item available for consumption
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>runqputslow</span>(<span style=color:#a6e22e>_p_</span>, <span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>h</span>, <span style=color:#a6e22e>t</span>) {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// the queue is not full, now the put above must succeed
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>goto</span> <span style=color:#a6e22e>retry</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><blockquote><p>runqput函数流程很清晰，它首先尝试把gp放入_p_的本地运行队列，如果本地队列满了，则通过runqputslow函数把gp放入全局运行队列。</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Put g and a batch of work from local runnable queue on global queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Executed only by the owner P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>runqputslow</span>(<span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>, <span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>h</span>, <span style=color:#a6e22e>t</span> <span style=color:#66d9ef>uint32</span>) <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>batch</span> [len(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>)<span style=color:#f92672>/</span><span style=color:#ae81ff>2</span> <span style=color:#f92672>+</span> <span style=color:#ae81ff>1</span>]<span style=color:#f92672>*</span><span style=color:#a6e22e>g</span> <span style=color:#75715e>// 256/2+1 = 129个goroutine
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// First, grab a batch from local queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>n</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>t</span> <span style=color:#f92672>-</span> <span style=color:#a6e22e>h</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>n</span> = <span style=color:#a6e22e>n</span> <span style=color:#f92672>/</span> <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>n</span> <span style=color:#f92672>!=</span> uint32(len(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>)<span style=color:#f92672>/</span><span style=color:#ae81ff>2</span>) {   <span style=color:#75715e>// 得到现有队列中的一半G
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;runqputslow: queue is not full&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> uint32(<span style=color:#ae81ff>0</span>); <span style=color:#a6e22e>i</span> &lt; <span style=color:#a6e22e>n</span>; <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>i</span>] = <span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>[(<span style=color:#a6e22e>h</span><span style=color:#f92672>+</span><span style=color:#a6e22e>i</span>)<span style=color:#f92672>%</span>uint32(len(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runq</span>))].<span style=color:#a6e22e>ptr</span>()
+</span></span><span style=display:flex><span>		<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			 ---------
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			|   |    |  
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			 ---------
+</span></span></span><span style=display:flex><span><span style=color:#75715e>           head[1]   tail[2], TODO 应该head, tail应该不是地址
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		*/</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> !<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>CasRel</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>runqhead</span>, <span style=color:#a6e22e>h</span>, <span style=color:#a6e22e>h</span><span style=color:#f92672>+</span><span style=color:#a6e22e>n</span>) { <span style=color:#75715e>// cas-release, commits consume
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>n</span>] = <span style=color:#a6e22e>gp</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>randomizeScheduler</span> { <span style=color:#75715e>// 打乱将要插入全局的G
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> uint32(<span style=color:#ae81ff>1</span>); <span style=color:#a6e22e>i</span> <span style=color:#f92672>&lt;=</span> <span style=color:#a6e22e>n</span>; <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>j</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>fastrandn</span>(<span style=color:#a6e22e>i</span> <span style=color:#f92672>+</span> <span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>i</span>], <span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>j</span>] = <span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>j</span>], <span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>i</span>]
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Link the goroutines.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> uint32(<span style=color:#ae81ff>0</span>); <span style=color:#a6e22e>i</span> &lt; <span style=color:#a6e22e>n</span>; <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>i</span>].<span style=color:#a6e22e>schedlink</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>i</span><span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>])  <span style=color:#75715e>// TODO 通过schedlink来进行连接? 全局运行队列是一个链表,把将要放入全局的G,链接起来.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>q</span> <span style=color:#a6e22e>gQueue</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>q</span>.<span style=color:#a6e22e>head</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>batch</span>[<span style=color:#ae81ff>0</span>])
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>q</span>.<span style=color:#a6e22e>tail</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>batch</span>[<span style=color:#a6e22e>n</span>])
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Now put the batch on global queue.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>globrunqputbatch</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>q</span>, int32(<span style=color:#a6e22e>n</span><span style=color:#f92672>+</span><span style=color:#ae81ff>1</span>))
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p><a href="https://www.bing.com/search?q=WaitGroup+source+code&PC=U316&FORM=CHROMN">https://www.bing.com/search?q=WaitGroup+source+code&PC=U316&FORM=CHROMN</a></p><h2 id=唤醒一个空闲p获得创建一个m开始轮询调度可能把上面已唤醒的g调度起来>唤醒一个空闲P,获得(创建)一个M,开始轮询调度,可能把上面已唤醒的G调度起来
+<a class=anchor href=#%e5%94%a4%e9%86%92%e4%b8%80%e4%b8%aa%e7%a9%ba%e9%97%b2p%e8%8e%b7%e5%be%97%e5%88%9b%e5%bb%ba%e4%b8%80%e4%b8%aam%e5%bc%80%e5%a7%8b%e8%bd%ae%e8%af%a2%e8%b0%83%e5%ba%a6%e5%8f%af%e8%83%bd%e6%8a%8a%e4%b8%8a%e9%9d%a2%e5%b7%b2%e5%94%a4%e9%86%92%e7%9a%84g%e8%b0%83%e5%ba%a6%e8%b5%b7%e6%9d%a5>#</a></h2><blockquote><p>我们继续看,<code>wakep() // 有空闲的P,并且没有正在自旋状态的M(偷取其他线程的goroutine)</code></p></blockquote><h3 id=wakep--startm>wakep&ndash;>startm
+<a class=anchor href=#wakep--startm>#</a></h3><ul><li>当唤醒一个G,放到本地或全局了,这时如果发现有空闲的P,而且没有正在偷其他的P队列中goroutine的M,那么此时就需要唤醒一个空闲P,来工作,<ul><li>一个P只能找到M,从空闲的M中找?, 然后通过m.g0找到.</li><li>生成新的M,此时,创造新的线程,因为M与线程是一一对应的,同时它也会创造一个g0.
+然后开始schedule()工作.</li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Tries to add one more P to execute G&#39;s.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Called when a G is made runnable (newproc, ready).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>wakep</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// be conservative about spinning threads
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> !<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Cas</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>nmspinning</span>, <span style=color:#ae81ff>0</span>, <span style=color:#ae81ff>1</span>) {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>startm</span>(<span style=color:#66d9ef>nil</span>, <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>这里又增加了全局的自旋线程的个数,因为我们在前面已经判断了,<code>wakep() // 有空闲的P,并且没有正在自旋状态的M(偷取其他线程的goroutine)</code>,先再次判断下,是否还是没有自旋的线程在运行,如果没有就加一,后面准备创建一个M,<code>startm</code>.</p><ul><li>继续看下startm<ul><li>如果p==nil，尝试获取一个空闲的P，如果没有空闲的P，<code>则什么也不做</code>。</li><li>安排一些M来运行p（必要时创建一个M）。</li><li>可以在m.p==nil的情况下运行，所以不允许写障碍。</li><li>如果设置了spinning，则调用者已经增量了nmspinning，startm将会在新启动的M中减去nmspinning或设置m.spinning。<ul><li>上面我们调用的<code>startm(nil,true)</code></li></ul></li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>startm</span>(<span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>, <span style=color:#a6e22e>spinning</span> <span style=color:#66d9ef>bool</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_p_</span> = <span style=color:#a6e22e>pidleget</span>()
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>spinning</span> {
+</span></span><span style=display:flex><span>				<span style=color:#75715e>// The caller incremented nmspinning, but there are no idle Ps,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#75715e>// so it&#39;s okay to just undo the increment and give up.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#66d9ef>if</span> int32(<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Xadd</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>nmspinning</span>, <span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)) &lt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>					<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;startm: negative nmspinning&#34;</span>)
+</span></span><span style=display:flex><span>				}
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>mget</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>) <span style=color:#75715e>// 全局空闲M队列
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>mp</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> { <span style=color:#75715e>//从全局的空闲队列没找到M
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>fn</span> <span style=color:#66d9ef>func</span>()
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>spinning</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// The caller incremented nmspinning, so set m.spinning in the new M.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>fn</span> = <span style=color:#a6e22e>mspinning</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>newm</span>(<span style=color:#a6e22e>fn</span>, <span style=color:#a6e22e>_p_</span>) <span style=color:#75715e>//新创建一个M,其中里面也有新g0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>return</span> <span style=color:#75715e>// 这里如果是新创建的线程,那么直接返回,不需要继续下面的唤醒notewakeup(&amp;mp.park)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>spinning</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;startm: m is spinning&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>nextp</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;startm: m has p&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>spinning</span> <span style=color:#f92672>&amp;&amp;</span> !<span style=color:#a6e22e>runqempty</span>(<span style=color:#a6e22e>_p_</span>) {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;startm: p has runnable gs&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// The caller incremented nmspinning, so set m.spinning in the new M.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>spinning</span> = <span style=color:#a6e22e>spinning</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>nextp</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>_p_</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>notewakeup</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>park</span>) <span style=color:#75715e>// 到这一步,那么M是从全局空闲M队列获得的Ms,那么需要唤醒.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><ul><li>关注三点:<ul><li>mget()&mdash;得到全局一个M</li><li>newm(fn, <em>p</em>),创建一个M</li><li>notewakeup(&mp.park)</li></ul></li></ul><h4 id=mget>mget
+<a class=anchor href=#mget>#</a></h4><blockquote><p>这个全局的空闲M队列,从下面的函数取出,它就是一个链表,通过schedlink指针来串联所有空闲的M.</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span>	<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		//尝试从全局的(sched.midle列表中得到一个m)
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		// Try to get an m from midle list.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		// Sched must be locked.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		// May run during STW, so write barriers are not allowed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		//go:nowritebarrierrec
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		func mget() *m {
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			mp := sched.midle.ptr()
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			if mp != nil {
+</span></span></span><span style=display:flex><span><span style=color:#75715e>				sched.midle = mp.schedlink
+</span></span></span><span style=display:flex><span><span style=color:#75715e>				sched.nmidle--
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			}
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			return mp
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		}
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	*/</span>
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>schedt</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>midle</span>        <span style=color:#a6e22e>muintptr</span> <span style=color:#75715e>// idle m&#39;s waiting for work
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>nmidle</span>       <span style=color:#66d9ef>int32</span>    <span style=color:#75715e>// number of idle m&#39;s waiting for work
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// muintptr类型
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>muintptr</span> <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>//go:nosplit
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>mp</span> <span style=color:#a6e22e>muintptr</span>) <span style=color:#a6e22e>ptr</span>() <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span> { <span style=color:#66d9ef>return</span> (<span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>)(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>mp</span>)) }
+</span></span><span style=display:flex><span><span style=color:#75715e>//go:nosplit
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>mp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>muintptr</span>) <span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>m</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>) { <span style=color:#f92672>*</span><span style=color:#a6e22e>mp</span> = <span style=color:#a6e22e>muintptr</span>(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>m</span>)) }
+</span></span></code></pre></div><h4 id=newm创建新的线程与m>newm创建新的线程与M
+<a class=anchor href=#newm%e5%88%9b%e5%bb%ba%e6%96%b0%e7%9a%84%e7%ba%bf%e7%a8%8b%e4%b8%8em>#</a></h4><blockquote><p><code>newm(fn, _p_) //新创建一个M,其中里面也有新g0.</code></p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>newm</span>(<span style=color:#a6e22e>fn</span> <span style=color:#66d9ef>func</span>(), <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>allocm</span>(<span style=color:#a6e22e>_p_</span>, <span style=color:#a6e22e>fn</span>) <span style=color:#75715e>//分配一个与任何线程无关的M结构体mp,mp.g0=Gorooutine(也是从这里面分配出来的)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>nextp</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>_p_</span>) <span style=color:#75715e>//把M关联上P
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>sigmask</span> = <span style=color:#a6e22e>initSigmask</span> <span style=color:#75715e>//初始化信号
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>gp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>(); <span style=color:#a6e22e>gp</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>m</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> <span style=color:#f92672>&amp;&amp;</span> (<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>lockedExt</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>incgo</span>) <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>GOOS</span> <span style=color:#f92672>!=</span> <span style=color:#e6db74>&#34;plan9&#34;</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// We&#39;re on a locked M or a thread that may have been
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// started by C. The kernel state of this thread may
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// be strange (the user may have locked it for that
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// purpose). We don&#39;t want to clone that into another
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// thread. Instead, ask a known-good thread to create
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// the thread for us.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// This is disabled on Plan 9. See golang.org/issue/22227.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// TODO: This may be unnecessary on Windows, which
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// doesn&#39;t model thread creation off fork.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>haveTemplateThread</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;on a locked thread with no template thread&#34;</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>schedlink</span> = <span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>newm</span>
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>newm</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>mp</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>waiting</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>waiting</span> = <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>notewakeup</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>wake</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>newmHandoff</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>newm1</span>(<span style=color:#a6e22e>mp</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><ul><li>newm函数主要是两件事:<ul><li>创建M结构体,G结构体(用于前面m.g0)在stack上开辟空间给g0.stack.<ul><li>allocm()</li></ul></li><li>创建一个真正的线程,与上面的M结构相关联.<ul><li>newm1()方式,<ul><li>直接从当前线程clone出一个新的线程.</li></ul></li><li>newmHandoff方式 [TODO zxc:可以新开一章来讲解]<ul><li>给一个一直在for循环的创建线程,然后休眠的函数来创建线程,关联上面的M结构体</li></ul></li></ul></li></ul></li></ul><h5 id=allocm函数>allocm函数
+<a class=anchor href=#allocm%e5%87%bd%e6%95%b0>#</a></h5><ul><li><p>因为函数需要new小对象,需要用到P.mcache,需要判断当前的M是否关联着P,如果没有就要向参数借,但是为什么没有判断如果参数_P_是nil的情况?</p></li><li><p>释放不需要等待的全局的M&rsquo;s stack资源,这里是防止新生成线程又需要stack空间,所以先释放一些?</p></li><li><p>new M, g0结构体,并且给g0分配stack空间.</p></li><li><p>遗留</p><ul><li>为什么需要locks&ndash;?</li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// Allocate a new m unassociated with any thread.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Can use p for allocation context if needed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// fn is recorded as the new m&#39;s m.mstartfn.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// This function is allowed to have write barriers even if the caller
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// isn&#39;t because it borrows _p_.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//go:yeswritebarrierrec
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>*/</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>allocm</span>(<span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>, <span style=color:#a6e22e>fn</span> <span style=color:#66d9ef>func</span>()) <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>acquirem</span>() <span style=color:#75715e>// disable GC because it can be called from sysmon 
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	 <span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	func acquirem() *m {
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	_g_ := getg()
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	_g_.m.locks++
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	return _g_.m
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 } 
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 TODO zxc: 这里很奇怪的,只是把M结构体里面的locks字段++1; 后面的releasem又把这个locks--?
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 func releasem(mp *m) {
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	_g_ := getg()
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	mp.locks--
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	if mp.locks == 0 &amp;&amp; _g_.preempt {
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 		// restore the preemption request in case we&#39;ve cleared it in newstack
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 		_g_.stackguard0 = stackPreempt
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 	}
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 }
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> { <span style=color:#75715e>//如果当前m的P不存在,acquirep(_p_)关联_p_和当前的M;只是用于小对象的分配到堆上? TODO zxc: 这里P.mcahce,就是M.mcache
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>acquirep</span>(<span style=color:#a6e22e>_p_</span>) <span style=color:#75715e>// temporarily borrow p for mallocs in this function
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Release the free M list. We need to do this somewhere and
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// this may free up a stack we can use.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>freem</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>newList</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>freem</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>freem</span>; <span style=color:#a6e22e>freem</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span>; {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>freem</span>.<span style=color:#a6e22e>freeWait</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> { <span style=color:#75715e>// if == 0, 安全释放g0并删除m; 这里如果不等于0,就说明需要等待,还不能立即释放,所以这个if里面就好像链表反转算法,转移到新链表.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>next</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>freem</span>.<span style=color:#a6e22e>freelink</span>
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>freem</span>.<span style=color:#a6e22e>freelink</span> = <span style=color:#a6e22e>newList</span> <span style=color:#75715e>//freem.freelink = newList(nil); so, freem.freelink == nil 
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>newList</span> = <span style=color:#a6e22e>freem</span> <span style=color:#75715e>// newList.freelink == nil; freem == newList 
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>freem</span> = <span style=color:#a6e22e>next</span>    <span style=color:#75715e>// 
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#66d9ef>continue</span> 
+</span></span><span style=display:flex><span>			} 
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>stackfree</span>(<span style=color:#a6e22e>freem</span>.<span style=color:#a6e22e>g0</span>.<span style=color:#a6e22e>stack</span>) <span style=color:#75715e>// 说明freem.freeWait==0;可以立即g0 stack释放
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>freem</span> = <span style=color:#a6e22e>freem</span>.<span style=color:#a6e22e>freelink</span>  <span style=color:#75715e>// freem等于它的next指针
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>freem</span> = <span style=color:#a6e22e>newList</span> <span style=color:#75715e>//这里就把不能释放的重新放入全局释放列表
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span> <span style=color:#f92672>:=</span> new(<span style=color:#a6e22e>m</span>) <span style=color:#75715e>// new一个M结构体
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>mstartfn</span> = <span style=color:#a6e22e>fn</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mcommoninit</span>(<span style=color:#a6e22e>mp</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// In case of cgo or Solaris or illumos or Darwin, pthread_create will make us a stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Windows and Plan 9 will layout sched stack on OS stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>iscgo</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>GOOS</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;solaris&#34;</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>GOOS</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;illumos&#34;</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>GOOS</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;windows&#34;</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>GOOS</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;plan9&#34;</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>GOOS</span> <span style=color:#f92672>==</span> <span style=color:#e6db74>&#34;darwin&#34;</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span> = <span style=color:#a6e22e>malg</span>(<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>	} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span> = <span style=color:#a6e22e>malg</span>(<span style=color:#ae81ff>8192</span> <span style=color:#f92672>*</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>StackGuardMultiplier</span>) <span style=color:#75715e>//约等于1024*8=8192 ==&gt; 8k
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span>.<span style=color:#a6e22e>m</span> = <span style=color:#a6e22e>mp</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>() { <span style=color:#75715e>//如果是借P来进行malloc,那么需要恢复原样.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>releasep</span>()
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>releasem</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>) <span style=color:#75715e>// TODO zxc: locks ?
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span> <span style=color:#a6e22e>mp</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h5 id=newm1>newm1
+<a class=anchor href=#newm1>#</a></h5><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>newm1</span>(<span style=color:#a6e22e>mp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>iscgo</span> {  <span style=color:#75715e>// 暂时忽略.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>execLock</span>.<span style=color:#a6e22e>rlock</span>() <span style=color:#75715e>// Prevent process clone.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>newosproc</span>(<span style=color:#a6e22e>mp</span>)   <span style=color:#75715e>//准备去clone.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>execLock</span>.<span style=color:#a6e22e>runlock</span>()
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>newosproc</span>(<span style=color:#a6e22e>mp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>stk</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>hi</span>)
+</span></span><span style=display:flex><span>	<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 * note: strace gets confused if we use CLONE_PTRACE here.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>	 */</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#66d9ef>false</span> {
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;newosproc stk=&#34;</span>, <span style=color:#a6e22e>stk</span>, <span style=color:#e6db74>&#34; m=&#34;</span>, <span style=color:#a6e22e>mp</span>, <span style=color:#e6db74>&#34; g=&#34;</span>, <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span>, <span style=color:#e6db74>&#34; clone=&#34;</span>, <span style=color:#a6e22e>funcPC</span>(<span style=color:#a6e22e>clone</span>), <span style=color:#e6db74>&#34; id=&#34;</span>, <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>id</span>, <span style=color:#e6db74>&#34; ostk=&#34;</span>, <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>mp</span>, <span style=color:#e6db74>&#34;\n&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Disable signals during clone, so that the new thread starts
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// with signals disabled. It will enable them in minit.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// 在clone,关闭信号,所以创建出来的thread信号都是关闭的,minit函数再打开.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>oset</span> <span style=color:#a6e22e>sigset</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>sigprocmask</span>(<span style=color:#a6e22e>_SIG_SETMASK</span>, <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sigset_all</span>, <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>oset</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>ret</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>clone</span>(<span style=color:#a6e22e>cloneFlags</span>, <span style=color:#a6e22e>stk</span>, <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>mp</span>), <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span>), <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>funcPC</span>(<span style=color:#a6e22e>mstart</span>)))
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>sigprocmask</span>(<span style=color:#a6e22e>_SIG_SETMASK</span>, <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>oset</span>, <span style=color:#66d9ef>nil</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>ret</span> &lt; <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;runtime: failed to create new OS thread (have &#34;</span>, <span style=color:#a6e22e>mcount</span>(), <span style=color:#e6db74>&#34; already; errno=&#34;</span>, <span style=color:#f92672>-</span><span style=color:#a6e22e>ret</span>, <span style=color:#e6db74>&#34;)\n&#34;</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>ret</span> <span style=color:#f92672>==</span> <span style=color:#f92672>-</span><span style=color:#a6e22e>_EAGAIN</span> {
+</span></span><span style=display:flex><span>			println(<span style=color:#e6db74>&#34;runtime: may need to increase max user processes (ulimit -u)&#34;</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;newosproc&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>上面还是比较清晰,先关闭信号,防止clone时候被打断.</p><h6 id=clone>clone
+<a class=anchor href=#clone>#</a></h6><blockquote><p>这个clone函数位于<code>src/runtime/sys_linux_amd64.s</code></p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// int32 clone(int32 flags, void *stk, M *mp, G *gp, void (*fn)(void));
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>TEXT</span> <span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>clone</span>(<span style=color:#a6e22e>SB</span>),<span style=color:#a6e22e>NOSPLIT</span>,<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>// Linux系统调用约定，这四个参数需要分别放入rdi， rsi，rdx和r10寄存器中
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#a6e22e>flags</span><span style=color:#f92672>+</span><span style=color:#ae81ff>0</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>DI</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>stk</span><span style=color:#f92672>+</span><span style=color:#ae81ff>8</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>SI</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>, <span style=color:#a6e22e>DX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>, <span style=color:#a6e22e>R10</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Copy mp, gp, fn off parent stack for use by child.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Careful: Linux system call clobbers CX and R11.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Linux系统调用会污染CX和R11; 所以我们参数不放在那里面
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>mp</span><span style=color:#f92672>+</span><span style=color:#ae81ff>16</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>R8</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>gp</span><span style=color:#f92672>+</span><span style=color:#ae81ff>24</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>R9</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>fn</span><span style=color:#f92672>+</span><span style=color:#ae81ff>32</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>R12</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#a6e22e>SYS_clone</span>, <span style=color:#a6e22e>AX</span> <span style=color:#75715e>// 系统调用了; 返回值放入AX寄存器里面.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>SYSCALL</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// In parent, return.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>CMPQ</span>	<span style=color:#a6e22e>AX</span>, <span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>    <span style=color:#75715e>// 如果返回值是0,证明是子进程返回
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>JEQ</span>	<span style=color:#ae81ff>3</span>(<span style=color:#a6e22e>PC</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#a6e22e>AX</span>, <span style=color:#a6e22e>ret</span><span style=color:#f92672>+</span><span style=color:#ae81ff>40</span>(<span style=color:#a6e22e>FP</span>) <span style=color:#75715e>// 父进程返回,返回到父进程的AX不等于0
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>RET</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// In child, on new stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>SI</span>, <span style=color:#a6e22e>SP</span>   <span style=color:#75715e>// sp = stk+8(FP); 就是设置子线程的栈顶;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// If g or m are nil, skip Go-related setup.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>CMPQ</span>	<span style=color:#a6e22e>R8</span>, <span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>    <span style=color:#75715e>// m
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>JEQ</span>	<span style=color:#a6e22e>nog</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>CMPQ</span>	<span style=color:#a6e22e>R9</span>, <span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>    <span style=color:#75715e>// g
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>JEQ</span>	<span style=color:#a6e22e>nog</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Initialize m-&gt;procid to Linux tid
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#a6e22e>SYS_gettid</span>, <span style=color:#a6e22e>AX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>SYSCALL</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>AX</span>, <span style=color:#a6e22e>m_procid</span>(<span style=color:#a6e22e>R8</span>) <span style=color:#75715e>// 设置m.proc_id = sys_gettid()
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Set FS to point at m-&gt;tls.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>LEAQ</span>	<span style=color:#a6e22e>m_tls</span>(<span style=color:#a6e22e>R8</span>), <span style=color:#a6e22e>DI</span>  <span style=color:#75715e>// 不取引用,所以是DI=&amp;m.tls[0];把m.tls[0]地址给DI寄存器.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>settls</span>(<span style=color:#a6e22e>SB</span>) <span style=color:#75715e>// FS寄存器里的值:就是m.tls[0]的地址.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// In child, set up new stack
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>get_tls</span>(<span style=color:#a6e22e>CX</span>) <span style=color:#75715e>// CX = &amp;m.tls[0]
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>R8</span>, <span style=color:#a6e22e>g_m</span>(<span style=color:#a6e22e>R9</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>R9</span>, <span style=color:#a6e22e>g</span>(<span style=color:#a6e22e>CX</span>) <span style=color:#75715e>// gp+24(FP) == R9; g(CX)---&gt; *CX; m.tls[0]=g0;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>stackcheck</span>(<span style=color:#a6e22e>SB</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>nog</span>:
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Call fn
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>R12</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// It shouldn&#39;t return. If it does, exit that thread.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>111</span>, <span style=color:#a6e22e>DI</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#a6e22e>SYS_exit</span>, <span style=color:#a6e22e>AX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>SYSCALL</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>JMP</span>	<span style=color:#f92672>-</span><span style=color:#ae81ff>3</span>(<span style=color:#a6e22e>PC</span>)	<span style=color:#75715e>// keep exiting
+</span></span></span></code></pre></div><ul><li><p>gdb</p><ul><li><code>list /tmp/kubernets/clone_test/main.go:1</code></li><li><code>list /usr/lib/golang/src/runtime/sys_linux_amd64.s:540</code></li></ul></li><li><p>gdb调试自定义函数</p></li></ul><pre tabindex=0><code class=language-gdb data-lang=gdb>define zxc
+info threads
+info register rbp rsp pc
+end
+</code></pre><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#f92672>[</span>New LWP 32548<span style=color:#f92672>]</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>[</span>Switching to LWP 32548<span style=color:#f92672>]</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Breakpoint 3, runtime.clone <span style=color:#f92672>()</span> at /usr/lib/golang/src/runtime/sys_linux_amd64.s:562
+</span></span><span style=display:flex><span>562		MOVQ	SI, SP           ---------------------------------------------------------here 这一行的确是没必要,clone完后,系统会把子线程的sp寄存器设置为传入参数stk; m.stack.hi.
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> zxc
+</span></span><span style=display:flex><span>  Id   Target Id         Frame
+</span></span><span style=display:flex><span>* <span style=color:#ae81ff>2</span>    LWP <span style=color:#ae81ff>32548</span> <span style=color:#e6db74>&#34;test&#34;</span>  runtime.clone <span style=color:#f92672>()</span> at /usr/lib/golang/src/runtime/sys_linux_amd64.s:562
+</span></span><span style=display:flex><span>  <span style=color:#ae81ff>1</span>    LWP <span style=color:#ae81ff>32547</span> <span style=color:#e6db74>&#34;test&#34;</span>  runtime.clone <span style=color:#f92672>()</span> at /usr/lib/golang/src/runtime/sys_linux_amd64.s:556
+</span></span><span style=display:flex><span>rbp            0x7fffffffe3b0	0x7fffffffe3b0
+</span></span><span style=display:flex><span>rsp            0xc000044000	0xc000044000
+</span></span><span style=display:flex><span>pc             0x455568	0x455568 &lt;runtime.clone+56&gt;
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> info register sp
+</span></span><span style=display:flex><span>sp             0xc000044000	0xc000044000
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> step
+</span></span><span style=display:flex><span>565		CMPQ	R8, $0    // m
+</span></span><span style=display:flex><span><span style=color:#f92672>(</span>gdb<span style=color:#f92672>)</span> info register sp
+</span></span><span style=display:flex><span>sp             0xc000044000	0xc000044000
+</span></span></code></pre></div><h4 id=notewakeupmppark>notewakeup(&mp.park)
+<a class=anchor href=#notewakeupmppark>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>notewakeup</span>(<span style=color:#a6e22e>n</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>note</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>v</span> <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>v</span> = <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Loaduintptr</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>n</span>.<span style=color:#a6e22e>key</span>)
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Casuintptr</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>n</span>.<span style=color:#a6e22e>key</span>, <span style=color:#a6e22e>v</span>, <span style=color:#a6e22e>locked</span>) {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>break</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Successfully set waitm to locked.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// What was it before?
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>switch</span> {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>case</span> <span style=color:#a6e22e>v</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span>:  <span style=color:#75715e>// 我们从上面知道 v == note.key; note.key == M结构体的指针; 如果是0,那么这个note是无效的,不需要唤醒.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// Nothing was waiting. Done.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>case</span> <span style=color:#a6e22e>v</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>locked</span>:
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Two notewakeups! Not allowed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;notewakeup - double wakeup&#34;</span>) <span style=color:#75715e>// 不能调用这个函数两次, locked的值是1,唤醒一次,这个note.key就变成1了,下次再调用就报错.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>default</span>:
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Must be the waiting m. Wake it up.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>semawakeup</span>((<span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>)(<span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>(<span style=color:#a6e22e>v</span>))) <span style=color:#75715e>//从这个semawakeup(mp *m)需要的参数,可以知道note.key字段是一个M的指针.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200916205719.png alt=唤醒睡眠></p><h2 id=附录>附录
+<a class=anchor href=#%e9%99%84%e5%bd%95>#</a></h2><p><a href=https://linux.die.net/man/2/clone>clone系统调用</a></p><p>所以这里必须为子线程指定其使用的栈，否则父子线程会共享同一个栈从而造成混乱，从上面的newosproc函数可以看出，新线程使用的栈为m.g0.stack.lo～m.g0.stack.hi这段内存，而这段内存是newm函数在创建m结构体对象时从进程的堆上分配而来的。</p><p>//&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p><p>alter table ai_course_mission_section_relation
+add type smallint default 0 not null;</p><p>comment on column ai_course_mission_section_relation.type is &lsquo;任务组的类型;0:默认是任务组 1:主题组&rsquo;;</p><p>comment on column ai_mission_section.name is &lsquo;任务分组/主题组名称&rsquo;;</p><p>alter table ai_mission_section
+add project_resource_id bigint;</p><p>comment on column ai_mission_section.project_resource_id is &lsquo;主题需要工程的resourceID&rsquo;;</p><p>alter table ai_mission_section
+add pic_resource_id bigint;</p><p>comment on column ai_mission_section.pic_resource_id is &lsquo;主题图片resourceID&rsquo;;</p><p>create table ai_mission_theme_relation
+(
+mission_id bigint not null
+constraint &ldquo;fk_mission_theme_relation_mission_id&rdquo;
+references ai_mission
+on delete cascade,
+ai_mission_section_id bigint not null
+constraint fk_mission_theme_relation_mission_section_id
+references ai_mission_section,
+update_time bigint not null,
+serial_number smallint default 1 not null,
+id bigserial not null
+constraint mission_theme_relation_pkey
+primary key
+);</p><p>comment on column ai_mission_theme_relation.mission_id is &lsquo;任务ID&rsquo;;</p><p>comment on column ai_mission_theme_relation.ai_mission_section_id is &lsquo;主题(这节课自带的主题ID才可以关联)ID&rsquo;;</p><p>comment on column ai_mission_theme_relation.update_time is &lsquo;修改时间&rsquo;;</p><p>comment on column ai_mission_theme_relation.serial_number is &lsquo;主题顺序&rsquo;;</p><p>alter table ai_mission_theme_relation owner to postgres;</p><p>create index idx_mission_theme_relation_mission_id
+on ai_mission_theme_relation (mission_id);</p><ul><li>TODO</li><li>删除的时候可以连着删除<ul><li><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200912155441.png alt=20200912155441></li></ul></li></ul><p>1000000个数,白天只查,晚上更新</p><p>一个无序的数组长度为1001 ，数组内的元素值在[1,1000]间，只用基本数据结构找出1001中唯一重复的元素 &mdash; （不能用map）</p><p>将IPv4（192.168.1.1）转换成longl诶行</p><p>一个程序 接收1亿个数 最后返回前100个最大的数</p></article><footer class=book-footer><div class="flex flex-wrap justify-between"><div><a class="flex align-center" href=https://github.com/alex-shpak/hugo-book/edit/main/exampleSite/content/docs/%e7%ac%ac%e5%9b%9b%e7%ab%a0%20%e8%b0%83%e5%ba%a6/%e4%ba%8c%20%e8%b0%83%e5%ba%a6%e7%9a%84%e6%97%b6%e6%9c%ba/4.2.2%20%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6.md target=_blank rel=noopener><img src=/svg/edit.svg class=book-icon alt=Edit>
+<span>Edit this page</span></a></div></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#什么是被动调度>什么是被动调度</a><ul><li><a href=#探寻被动调度如何进入睡眠>探寻被动调度,如何进入睡眠</a><ul><li><a href=#定义程序>定义程序</a></li></ul></li><li><a href=#睡眠>睡眠</a><ul><li><a href=#runtime_semacquire>runtime_Semacquire</a></li></ul></li><li><a href=#唤醒睡眠中的goroutine>唤醒睡眠中的goroutine</a><ul><li><a href=#runtime_semrelease>runtime_Semrelease</a></li></ul></li><li><a href=#唤醒一个空闲p获得创建一个m开始轮询调度可能把上面已唤醒的g调度起来>唤醒一个空闲P,获得(创建)一个M,开始轮询调度,可能把上面已唤醒的G调度起来</a><ul><li><a href=#wakep--startm>wakep&ndash;>startm</a></li></ul></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></div></aside></main></body></html>
