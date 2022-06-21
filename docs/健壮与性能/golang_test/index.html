@@ -1,0 +1,408 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="golang测试相关函数 # test函数的种类 # func TestXxx(t *testing.T) { ... }
+注意下这个Xxx需要大写 func BenchmarkXxx(b *testing.B) { ... }
+注意下这个Xxx需要大写 ExampleXxx
+prints output to os.Stdout &ldquo;Output:&rdquo; &ldquo;Unordered output:&rdquo; go help testfunc
+The 'go test' command expects to find test, benchmark, and example functions in the &#34;*_test.go&#34; files corresponding to the package under test. A test function is one named TestXxx (where Xxx does not start with a lower case letter) and should have the signature, func TestXxx(t *testing."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="测试相关函数"><meta property="og:description" content="golang测试相关函数 # test函数的种类 # func TestXxx(t *testing.T) { ... }
+注意下这个Xxx需要大写 func BenchmarkXxx(b *testing.B) { ... }
+注意下这个Xxx需要大写 ExampleXxx
+prints output to os.Stdout &ldquo;Output:&rdquo; &ldquo;Unordered output:&rdquo; go help testfunc
+The 'go test' command expects to find test, benchmark, and example functions in the &#34;*_test.go&#34; files corresponding to the package under test. A test function is one named TestXxx (where Xxx does not start with a lower case letter) and should have the signature, func TestXxx(t *testing."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/%E5%81%A5%E5%A3%AE%E4%B8%8E%E6%80%A7%E8%83%BD/golang_test/"><meta property="article:section" content="docs"><title>测试相关函数 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.82c5dbd23447cee0b4c2aa3ed08ce0961faa40e1fa370eee4f8c9f02e0d46b5f.css integrity="sha256-gsXb0jRHzuC0wqo+0Izglh+qQOH6Nw7uT4yfAuDUa18=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.5dac47d1b2cd3428214396bef7c400bab155a4cf78db9e4a03e5ab36eeee0581.js integrity="sha256-XaxH0bLNNCghQ5a+98QAurFVpM94255KA+WrNu7uBYE=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/golang_basic/>基本用法</a></li></ul></li><li><span>健壮与性能</span><ul><li><a href=/go-goroutine/docs/%E5%81%A5%E5%A3%AE%E4%B8%8E%E6%80%A7%E8%83%BD/golang_test/ class=active>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/2_init_before_enter_main_function/>进入main函数前的初始化</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/>调度</a><ul><li><span>调度策略</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%B8%80-%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/4.1.2-%E7%9B%97%E5%8F%96goroutine%E4%BB%8E%E5%85%B6%E4%BB%96%E9%98%9F%E5%88%97/>4.1.2 盗取goroutine从其他队列</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%B8%80-%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/4.1.1-%E4%BB%8E%E6%9C%AC%E5%9C%B0%E9%98%9F%E5%88%97%E6%88%96%E5%85%A8%E5%B1%80%E9%98%9F%E5%88%97%E8%8E%B7%E5%8F%96goroutine/>4.1.1 从本地队列或全局队列获取goroutine</a></li></ul></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/>调度时机</a><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.1-%E4%B8%BB%E5%8A%A8%E8%B0%83%E5%BA%A6/>4.2.1 goroutine主动调度</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.2-%E8%A2%AB%E5%8A%A8%E8%B0%83%E5%BA%A6/>4.2.2 goroutine被动调度</a></li><li><span>4.2.3 剥夺调度</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.1-%E8%BF%90%E8%A1%8C%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E6%97%B6%E9%97%B4%E8%BF%87%E9%95%BF%E8%B0%83%E5%BA%A6/>4.2.3.1 运行用户代码时间过长调度</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.2-%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E6%94%B6%E5%B0%BE%E5%A6%82%E6%9E%9C%E4%BB%8E%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E8%BF%94%E5%9B%9E%E5%A6%82%E4%BD%95%E9%87%8D%E6%96%B0%E5%BE%97%E5%88%B0P/>4.2.3.2 系统调用收尾,如从系统调用返回,如何重新得到P</a></li></ul></li></ul></li><li><span>调度循环</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%B8%89-%E8%B0%83%E5%BA%A6%E5%BE%AA%E7%8E%AF/4.3.1-%E8%B0%83%E5%BA%A6%E5%BE%AA%E7%8E%AF/>调度循环</a></li></ul></li></ul></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/3_exit_goroutine/>goroutine退出过程</a></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>测试相关函数</strong>
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#golang测试相关函数>golang测试相关函数</a><ul><li><a href=#test函数的种类>test函数的种类</a></li><li><a href=#go-test工具>go test工具</a><ul><li><a href=#运行文件的单个测试单元>运行文件的单个测试单元</a></li><li><a href=#test文件生成二进制文件>test文件生成二进制文件</a></li><li><a href=#benchmark>benchmark</a></li></ul></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></aside></header><article class=markdown><h1 id=golang测试相关函数>golang测试相关函数
+<a class=anchor href=#golang%e6%b5%8b%e8%af%95%e7%9b%b8%e5%85%b3%e5%87%bd%e6%95%b0>#</a></h1><h2 id=test函数的种类>test函数的种类
+<a class=anchor href=#test%e5%87%bd%e6%95%b0%e7%9a%84%e7%a7%8d%e7%b1%bb>#</a></h2><ul><li><p><code>func TestXxx(t *testing.T) { ... }</code></p><ul><li>注意下这个Xxx需要大写</li></ul></li><li><p><code>func BenchmarkXxx(b *testing.B) { ... }</code></p><ul><li>注意下这个Xxx需要大写</li></ul></li><li><p><code>ExampleXxx</code></p><ul><li><code>prints output to os.Stdout</code></li><li>&ldquo;Output:&rdquo;</li><li>&ldquo;Unordered output:&rdquo;</li></ul></li><li><p><code>go help testfunc</code></p></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span>The <span style=color:#e6db74>&#39;go test&#39;</span> command expects to find test, benchmark, and example functions
+</span></span><span style=display:flex><span>in the <span style=color:#e6db74>&#34;*_test.go&#34;</span> files corresponding to the package under test.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>A test <span style=color:#66d9ef>function</span> is one named TestXxx <span style=color:#f92672>(</span>where Xxx does not start with a
+</span></span><span style=display:flex><span>lower <span style=color:#66d9ef>case</span> letter<span style=color:#f92672>)</span> and should have the signature,
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        func TestXxx<span style=color:#f92672>(</span>t *testing.T<span style=color:#f92672>)</span> <span style=color:#f92672>{</span> ... <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>A benchmark <span style=color:#66d9ef>function</span> is one named BenchmarkXxx and should have the signature,
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        func BenchmarkXxx<span style=color:#f92672>(</span>b *testing.B<span style=color:#f92672>)</span> <span style=color:#f92672>{</span> ... <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>An example <span style=color:#66d9ef>function</span> is similar to a test <span style=color:#66d9ef>function</span> but, instead of using
+</span></span><span style=display:flex><span>*testing.T to report success or failure, prints output to os.Stdout.
+</span></span><span style=display:flex><span>If the last comment in the <span style=color:#66d9ef>function</span> starts with <span style=color:#e6db74>&#34;Output:&#34;</span> <span style=color:#66d9ef>then</span> the output
+</span></span><span style=display:flex><span>is compared exactly against the comment <span style=color:#f92672>(</span>see examples below<span style=color:#f92672>)</span>. If the last
+</span></span><span style=display:flex><span>comment begins with <span style=color:#e6db74>&#34;Unordered output:&#34;</span> <span style=color:#66d9ef>then</span> the output is compared to the
+</span></span><span style=display:flex><span>comment, however the order of the lines is ignored. An example with no such
+</span></span><span style=display:flex><span>comment is compiled but not executed. An example with no text after
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#34;Output:&#34;</span> is compiled, executed, and expected to produce no output.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Godoc displays the body of ExampleXxx to demonstrate the use
+</span></span><span style=display:flex><span>of the <span style=color:#66d9ef>function</span>, constant, or variable Xxx. An example of a method M with
+</span></span><span style=display:flex><span>receiver type T or *T is named ExampleT_M. There may be multiple examples
+</span></span><span style=display:flex><span><span style=color:#66d9ef>for</span> a given <span style=color:#66d9ef>function</span>, constant, or variable, distinguished by a trailing _xxx,
+</span></span><span style=display:flex><span>where xxx is a suffix not beginning with an upper <span style=color:#66d9ef>case</span> letter.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Here is an example of an example:
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        func ExamplePrintln<span style=color:#f92672>()</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>                Println<span style=color:#f92672>(</span><span style=color:#e6db74>&#34;The output of\nthis example.&#34;</span><span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>                // Output: The output of
+</span></span><span style=display:flex><span>                // this example.
+</span></span><span style=display:flex><span>        <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Here is another example where the ordering of the output is ignored:
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        func ExamplePerm<span style=color:#f92672>()</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>for</span> _, value :<span style=color:#f92672>=</span> range Perm<span style=color:#f92672>(</span>4<span style=color:#f92672>)</span> <span style=color:#f92672>{</span>
+</span></span><span style=display:flex><span>                        fmt.Println<span style=color:#f92672>(</span>value<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>                <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>                // Unordered output: <span style=color:#ae81ff>4</span>
+</span></span><span style=display:flex><span>                // <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>                // <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>                // <span style=color:#ae81ff>3</span>
+</span></span><span style=display:flex><span>                // <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>        <span style=color:#f92672>}</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>The entire test file is presented as the example when it contains a single
+</span></span><span style=display:flex><span>example <span style=color:#66d9ef>function</span>, at least one other <span style=color:#66d9ef>function</span>, type, variable, or constant
+</span></span><span style=display:flex><span>declaration, and no test or benchmark functions.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>See the documentation of the testing package <span style=color:#66d9ef>for</span> more information.
+</span></span></code></pre></div><h2 id=go-test工具>go test工具
+<a class=anchor href=#go-test%e5%b7%a5%e5%85%b7>#</a></h2><blockquote><p>测试结果输出结果：<code>test status ('ok' or 'FAIL')</code> <code>package name</code> <code>elapsed time</code></p></blockquote><ul><li><code>go test [build/test flags] [packages] [build/test flags & test binary flags]</code><ul><li>当前目录模式: 如果当前没有go.mod，那么会自动生成
+<a href=https://blog.golang.org/using-go-modules title=https://blog.golang.org/using-go-modules>一个临时_path:_/tmp/hello</a><ul><li><code>go test</code></li><li><code>go test -v</code></li></ul></li><li>包列表模式<ul><li><code>go test &lt;module name></code></li><li><code>go test .</code></li><li><code>go test ./...</code><ul><li>打印更详细的信息<ul><li><code>go test -v .</code></li><li><code>go test -bench .</code></li></ul></li></ul></li></ul></li></ul></li></ul><pre tabindex=0><code>[root@iZf8z14idfp0rwhiicngwqZ hello]# tree
+.
+├── main.go
+└── main_test.go
+
+0 directories, 2 files
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test
+PASS
+ok  	_/tmp/hello	1.001s
+
+// --------------------------------------------------------------------------- //
+
+[root@iZf8z14idfp0rwhiicngwqZ hello]# tree
+.
+├── go.mod
+├── main.go
+└── main_test.go
+
+0 directories, 3 files
+[root@iZf8z14idfp0rwhiicngwqZ hello]# cat go.mod
+module example.com/hello
+
+go 1.13
+
+// --------------------------------------------------------------------------- //
+
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test example.com/hello/hello
+can&#39;t load package: package example.com/hello/hello: module example.com/hello/hello: Get https://proxy.golang.org/example.com/hello/hello/@v/list: dial tcp 172.217.160.113:443: i/o timeout
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test example.com/hello
+ok  	example.com/hello	1.002s
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test hello
+can&#39;t load package: package hello: malformed module path &#34;hello&#34;: missing dot in first path element
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test .
+ok  	example.com/hello	(cached)
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test ./...
+ok  	example.com/hello	(cached)
+
+// --------------------------------------------------------------------------- //
+
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test -v .
+=== RUN   TestHello
+--- PASS: TestHello (1.00s)
+PASS
+ok  	example.com/hello	1.001s
+[root@iZf8z14idfp0rwhiicngwqZ hello]# go test -bench .
+PASS
+ok  	example.com/hello	1.001s
+</code></pre><ul><li><code>go help test</code></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span>usage: go test <span style=color:#f92672>[</span>build/test flags<span style=color:#f92672>]</span> <span style=color:#f92672>[</span>packages<span style=color:#f92672>]</span> <span style=color:#f92672>[</span>build/test flags &amp; test binary flags<span style=color:#f92672>]</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#39;Go test&#39;</span> automates testing the packages named by the import paths.
+</span></span><span style=display:flex><span>It prints a summary of the test results in the format:
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        ok   archive/tar   0.011s
+</span></span><span style=display:flex><span>        FAIL archive/zip   0.022s
+</span></span><span style=display:flex><span>        ok   compress/gzip 0.033s
+</span></span><span style=display:flex><span>        ...
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>followed by detailed output <span style=color:#66d9ef>for</span> each failed package.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#39;Go test&#39;</span> recompiles each package along with any files with names matching
+</span></span><span style=display:flex><span>the file pattern <span style=color:#e6db74>&#34;*_test.go&#34;</span>.
+</span></span><span style=display:flex><span>These additional files can contain test functions, benchmark functions, and
+</span></span><span style=display:flex><span>example functions. See <span style=color:#e6db74>&#39;go help testfunc&#39;</span> <span style=color:#66d9ef>for</span> more.
+</span></span><span style=display:flex><span>Each listed package causes the execution of a separate test binary.
+</span></span><span style=display:flex><span>Files whose names begin with <span style=color:#e6db74>&#34;_&#34;</span> <span style=color:#f92672>(</span>including <span style=color:#e6db74>&#34;_test.go&#34;</span><span style=color:#f92672>)</span> or <span style=color:#e6db74>&#34;.&#34;</span> are ignored.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Test files that declare a package with the suffix <span style=color:#e6db74>&#34;_test&#34;</span> will be compiled as a
+</span></span><span style=display:flex><span>separate package, and <span style=color:#66d9ef>then</span> linked and run with the main test binary.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>The go tool will ignore a directory named <span style=color:#e6db74>&#34;testdata&#34;</span>, making it available
+</span></span><span style=display:flex><span>to hold ancillary data needed by the tests.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>As part of building a test binary, go test runs go vet on the package
+</span></span><span style=display:flex><span>and its test source files to identify significant problems. If go vet
+</span></span><span style=display:flex><span>finds any problems, go test reports those and does not run the test
+</span></span><span style=display:flex><span>binary. Only a high-confidence subset of the default go vet checks are
+</span></span><span style=display:flex><span>used. That subset is: <span style=color:#e6db74>&#39;atomic&#39;</span>, <span style=color:#e6db74>&#39;bool&#39;</span>, <span style=color:#e6db74>&#39;buildtags&#39;</span>, <span style=color:#e6db74>&#39;nilfunc&#39;</span>, and
+</span></span><span style=display:flex><span><span style=color:#e6db74>&#39;printf&#39;</span>. You can see the documentation <span style=color:#66d9ef>for</span> these and other vet tests
+</span></span><span style=display:flex><span>via <span style=color:#e6db74>&#34;go doc cmd/vet&#34;</span>. To disable the running of go vet, use the
+</span></span><span style=display:flex><span>-vet<span style=color:#f92672>=</span>off flag.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>All test output and summary lines are printed to the go command<span style=color:#e6db74>&#39;s
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>standard output, even if the test printed them to its own standard
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>error. (The go command&#39;</span>s standard error is reserved <span style=color:#66d9ef>for</span> printing
+</span></span><span style=display:flex><span>errors building the tests.<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>Go test runs in two different modes:
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>The first, called local directory mode, occurs when go test is
+</span></span><span style=display:flex><span>invoked with no package arguments <span style=color:#f92672>(</span><span style=color:#66d9ef>for</span> example, <span style=color:#e6db74>&#39;go test&#39;</span> or <span style=color:#e6db74>&#39;go
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>test -v&#39;</span><span style=color:#f92672>)</span>. In this mode, go test compiles the package sources and
+</span></span><span style=display:flex><span>tests found in the current directory and <span style=color:#66d9ef>then</span> runs the resulting
+</span></span><span style=display:flex><span>test binary. In this mode, caching <span style=color:#f92672>(</span>discussed below<span style=color:#f92672>)</span> is disabled.
+</span></span><span style=display:flex><span>After the package test finishes, go test prints a summary line
+</span></span><span style=display:flex><span>showing the test status <span style=color:#f92672>(</span><span style=color:#e6db74>&#39;ok&#39;</span> or <span style=color:#e6db74>&#39;FAIL&#39;</span><span style=color:#f92672>)</span>, package name, and elapsed
+</span></span><span style=display:flex><span>time.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>The second, called package list mode, occurs when go test is invoked
+</span></span><span style=display:flex><span>with explicit package arguments <span style=color:#f92672>(</span><span style=color:#66d9ef>for</span> example <span style=color:#e6db74>&#39;go test math&#39;</span>, <span style=color:#e6db74>&#39;go
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>test ./...&#39;</span>, and even <span style=color:#e6db74>&#39;go test .&#39;</span><span style=color:#f92672>)</span>. In this mode, go test compiles
+</span></span><span style=display:flex><span>and tests each of the packages listed on the command line. If a
+</span></span><span style=display:flex><span>package test passes, go test prints only the final <span style=color:#e6db74>&#39;ok&#39;</span> summary
+</span></span><span style=display:flex><span>line. If a package test fails, go test prints the full test output.
+</span></span><span style=display:flex><span>If invoked with the -bench or -v flag, go test prints the full
+</span></span><span style=display:flex><span>output even <span style=color:#66d9ef>for</span> passing package tests, in order to display the
+</span></span><span style=display:flex><span>requested benchmark results or verbose logging. After the package
+</span></span><span style=display:flex><span>tests <span style=color:#66d9ef>for</span> all of the listed packages finish, and their output is
+</span></span><span style=display:flex><span>printed, go test prints a final <span style=color:#e6db74>&#39;FAIL&#39;</span> status <span style=color:#66d9ef>if</span> any package test
+</span></span><span style=display:flex><span>has failed.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>In package list mode only, go test caches successful package test
+</span></span><span style=display:flex><span>results to avoid unnecessary repeated running of tests. When the
+</span></span><span style=display:flex><span>result of a test can be recovered from the cache, go test will
+</span></span><span style=display:flex><span>redisplay the previous output instead of running the test binary
+</span></span><span style=display:flex><span>again. When this happens, go test prints <span style=color:#e6db74>&#39;(cached)&#39;</span> in place of the
+</span></span><span style=display:flex><span>elapsed time in the summary line.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>The rule <span style=color:#66d9ef>for</span> a match in the cache is that the run involves the same
+</span></span><span style=display:flex><span>test binary and the flags on the command line come entirely from a
+</span></span><span style=display:flex><span>restricted set of <span style=color:#e6db74>&#39;cacheable&#39;</span> test flags, defined as -cpu, -list,
+</span></span><span style=display:flex><span>-parallel, -run, -short, and -v. If a run of go test has any test
+</span></span><span style=display:flex><span>or non-test flags outside this set, the result is not cached. To
+</span></span><span style=display:flex><span>disable test caching, use any test flag or argument other than the
+</span></span><span style=display:flex><span>cacheable flags. The idiomatic way to disable test caching explicitly
+</span></span><span style=display:flex><span>is to use -count<span style=color:#f92672>=</span>1. Tests that open files within the package<span style=color:#e6db74>&#39;s source
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>root (usually $GOPATH) or that consult environment variables only
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>match future runs in which the files and environment variables are unchanged.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>A cached test result is treated as executing in no time at all,
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>so a successful package test result will be cached and reused
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>regardless of -timeout setting.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>In addition to the build flags, the flags handled by &#39;</span>go test<span style=color:#e6db74>&#39; itself are:
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        -args
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            Pass the remainder of the command line (everything after -args)
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            to the test binary, uninterpreted and unchanged.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            Because this flag consumes the remainder of the command line,
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            the package list (if present) must appear before this flag.
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>        -c
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            Compile the test binary to pkg.test but do not run it
+</span></span></span><span style=display:flex><span><span style=color:#e6db74>            (where pkg is the last element of the package&#39;</span>s import path<span style=color:#f92672>)</span>.
+</span></span><span style=display:flex><span>            The file name can be changed with the -o flag.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        -exec xprog
+</span></span><span style=display:flex><span>            Run the test binary using xprog. The behavior is the same as
+</span></span><span style=display:flex><span>            in <span style=color:#e6db74>&#39;go run&#39;</span>. See <span style=color:#e6db74>&#39;go help run&#39;</span> <span style=color:#66d9ef>for</span> details.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        -i
+</span></span><span style=display:flex><span>            Install packages that are dependencies of the test.
+</span></span><span style=display:flex><span>            Do not run the test.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        -json
+</span></span><span style=display:flex><span>            Convert test output to JSON suitable <span style=color:#66d9ef>for</span> automated processing.
+</span></span><span style=display:flex><span>            See <span style=color:#e6db74>&#39;go doc test2json&#39;</span> <span style=color:#66d9ef>for</span> the encoding details.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>        -o file
+</span></span><span style=display:flex><span>            Compile the test binary to the named file.
+</span></span><span style=display:flex><span>            The test still runs <span style=color:#f92672>(</span>unless -c or -i is specified<span style=color:#f92672>)</span>.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>The test binary also accepts flags that control execution of the test; these
+</span></span><span style=display:flex><span>flags are also accessible by <span style=color:#e6db74>&#39;go test&#39;</span>. See <span style=color:#e6db74>&#39;go help testflag&#39;</span> <span style=color:#66d9ef>for</span> details.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>For more about build flags, see <span style=color:#e6db74>&#39;go help build&#39;</span>.
+</span></span><span style=display:flex><span>For more about specifying packages, see <span style=color:#e6db74>&#39;go help packages&#39;</span>.
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>See also: go build, go vet.
+</span></span></code></pre></div><h3 id=运行文件的单个测试单元>运行文件的单个测试单元
+<a class=anchor href=#%e8%bf%90%e8%a1%8c%e6%96%87%e4%bb%b6%e7%9a%84%e5%8d%95%e4%b8%aa%e6%b5%8b%e8%af%95%e5%8d%95%e5%85%83>#</a></h3><ul><li>运行某个test文件的某个test例子。<ul><li><code>go test -v -run="Regrex$" main_test.go</code></li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// tree
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>.
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>├──</span> <span style=color:#66d9ef>go</span>.<span style=color:#a6e22e>mod</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>├──</span> <span style=color:#a6e22e>main</span>.<span style=color:#66d9ef>go</span>
+</span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>└──</span> <span style=color:#a6e22e>main_test</span>.<span style=color:#66d9ef>go</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#ae81ff>0</span> <span style=color:#a6e22e>directories</span>, <span style=color:#ae81ff>3</span> <span style=color:#a6e22e>files</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// cat main_test.go
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#f92672>package</span> <span style=color:#a6e22e>hello</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;testing&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;time&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>TestHello</span>(<span style=color:#a6e22e>t</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>testing</span>.<span style=color:#a6e22e>T</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>want</span> <span style=color:#f92672>:=</span> <span style=color:#e6db74>&#34;Hello, world.&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>got</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>Hello</span>(); <span style=color:#a6e22e>got</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>want</span> {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>t</span>.<span style=color:#a6e22e>Errorf</span>(<span style=color:#e6db74>&#34;Hello() = %q, want %q&#34;</span>, <span style=color:#a6e22e>got</span>, <span style=color:#a6e22e>want</span>)
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Sleep</span>(<span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Second</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>TestRegrex</span>(<span style=color:#a6e22e>t</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>testing</span>.<span style=color:#a6e22e>T</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>want</span> <span style=color:#f92672>:=</span> <span style=color:#e6db74>&#34;Hello, world. --- regrex&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>got</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>Hello</span>(); <span style=color:#a6e22e>got</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>want</span> {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>t</span>.<span style=color:#a6e22e>Errorf</span>(<span style=color:#e6db74>&#34;Hello() = %q, want %q&#34;</span>, <span style=color:#a6e22e>got</span>, <span style=color:#a6e22e>want</span>)
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Sleep</span>(<span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Second</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// cat go.mod
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>module</span> <span style=color:#a6e22e>example</span>.<span style=color:#a6e22e>com</span><span style=color:#f92672>/</span><span style=color:#a6e22e>hello</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>go</span> <span style=color:#ae81ff>1.13</span>
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span><span style=color:#f92672>[</span>root@iZf8z14idfp0rwhiicngwqZ hello<span style=color:#f92672>]</span><span style=color:#75715e># go test -v -run=&#34;Regrex$&#34; main_test.go</span>
+</span></span><span style=display:flex><span><span style=color:#75715e># command-line-arguments [command-line-arguments.test]</span>
+</span></span><span style=display:flex><span>./main_test.go:10:15: undefined: Hello
+</span></span><span style=display:flex><span>./main_test.go:19:15: undefined: Hello
+</span></span><span style=display:flex><span>FAIL	command-line-arguments <span style=color:#f92672>[</span>build failed<span style=color:#f92672>]</span>
+</span></span><span style=display:flex><span>FAIL
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>[</span>root@iZf8z14idfp0rwhiicngwqZ hello<span style=color:#f92672>]</span><span style=color:#75715e># go test -v -run=&#34;Regrex$&#34; main_test.go main.go</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>===</span> RUN   TestRegrex
+</span></span><span style=display:flex><span>--- FAIL: TestRegrex <span style=color:#f92672>(</span>1.00s<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>    main_test.go:20: Hello<span style=color:#f92672>()</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Hello, world.&#34;</span>, want <span style=color:#e6db74>&#34;Hello, world. --- regrex&#34;</span>
+</span></span><span style=display:flex><span>FAIL
+</span></span><span style=display:flex><span>FAIL	command-line-arguments	1.002s
+</span></span><span style=display:flex><span>FAIL
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>[</span>root@iZf8z14idfp0rwhiicngwqZ hello<span style=color:#f92672>]</span><span style=color:#75715e># go test -v -run=&#34;Regrex$&#34; .</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>===</span> RUN   TestRegrex
+</span></span><span style=display:flex><span>--- FAIL: TestRegrex <span style=color:#f92672>(</span>1.00s<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>    main_test.go:20: Hello<span style=color:#f92672>()</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Hello, world.&#34;</span>, want <span style=color:#e6db74>&#34;Hello, world. --- regrex&#34;</span>
+</span></span><span style=display:flex><span>FAIL
+</span></span><span style=display:flex><span>FAIL	example.com/hello	1.001s
+</span></span><span style=display:flex><span>FAIL
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>[</span>root@iZf8z14idfp0rwhiicngwqZ hello<span style=color:#f92672>]</span><span style=color:#75715e># go test -v -run=&#34;Regrex$&#34; example.com/hello</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>===</span> RUN   TestRegrex
+</span></span><span style=display:flex><span>--- FAIL: TestRegrex <span style=color:#f92672>(</span>1.00s<span style=color:#f92672>)</span>
+</span></span><span style=display:flex><span>    main_test.go:20: Hello<span style=color:#f92672>()</span> <span style=color:#f92672>=</span> <span style=color:#e6db74>&#34;Hello, world.&#34;</span>, want <span style=color:#e6db74>&#34;Hello, world. --- regrex&#34;</span>
+</span></span><span style=display:flex><span>FAIL
+</span></span><span style=display:flex><span>FAIL	example.com/hello	1.001s
+</span></span><span style=display:flex><span>FAIL
+</span></span></code></pre></div><h3 id=test文件生成二进制文件>test文件生成二进制文件
+<a class=anchor href=#test%e6%96%87%e4%bb%b6%e7%94%9f%e6%88%90%e4%ba%8c%e8%bf%9b%e5%88%b6%e6%96%87%e4%bb%b6>#</a></h3><ul><li><code>go test [build/test flags] [packages] [build/test flags & test binary flags]</code><ul><li><code>test binary flags</code></li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// ls  ------------------------------------------------------------
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>bench</span>.<span style=color:#a6e22e>test</span>   <span style=color:#66d9ef>go</span>.<span style=color:#a6e22e>mod</span>       <span style=color:#a6e22e>main</span>.<span style=color:#66d9ef>go</span>      <span style=color:#a6e22e>main_test</span>.<span style=color:#66d9ef>go</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// cat go.mod  ----------------------module is bench---------------
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>module</span> <span style=color:#a6e22e>bench</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>go</span> <span style=color:#ae81ff>1.13</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// cat main.go   --------------------------------------------------
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>fib</span>(<span style=color:#a6e22e>n</span> <span style=color:#66d9ef>int</span>) <span style=color:#66d9ef>int</span> {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>n</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>n</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>1</span> {
+</span></span><span style=display:flex><span>                <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>n</span>
+</span></span><span style=display:flex><span>        }
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span> <span style=color:#a6e22e>fib</span>(<span style=color:#a6e22e>n</span><span style=color:#f92672>-</span><span style=color:#ae81ff>2</span>) <span style=color:#f92672>+</span> <span style=color:#a6e22e>fib</span>(<span style=color:#a6e22e>n</span><span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// cat main_test.go -----------------------------------------------
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> <span style=color:#e6db74>&#34;testing&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>BenchmarkFib</span>(<span style=color:#a6e22e>b</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>testing</span>.<span style=color:#a6e22e>B</span>) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>for</span> <span style=color:#a6e22e>n</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>n</span> &lt; <span style=color:#a6e22e>b</span>.<span style=color:#a6e22e>N</span>; <span style=color:#a6e22e>n</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>                <span style=color:#a6e22e>fib</span>(<span style=color:#ae81ff>30</span>) <span style=color:#75715e>// run fib(30) b.N times
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>        }
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-sh data-lang=sh><span style=display:flex><span>
+</span></span><span style=display:flex><span>go test bench -c -o test_binary -bench .
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>go test -bench<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;Fib</span>$<span style=color:#e6db74>&#34;</span> . 
+</span></span><span style=display:flex><span>goos: darwin
+</span></span><span style=display:flex><span>goarch: amd64
+</span></span><span style=display:flex><span>pkg: bench
+</span></span><span style=display:flex><span>BenchmarkFib-4               <span style=color:#ae81ff>224</span>           <span style=color:#ae81ff>5329575</span> ns/op
+</span></span><span style=display:flex><span>PASS
+</span></span><span style=display:flex><span>ok      bench   1.739s
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>./bench.test -test.bench<span style=color:#f92672>=</span><span style=color:#e6db74>&#34;Fib</span>$<span style=color:#e6db74>&#34;</span>
+</span></span><span style=display:flex><span>goos: darwin
+</span></span><span style=display:flex><span>goarch: amd64
+</span></span><span style=display:flex><span>pkg: bench
+</span></span><span style=display:flex><span>BenchmarkFib-4               <span style=color:#ae81ff>223</span>           <span style=color:#ae81ff>5320568</span> ns/op
+</span></span><span style=display:flex><span>PASS
+</span></span></code></pre></div><h3 id=benchmark>benchmark
+<a class=anchor href=#benchmark>#</a></h3><ul><li><p>go test 命令默认不运行 benchmark 用例的，如果我们想运行 benchmark 用例，则需要加上 -bench 参数。</p><ul><li><code>-bench</code>参数支持传入一个正则表达式，匹配到的用例才会得到执行。</li></ul></li><li><p><code>-cpu</code></p><ul><li>GOMAXPROCS，默认等于 CPU 核数。可以通过 -cpu 参数改变 GOMAXPROCS，-cpu 支持传入一个列表作为参数</li></ul></li><li><p>提升测试准确度的一个重要手段就是增加测试的次数。</p><ul><li>我们可以使用<code>-benchtime 和 -count</code>两个参数达到这个目的。<ul><li><code>-benchtime</code>的默认时间是 1s，那么我们可以使用<code>-benchtime</code>指定为 5s。</li><li>还可以是具体的次数。```-benchtime=30x`(执行30次)</li></ul></li><li><code>-count</code> 参数可以用来设置 benchmark 的轮数。例如，进行 3 轮 benchmark。</li></ul></li><li><p><code>-benchmem</code>参数可以度量内存分配的次数。</p></li></ul><h4 id=基准测试的测试次数>基准测试的测试次数
+<a class=anchor href=#%e5%9f%ba%e5%87%86%e6%b5%8b%e8%af%95%e7%9a%84%e6%b5%8b%e8%af%95%e6%ac%a1%e6%95%b0>#</a></h4><blockquote><p>b *testing.B，有个属性 b.N 表示这个用例需要运行的次数。b.N 对于每个用例都是不一样的。</p><blockquote><p>那这个值是如何决定的呢？b.N 从 1 开始，如果该用例能够在 1s 内完成，b.N 的值便会增加，再次执行。b.N 的值大概以 1, 2, 3, 5, 10, 20, 30, 50, 100 这样的序列递增，越到后面，增加得越快。</p></blockquote></blockquote><h4 id=精确>精确
+<a class=anchor href=#%e7%b2%be%e7%a1%ae>#</a></h4><ul><li>ResetTimer</li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>BenchmarkFib</span>(<span style=color:#a6e22e>b</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>testing</span>.<span style=color:#a6e22e>B</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Sleep</span>(<span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Second</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>3</span>) <span style=color:#75715e>// 模拟耗时准备任务
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>b</span>.<span style=color:#a6e22e>ResetTimer</span>() <span style=color:#75715e>// 重置定时器
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>n</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>n</span> &lt; <span style=color:#a6e22e>b</span>.<span style=color:#a6e22e>N</span>; <span style=color:#a6e22e>n</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>fib</span>(<span style=color:#ae81ff>30</span>) <span style=color:#75715e>// run fib(30) b.N times
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><ul><li>StopTimer & StartTimer</li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// sort_test.go
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;math/rand&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;testing&#34;</span>
+</span></span><span style=display:flex><span>	<span style=color:#e6db74>&#34;time&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>generateWithCap</span>(<span style=color:#a6e22e>n</span> <span style=color:#66d9ef>int</span>) []<span style=color:#66d9ef>int</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>rand</span>.<span style=color:#a6e22e>Seed</span>(<span style=color:#a6e22e>time</span>.<span style=color:#a6e22e>Now</span>().<span style=color:#a6e22e>UnixNano</span>())
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>nums</span> <span style=color:#f92672>:=</span> make([]<span style=color:#66d9ef>int</span>, <span style=color:#ae81ff>0</span>, <span style=color:#a6e22e>n</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>i</span> &lt; <span style=color:#a6e22e>n</span>; <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>nums</span> = append(<span style=color:#a6e22e>nums</span>, <span style=color:#a6e22e>rand</span>.<span style=color:#a6e22e>Int</span>())
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span> <span style=color:#a6e22e>nums</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>bubbleSort</span>(<span style=color:#a6e22e>nums</span> []<span style=color:#66d9ef>int</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>i</span> &lt; len(<span style=color:#a6e22e>nums</span>); <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>j</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>1</span>; <span style=color:#a6e22e>j</span> &lt; len(<span style=color:#a6e22e>nums</span>)<span style=color:#f92672>-</span><span style=color:#a6e22e>i</span>; <span style=color:#a6e22e>j</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>nums</span>[<span style=color:#a6e22e>j</span>] &lt; <span style=color:#a6e22e>nums</span>[<span style=color:#a6e22e>j</span><span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>] {
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>nums</span>[<span style=color:#a6e22e>j</span>], <span style=color:#a6e22e>nums</span>[<span style=color:#a6e22e>j</span><span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>] = <span style=color:#a6e22e>nums</span>[<span style=color:#a6e22e>j</span><span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>], <span style=color:#a6e22e>nums</span>[<span style=color:#a6e22e>j</span>]
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>BenchmarkBubbleSort</span>(<span style=color:#a6e22e>b</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>testing</span>.<span style=color:#a6e22e>B</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>n</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>n</span> &lt; <span style=color:#a6e22e>b</span>.<span style=color:#a6e22e>N</span>; <span style=color:#a6e22e>n</span><span style=color:#f92672>++</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>b</span>.<span style=color:#a6e22e>StopTimer</span>()
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>nums</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>generateWithCap</span>(<span style=color:#ae81ff>10000</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>b</span>.<span style=color:#a6e22e>StartTimer</span>()
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>bubbleSort</span>(<span style=color:#a6e22e>nums</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h2 id=附录>附录
+<a class=anchor href=#%e9%99%84%e5%bd%95>#</a></h2></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#golang测试相关函数>golang测试相关函数</a><ul><li><a href=#test函数的种类>test函数的种类</a></li><li><a href=#go-test工具>go test工具</a><ul><li><a href=#运行文件的单个测试单元>运行文件的单个测试单元</a></li><li><a href=#test文件生成二进制文件>test文件生成二进制文件</a></li><li><a href=#benchmark>benchmark</a></li></ul></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></div></aside></main></body></html>

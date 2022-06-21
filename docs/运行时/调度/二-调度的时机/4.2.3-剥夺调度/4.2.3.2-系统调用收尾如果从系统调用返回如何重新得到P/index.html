@@ -1,0 +1,331 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="定义程序 # main.go
+package main import ( &#34;fmt&#34; &#34;os&#34; ) var path = &#34;appss.txt&#34; func isError(err error) bool { if err != nil { fmt.Println(err.Error()) } return (err != nil) } func main() { var file, err = os.OpenFile(path, os.O_RDWR, 0644) if isError(err) { return } defer file.Close() } gdb调试前准备 # 编译程序 # 编译一下源代码: go build -gcflags &#34;-N -l&#34; -o test ..
+准备mcall函数断点的文件 # gdb list /usr/lib/golang/src/syscall/zsyscall_linux_amd64.go:62 list /usr/lib/golang/src/syscall/asm_linux_amd64.s:44 gdb # // func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) TEXT ·Syscall6(SB),NOSPLIT,$0-80 CALL	runtime·entersyscall(SB) MOVQ	a1+8(FP), DI MOVQ	a2+16(FP), SI MOVQ	a3+24(FP), DX MOVQ	a4+32(FP), R10 MOVQ	a5+40(FP), R8 MOVQ	a6+48(FP), R9 SYSCALL CMPQ	AX, $0xfffffffffffff001 JLS	ok6 MOVQ	$-1, r1+56(FP) MOVQ	$0, r2+64(FP) NEGQ	AX MOVQ	AX, err+72(FP) CALL	runtime·exitsyscall(SB) RET ok6: MOVQ	AX, r1+56(FP) MOVQ	DX, r2+64(FP) MOVQ	$0, err+72(FP) CALL	runtime·exitsyscall(SB) RET entersyscall # src/runtime/proc."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="4.2.3.2 系统调用收尾,如从系统调用返回,如何重新得到P"><meta property="og:description" content="定义程序 # main.go
+package main import ( &#34;fmt&#34; &#34;os&#34; ) var path = &#34;appss.txt&#34; func isError(err error) bool { if err != nil { fmt.Println(err.Error()) } return (err != nil) } func main() { var file, err = os.OpenFile(path, os.O_RDWR, 0644) if isError(err) { return } defer file.Close() } gdb调试前准备 # 编译程序 # 编译一下源代码: go build -gcflags &#34;-N -l&#34; -o test ..
+准备mcall函数断点的文件 # gdb list /usr/lib/golang/src/syscall/zsyscall_linux_amd64.go:62 list /usr/lib/golang/src/syscall/asm_linux_amd64.s:44 gdb # // func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr) TEXT ·Syscall6(SB),NOSPLIT,$0-80 CALL	runtime·entersyscall(SB) MOVQ	a1+8(FP), DI MOVQ	a2+16(FP), SI MOVQ	a3+24(FP), DX MOVQ	a4+32(FP), R10 MOVQ	a5+40(FP), R8 MOVQ	a6+48(FP), R9 SYSCALL CMPQ	AX, $0xfffffffffffff001 JLS	ok6 MOVQ	$-1, r1+56(FP) MOVQ	$0, r2+64(FP) NEGQ	AX MOVQ	AX, err+72(FP) CALL	runtime·exitsyscall(SB) RET ok6: MOVQ	AX, r1+56(FP) MOVQ	DX, r2+64(FP) MOVQ	$0, err+72(FP) CALL	runtime·exitsyscall(SB) RET entersyscall # src/runtime/proc."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.2-%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E6%94%B6%E5%B0%BE%E5%A6%82%E6%9E%9C%E4%BB%8E%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E8%BF%94%E5%9B%9E%E5%A6%82%E4%BD%95%E9%87%8D%E6%96%B0%E5%BE%97%E5%88%B0P/"><meta property="article:section" content="docs"><meta property="article:published_time" content="2020-06-23T20:50:00+00:00"><meta property="article:modified_time" content="2020-06-23T20:50:00+00:00"><title>4.2.3.2 系统调用收尾,如从系统调用返回,如何重新得到P | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.82c5dbd23447cee0b4c2aa3ed08ce0961faa40e1fa370eee4f8c9f02e0d46b5f.css integrity="sha256-gsXb0jRHzuC0wqo+0Izglh+qQOH6Nw7uT4yfAuDUa18=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.5dac47d1b2cd3428214396bef7c400bab155a4cf78db9e4a03e5ab36eeee0581.js integrity="sha256-XaxH0bLNNCghQ5a+98QAurFVpM94255KA+WrNu7uBYE=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/%E5%9F%BA%E7%A1%80%E7%9F%A5%E8%AF%86/golang_basic/>基本用法</a></li></ul></li><li><span>健壮与性能</span><ul><li><a href=/go-goroutine/docs/%E5%81%A5%E5%A3%AE%E4%B8%8E%E6%80%A7%E8%83%BD/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/2_init_before_enter_main_function/>进入main函数前的初始化</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/>调度</a><ul><li><span>调度策略</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%B8%80-%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/4.1.2-%E7%9B%97%E5%8F%96goroutine%E4%BB%8E%E5%85%B6%E4%BB%96%E9%98%9F%E5%88%97/>4.1.2 盗取goroutine从其他队列</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%B8%80-%E8%B0%83%E5%BA%A6%E7%AD%96%E7%95%A5/4.1.1-%E4%BB%8E%E6%9C%AC%E5%9C%B0%E9%98%9F%E5%88%97%E6%88%96%E5%85%A8%E5%B1%80%E9%98%9F%E5%88%97%E8%8E%B7%E5%8F%96goroutine/>4.1.1 从本地队列或全局队列获取goroutine</a></li></ul></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/>调度时机</a><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.1-%E4%B8%BB%E5%8A%A8%E8%B0%83%E5%BA%A6/>4.2.1 goroutine主动调度</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.2-%E8%A2%AB%E5%8A%A8%E8%B0%83%E5%BA%A6/>4.2.2 goroutine被动调度</a></li><li><span>4.2.3 剥夺调度</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.1-%E8%BF%90%E8%A1%8C%E7%94%A8%E6%88%B7%E4%BB%A3%E7%A0%81%E6%97%B6%E9%97%B4%E8%BF%87%E9%95%BF%E8%B0%83%E5%BA%A6/>4.2.3.1 运行用户代码时间过长调度</a></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%BA%8C-%E8%B0%83%E5%BA%A6%E7%9A%84%E6%97%B6%E6%9C%BA/4.2.3-%E5%89%A5%E5%A4%BA%E8%B0%83%E5%BA%A6/4.2.3.2-%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E6%94%B6%E5%B0%BE%E5%A6%82%E6%9E%9C%E4%BB%8E%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%E8%BF%94%E5%9B%9E%E5%A6%82%E4%BD%95%E9%87%8D%E6%96%B0%E5%BE%97%E5%88%B0P/ class=active>4.2.3.2 系统调用收尾,如从系统调用返回,如何重新得到P</a></li></ul></li></ul></li><li><span>调度循环</span><ul><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/%E8%B0%83%E5%BA%A6/%E4%B8%89-%E8%B0%83%E5%BA%A6%E5%BE%AA%E7%8E%AF/4.3.1-%E8%B0%83%E5%BA%A6%E5%BE%AA%E7%8E%AF/>调度循环</a></li></ul></li></ul></li><li><a href=/go-goroutine/docs/%E8%BF%90%E8%A1%8C%E6%97%B6/3_exit_goroutine/>goroutine退出过程</a></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>4.2.3.2 系统调用收尾,如从系统调用返回,如何重新得到P</strong>
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><a href=#定义程序>定义程序</a></li><li><a href=#gdb调试前准备>gdb调试前准备</a><ul><li><a href=#编译程序>编译程序</a></li><li><a href=#准备mcall函数断点的文件>准备mcall函数断点的文件</a></li></ul></li><li><a href=#gdb>gdb</a><ul><li><a href=#entersyscall>entersyscall</a></li><li><a href=#exitsyscall>exitsyscall</a></li></ul></li><li><a href=#syscalltick>syscalltick</a></li></ul></li></ul></nav></aside></header><article class=markdown><h2 id=定义程序>定义程序
+<a class=anchor href=#%e5%ae%9a%e4%b9%89%e7%a8%8b%e5%ba%8f>#</a></h2><blockquote><p>main.go</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>    <span style=color:#e6db74>&#34;os&#34;</span>
+</span></span><span style=display:flex><span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>var</span> <span style=color:#a6e22e>path</span> = <span style=color:#e6db74>&#34;appss.txt&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>isError</span>(<span style=color:#a6e22e>err</span> <span style=color:#66d9ef>error</span>) <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#a6e22e>err</span>.<span style=color:#a6e22e>Error</span>())
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>return</span> (<span style=color:#a6e22e>err</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>var</span> <span style=color:#a6e22e>file</span>, <span style=color:#a6e22e>err</span> = <span style=color:#a6e22e>os</span>.<span style=color:#a6e22e>OpenFile</span>(<span style=color:#a6e22e>path</span>, <span style=color:#a6e22e>os</span>.<span style=color:#a6e22e>O_RDWR</span>, <span style=color:#ae81ff>0644</span>)
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>isError</span>(<span style=color:#a6e22e>err</span>) {
+</span></span><span style=display:flex><span>        <span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>defer</span> <span style=color:#a6e22e>file</span>.<span style=color:#a6e22e>Close</span>()
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h2 id=gdb调试前准备>gdb调试前准备
+<a class=anchor href=#gdb%e8%b0%83%e8%af%95%e5%89%8d%e5%87%86%e5%a4%87>#</a></h2><h3 id=编译程序>编译程序
+<a class=anchor href=#%e7%bc%96%e8%af%91%e7%a8%8b%e5%ba%8f>#</a></h3><p>编译一下源代码: <code>go build -gcflags "-N -l" -o test .</code>.</p><h3 id=准备mcall函数断点的文件>准备mcall函数断点的文件
+<a class=anchor href=#%e5%87%86%e5%a4%87mcall%e5%87%bd%e6%95%b0%e6%96%ad%e7%82%b9%e7%9a%84%e6%96%87%e4%bb%b6>#</a></h3><ul><li>gdb<ul><li><code>list /usr/lib/golang/src/syscall/zsyscall_linux_amd64.go:62</code></li><li><code>list /usr/lib/golang/src/syscall/asm_linux_amd64.s:44</code></li></ul></li></ul><h2 id=gdb>gdb
+<a class=anchor href=#gdb>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// func Syscall6(trap, a1, a2, a3, a4, a5, a6 uintptr) (r1, r2, err uintptr)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>TEXT</span> <span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>Syscall6</span>(<span style=color:#a6e22e>SB</span>),<span style=color:#a6e22e>NOSPLIT</span>,<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span><span style=color:#f92672>-</span><span style=color:#ae81ff>80</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>entersyscall</span>(<span style=color:#a6e22e>SB</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>a1</span><span style=color:#f92672>+</span><span style=color:#ae81ff>8</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>DI</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>a2</span><span style=color:#f92672>+</span><span style=color:#ae81ff>16</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>SI</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>a3</span><span style=color:#f92672>+</span><span style=color:#ae81ff>24</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>DX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>a4</span><span style=color:#f92672>+</span><span style=color:#ae81ff>32</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>R10</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>a5</span><span style=color:#f92672>+</span><span style=color:#ae81ff>40</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>R8</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>a6</span><span style=color:#f92672>+</span><span style=color:#ae81ff>48</span>(<span style=color:#a6e22e>FP</span>), <span style=color:#a6e22e>R9</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>SYSCALL</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>CMPQ</span>	<span style=color:#a6e22e>AX</span>, <span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0xfffffffffffff001</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>JLS</span>	<span style=color:#a6e22e>ok6</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>, <span style=color:#a6e22e>r1</span><span style=color:#f92672>+</span><span style=color:#ae81ff>56</span>(<span style=color:#a6e22e>FP</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>, <span style=color:#a6e22e>r2</span><span style=color:#f92672>+</span><span style=color:#ae81ff>64</span>(<span style=color:#a6e22e>FP</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>NEGQ</span>	<span style=color:#a6e22e>AX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>AX</span>, <span style=color:#a6e22e>err</span><span style=color:#f92672>+</span><span style=color:#ae81ff>72</span>(<span style=color:#a6e22e>FP</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>exitsyscall</span>(<span style=color:#a6e22e>SB</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>RET</span>
+</span></span><span style=display:flex><span><span style=color:#a6e22e>ok6</span>:
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>AX</span>, <span style=color:#a6e22e>r1</span><span style=color:#f92672>+</span><span style=color:#ae81ff>56</span>(<span style=color:#a6e22e>FP</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#a6e22e>DX</span>, <span style=color:#a6e22e>r2</span><span style=color:#f92672>+</span><span style=color:#ae81ff>64</span>(<span style=color:#a6e22e>FP</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>0</span>, <span style=color:#a6e22e>err</span><span style=color:#f92672>+</span><span style=color:#ae81ff>72</span>(<span style=color:#a6e22e>FP</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>exitsyscall</span>(<span style=color:#a6e22e>SB</span>)
+</span></span><span style=display:flex><span>  <span style=color:#a6e22e>RET</span>
+</span></span></code></pre></div><h3 id=entersyscall>entersyscall
+<a class=anchor href=#entersyscall>#</a></h3><blockquote><p><code>src/runtime/proc.go</code></p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>entersyscall</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>reentersyscall</span>(<span style=color:#a6e22e>getcallerpc</span>(), <span style=color:#a6e22e>getcallersp</span>()) <span style=color:#75715e>// 这个是Goroutine的pc, sp,不是g0的，因为还没有切换栈。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><h4 id=reentersyscall>reentersyscall
+<a class=anchor href=#reentersyscall>#</a></h4><ul><li>reentersyscall主要是做三件事:<ul><li>把PC,SP保存到当前Goroutine.sched里面;</li><li>解除M与P两者之间的关系;</li><li>设置P的状态为_Psyscall</li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>- 把PC,SP保存到当前Goroutine.sched里面;
+</span></span></span><span style=display:flex><span><span style=color:#75715e>- 解除M与P两者之间的关系;
+</span></span></span><span style=display:flex><span><span style=color:#75715e>- 设置P的状态为_Psyscall
+</span></span></span><span style=display:flex><span><span style=color:#75715e>*/</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>reentersyscall</span>(<span style=color:#a6e22e>pc</span>, <span style=color:#a6e22e>sp</span> <span style=color:#66d9ef>uintptr</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>() <span style=color:#75715e>// get Goroutine的g
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Disable preemption because during this function g is in Gsyscall status,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// but can have inconsistent g-&gt;sched, do not let GC observe it.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span><span style=color:#f92672>++</span> <span style=color:#75715e>// ++就能让GC不能观察到？TODO zxc:
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Entersyscall must not call any function that might split/grow the stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// (See details in comment above.)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Catch calls that might, by replacing the stack guard with something that
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// will trip any stack check and leaving a flag to tell newstack to die.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stackguard0</span> = <span style=color:#a6e22e>stackPreempt</span> <span style=color:#75715e>//进入系统调用前就设置了抢占标志。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>throwsplit</span> = <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Leave SP around for GC and traceback.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>save</span>(<span style=color:#a6e22e>pc</span>, <span style=color:#a6e22e>sp</span>) <span style=color:#75715e>//保存寄存器的值到当前Goroutine的sched结构体。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span> = <span style=color:#a6e22e>sp</span> <span style=color:#75715e>//gc使用
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallpc</span> = <span style=color:#a6e22e>pc</span> <span style=color:#75715e>//gc使用
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>_g_</span>, <span style=color:#a6e22e>_Grunning</span>, <span style=color:#a6e22e>_Gsyscall</span>) <span style=color:#75715e>// 修改状态
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span> &lt; <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>hi</span> &lt; <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>			print(<span style=color:#e6db74>&#34;entersyscall inconsistent &#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span>), <span style=color:#e6db74>&#34; [&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span>), <span style=color:#e6db74>&#34;,&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>hi</span>), <span style=color:#e6db74>&#34;]\n&#34;</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;entersyscall&#34;</span>)
+</span></span><span style=display:flex><span>		})
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#a6e22e>traceGoSysCall</span>)
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// systemstack itself clobbers g.sched.{pc,sp} and we might
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// need them later when the G is genuinely blocked in a
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// syscall
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>save</span>(<span style=color:#a6e22e>pc</span>, <span style=color:#a6e22e>sp</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>sysmonwait</span>) <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#a6e22e>entersyscall_sysmon</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>save</span>(<span style=color:#a6e22e>pc</span>, <span style=color:#a6e22e>sp</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>runSafePointFn</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// runSafePointFn may stack split if run on this stack
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#a6e22e>runSafePointFn</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>save</span>(<span style=color:#a6e22e>pc</span>, <span style=color:#a6e22e>sp</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>syscalltick</span> = <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>syscalltick</span> <span style=color:#75715e>//把P的syscalltick,放到m中。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>sysblocktraced</span> = <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>mcache</span> = <span style=color:#66d9ef>nil</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>pp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>pp</span>.<span style=color:#a6e22e>m</span> = <span style=color:#ae81ff>0</span> <span style=color:#75715e>// 解除P与M的关系。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>oldp</span>.<span style=color:#a6e22e>set</span>(<span style=color:#a6e22e>pp</span>) <span style=color:#75715e>// 把现在的P放到M中的oldp中。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span> = <span style=color:#ae81ff>0</span> <span style=color:#75715e>// 解除M与P的关系。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Store</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>pp</span>.<span style=color:#a6e22e>status</span>, <span style=color:#a6e22e>_Psyscall</span>) <span style=color:#75715e>// 修改P的状态为系统调用。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>gcwaiting</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#a6e22e>entersyscall_gcwait</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>save</span>(<span style=color:#a6e22e>pc</span>, <span style=color:#a6e22e>sp</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span><span style=color:#f92672>--</span> <span style=color:#75715e>// --解除锁定。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><ul><li><blockquote><p>这里需要注意的是：在进入系统调用的时候，它是没有进行自增的，它是在<code>exitsyscall()</code>函数才开始进行自增的；</p></blockquote></li><li><blockquote><p>这个就是为了判断P，在当前Goroutine进入系统调用，到返回的那一段时间，这个P有可能又被其他M关联，然后又进入_Psyscall状态，<code>_g_.m.syscalltick = _g_.m.p.ptr().syscalltick //把P的syscalltick,放到m中。</code></p></blockquote></li></ul><h3 id=exitsyscall>exitsyscall
+<a class=anchor href=#exitsyscall>#</a></h3><ul><li>这个退出系统调用：<ul><li>尝试重新绑定oldp,如果没有成功，从全局空闲P队列获得一个P。</li><li>如果还是失败，mcall&ndash;>exitsyscall0()，<ul><li>在这个里面再次从全局空闲P队列中尝试下，如果失败就把Goroutine放入全局空闲G队列;</li><li>M放入全局空闲M队列,休眠M;</li><li>schedule().</li></ul></li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>这个退出系统调用：
+</span></span></span><span style=display:flex><span><span style=color:#75715e>  - 尝试重新绑定oldp,如果没有成功，从全局空闲P队列获得一个P。
+</span></span></span><span style=display:flex><span><span style=color:#75715e>  - 如果还是失败，mcall--&gt;exitsyscall0()，
+</span></span></span><span style=display:flex><span><span style=color:#75715e>    - 在这个里面再次从全局空闲P队列中尝试下，如果失败就把Goroutine放入全局空闲G队列;
+</span></span></span><span style=display:flex><span><span style=color:#75715e>    - M放入全局空闲M队列,休眠M;
+</span></span></span><span style=display:flex><span><span style=color:#75715e>    - schedule().
+</span></span></span><span style=display:flex><span><span style=color:#75715e>*/</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>exitsyscall</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span><span style=color:#f92672>++</span> <span style=color:#75715e>// see comment in entersyscall 防止GC？ TODO zxc:
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>getcallersp</span>() &gt; <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;exitsyscall: syscall frame is no longer valid&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>waitsince</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>oldp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>oldp</span>.<span style=color:#a6e22e>ptr</span>() <span style=color:#75715e>//重新取出oldp
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>oldp</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>exitsyscallfast</span>(<span style=color:#a6e22e>oldp</span>) { <span style=color:#75715e>//如果返回true，那么M与P在这个里面已经重新关联了。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>mcache</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;lost mcache&#34;</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>oldp</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>() <span style=color:#f92672>||</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>syscalltick</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>syscalltick</span> {
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>systemstack</span>(<span style=color:#a6e22e>traceGoStart</span>)
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// There&#39;s a cpu for us, so we can run.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>syscalltick</span><span style=color:#f92672>++</span> <span style=color:#75715e>//系统调用完成，syscalltick自增。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// We need to cas the status and scan before resuming...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>_g_</span>, <span style=color:#a6e22e>_Gsyscall</span>, <span style=color:#a6e22e>_Grunning</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Garbage collector isn&#39;t running (since we are),
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// so okay to clear syscallsp.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span><span style=color:#f92672>--</span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>preempt</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// restore the preemption request in case we&#39;ve cleared it in newstack
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stackguard0</span> = <span style=color:#a6e22e>stackPreempt</span>
+</span></span><span style=display:flex><span>		} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// otherwise restore the real _StackGuard, we&#39;ve spoiled it in entersyscall/entersyscallblock
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stackguard0</span> = <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> <span style=color:#f92672>+</span> <span style=color:#a6e22e>_StackGuard</span> <span style=color:#75715e>//在entersyscall里面我们设置_g_.stackguard0 = stackPreempt //进入系统调用前就设置了抢占标志。这里要恢复。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>throwsplit</span> = <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>disable</span>.<span style=color:#a6e22e>user</span> <span style=color:#f92672>&amp;&amp;</span> !<span style=color:#a6e22e>schedEnabled</span>(<span style=color:#a6e22e>_g_</span>) {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// Scheduling of this goroutine is disabled.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>Gosched</span>()
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>sysexitticks</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Wait till traceGoSysBlock event is emitted.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// This ensures consistency of the trace (the goroutine is started after it is blocked).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>oldp</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>oldp</span>.<span style=color:#a6e22e>syscalltick</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>syscalltick</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>osyield</span>()
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// We can&#39;t trace syscall exit right now because we don&#39;t have a P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// Tracing code can invoke write barriers that cannot run without a P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// So instead we remember the syscall exit time and emit the event
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// in execute when we have a P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>sysexitticks</span> = <span style=color:#a6e22e>cputicks</span>()
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span><span style=color:#f92672>--</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Call the scheduler.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>mcall</span>(<span style=color:#a6e22e>exitsyscall0</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>mcache</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;lost mcache&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Scheduler returned, so we&#39;re allowed to run now.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Delete the syscallsp information that we left for
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// the garbage collector during the system call.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Must wait until now because until gosched returns
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// we don&#39;t know for sure that the garbage collector
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// is not running.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>syscallsp</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>syscalltick</span><span style=color:#f92672>++</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>throwsplit</span> = <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h5 id=exitsyscallfast>exitsyscallfast
+<a class=anchor href=#exitsyscallfast>#</a></h5><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>//go:nosplit
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>exitsyscallfast</span>(<span style=color:#a6e22e>oldp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>) <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Freezetheworld sets stopwait but does not retake P&#39;s.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>stopwait</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>freezeStopWait</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Try to re-acquire the last P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>oldp</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>oldp</span>.<span style=color:#a6e22e>status</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_Psyscall</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Cas</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>oldp</span>.<span style=color:#a6e22e>status</span>, <span style=color:#a6e22e>_Psyscall</span>, <span style=color:#a6e22e>_Pidle</span>) {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>/*
+</span></span></span><span style=display:flex><span><span style=color:#75715e>			- 查看老的P的状态是否是正处于_Psyscall;
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		      - 从reentersyscall里面的三个步骤，当它设置为_Psyscall, 它这个时候是没有与任何M相关联。
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		      - 所以这里如果发现P又处于_psyscall，直接关联。
+</span></span></span><span style=display:flex><span><span style=color:#75715e>		*/</span>
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// There&#39;s a cpu for us, so we can run.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>wirep</span>(<span style=color:#a6e22e>oldp</span>) <span style=color:#75715e>// 关联M和P；当前的M和这个oldp。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>exitsyscallfast_reacquired</span>()
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Try to get any other idle P.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>pidle</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>ok</span> <span style=color:#66d9ef>bool</span>
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>ok</span> = <span style=color:#a6e22e>exitsyscallfast_pidle</span>()
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>ok</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>				<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>oldp</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>					<span style=color:#75715e>// Wait till traceGoSysBlock event is emitted.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>					<span style=color:#75715e>// This ensures consistency of the trace (the goroutine is started after it is blocked).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>					<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>oldp</span>.<span style=color:#a6e22e>syscalltick</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>syscalltick</span> {
+</span></span><span style=display:flex><span>						<span style=color:#a6e22e>osyield</span>()
+</span></span><span style=display:flex><span>					}
+</span></span><span style=display:flex><span>				}
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>traceGoSysExit</span>(<span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>		})
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>ok</span> {
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h6 id=exitsyscallfast_reacquired>exitsyscallfast_reacquired
+<a class=anchor href=#exitsyscallfast_reacquired>#</a></h6><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>exitsyscallfast_reacquired</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>syscalltick</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>syscalltick</span> { <span style=color:#75715e>// 如果他们两者不相等，那么说明该p被收回，然后再次进入syscall(因为_g_.m.syscalltick变了)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// The p was retaken and then enter into syscall again (since _g_.m.syscalltick has changed).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// traceGoSysBlock for this syscall was already emitted,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// but here we effectively retake the p from the new syscall running on the same p.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>systemstack</span>(<span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>				<span style=color:#75715e>// Denote blocking of the new syscall.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>traceGoSysBlock</span>(<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>())
+</span></span><span style=display:flex><span>				<span style=color:#75715e>// Denote completion of the current syscall.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>traceGoSysExit</span>(<span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>			})
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>syscalltick</span><span style=color:#f92672>++</span> <span style=color:#75715e>// 这里又开始自增了---&gt;因为它在进入reentersyscall()函数是不能增加这个值的。只有当退出exitsyscall()函数才会自增，所以如果
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h4 id=mcallexitsyscall0>mcall(exitsyscall0)
+<a class=anchor href=#mcallexitsyscall0>#</a></h4><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// exitsyscall slow path on g0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Failed to acquire P, enqueue gp as runnable.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//go:nowritebarrierrec
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>exitsyscall0</span>(<span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_g_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gsyscall</span>, <span style=color:#a6e22e>_Grunnable</span>) <span style=color:#75715e>//从系统调用状态转变为可运行状态
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>dropg</span>() <span style=color:#75715e>//断开M与G之间的关系
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>) <span style=color:#75715e>//要修改全局的sched,先加锁
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>schedEnabled</span>(<span style=color:#a6e22e>_g_</span>) {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>_p_</span> = <span style=color:#a6e22e>pidleget</span>() <span style=color:#75715e>//从全局空闲P队列获取一个P
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>globrunqput</span>(<span style=color:#a6e22e>gp</span>) <span style=color:#75715e>//如果没有获取P，那么把Goroutine放入全局空闲g队列。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	} <span style=color:#66d9ef>else</span> <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>sysmonwait</span>) <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Store</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>sysmonwait</span>, <span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>notewakeup</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>sysmonnote</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>!=</span> <span style=color:#66d9ef>nil</span> { <span style=color:#75715e>//如果有获取到P。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>acquirep</span>(<span style=color:#a6e22e>_p_</span>) <span style=color:#75715e>// 关联P与M
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>execute</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#66d9ef>false</span>) <span style=color:#75715e>// Never returns. 直接执行
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_g_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>lockedg</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> { <span style=color:#75715e>// TODO zxc: 我记得是这个某个g,必须运行在某个线程上面，比如，main.main.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#75715e>// Wait until another thread schedules gp and so m again.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>stoplockedm</span>()
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>execute</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#66d9ef>false</span>) <span style=color:#75715e>// Never returns.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>stopm</span>() <span style=color:#75715e>//停止M。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>schedule</span>() <span style=color:#75715e>// Never returns.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><h2 id=syscalltick>syscalltick
+<a class=anchor href=#syscalltick>#</a></h2><p>这个<code>syscalltick</code>;发现不是每次系统调用一次，才增加一次。</p><p>在我们这里，</p><ul><li>entersystem<ul><li><em>g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick</li></ul></li><li>existsystem<ul><li>exitsyscall主函数里面有一次;</li><li>exitsyscallfast_reacquired函数又增加了一次.</li></ul></li></ul><p>// To ensure that traceGoSysExit is emitted strictly after traceGoSysBlock,
+// we remember current value of syscalltick in m (<em>g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick),
+// whoever emits traceGoSysBlock increments p.syscalltick afterwards;
+// and we wait for the increment before emitting traceGoSysExit.
+// Note that the increment is done even if tracing is not enabled,
+// because tracing can be enabled in the middle of syscall. We don&rsquo;t want the wait to hang.</p><p>// 为了确保traceGoSysExit严格在traceGoSysBlock之后发出。
+// 我们记住m中syscalltick的当前值(<em>g</em>.m.syscalltick = <em>g</em>.m.p.ptr().syscalltick)。
+// 不管是谁发出traceGoSysBlock，都会在之后增量p.syscalltick。
+// 我们等待增量后再发出 traceGoSysExit。
+// 注意，即使没有启用跟踪，增量也会被完成。
+// 因为跟踪可以在syscall中间启用。我们不希望等待被挂起。</p><p>在这个解释里面,发现跟踪的时候也会<code>syscalltick</code></p><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200923134905.png alt=syscall返回></p></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><ul><li><a href=#定义程序>定义程序</a></li><li><a href=#gdb调试前准备>gdb调试前准备</a><ul><li><a href=#编译程序>编译程序</a></li><li><a href=#准备mcall函数断点的文件>准备mcall函数断点的文件</a></li></ul></li><li><a href=#gdb>gdb</a><ul><li><a href=#entersyscall>entersyscall</a></li><li><a href=#exitsyscall>exitsyscall</a></li></ul></li><li><a href=#syscalltick>syscalltick</a></li></ul></li></ul></nav></div></aside></main></body></html>
