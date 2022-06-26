@@ -1,0 +1,221 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="开启系统监控 # 这个是main goroutine执行的主函数，此函数之后会调用用户定义main函数,我们在初始化一章已经提过 main goroutine执行的主函数 它的里面可以看到调用了newm函数生成新M,且新M将执行sysmon函数
+func main() { //... if GOARCH != &#34;wasm&#34; { // no threads on wasm yet, so no sysmon systemstack(func() { newm(sysmon, nil) }) } //... } sysmon # 可以看到sysmon里面是一个for循环,它会一直运行,因为这个M没有关联P，所以不允许写屏障 逻辑比较简单，延时睡眠，调用retake
+// Always runs without a P, so write barriers are not allowed. // //go:nowritebarrierrec func sysmon() { lock(&sched.lock) sched.nmsys++ //增加记录系统线程的值的个数 checkdead() unlock(&sched.lock) lasttrace := int64(0) idle := 0 // how many cycles in succession we had not wokeup somebody delay := uint32(0) for { if idle == 0 { // start with 20us sleep."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="开启系统监控"><meta property="og:description" content="开启系统监控 # 这个是main goroutine执行的主函数，此函数之后会调用用户定义main函数,我们在初始化一章已经提过 main goroutine执行的主函数 它的里面可以看到调用了newm函数生成新M,且新M将执行sysmon函数
+func main() { //... if GOARCH != &#34;wasm&#34; { // no threads on wasm yet, so no sysmon systemstack(func() { newm(sysmon, nil) }) } //... } sysmon # 可以看到sysmon里面是一个for循环,它会一直运行,因为这个M没有关联P，所以不允许写屏障 逻辑比较简单，延时睡眠，调用retake
+// Always runs without a P, so write barriers are not allowed. // //go:nowritebarrierrec func sysmon() { lock(&sched.lock) sched.nmsys++ //增加记录系统线程的值的个数 checkdead() unlock(&sched.lock) lasttrace := int64(0) idle := 0 // how many cycles in succession we had not wokeup somebody delay := uint32(0) for { if idle == 0 { // start with 20us sleep."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/"><meta property="article:section" content="docs"><meta property="article:published_time" content="2020-05-04T12:35:00+00:00"><meta property="article:modified_time" content="2020-05-04T12:35:00+00:00"><title>开启系统监控 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.82c5dbd23447cee0b4c2aa3ed08ce0961faa40e1fa370eee4f8c9f02e0d46b5f.css integrity="sha256-gsXb0jRHzuC0wqo+0Izglh+qQOH6Nw7uT4yfAuDUa18=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.75f3025a21511955ad10f181cae208dd296ce24ee2a06def487a11decfa675f1.js integrity="sha256-dfMCWiFRGVWtEPGByuII3Sls4k7ioG3vSHoR3s+mdfE=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><input type=checkbox id=section-7d6b3fd068f9ea3865f7d1774807bfaf class=toggle>
+<label for=section-7d6b3fd068f9ea3865f7d1774807bfaf class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><input type=checkbox id=section-fb88ef1ea572c8bc68f803b54074fbd3 class=toggle checked>
+<label for=section-fb88ef1ea572c8bc68f803b54074fbd3 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle checked>
+<label for=section-99f41010918d678e89a7af90330cabe1 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/ class=active>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>执行太久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>系统调用抢占</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>开启系统监控</strong>
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#开启系统监控>开启系统监控</a><ul><li><a href=#sysmon>sysmon</a><ul><li><a href=#retake>retake</a></li></ul></li></ul></li></ul></nav></aside></header><article class=markdown><h1 id=开启系统监控>开启系统监控
+<a class=anchor href=#%e5%bc%80%e5%90%af%e7%b3%bb%e7%bb%9f%e7%9b%91%e6%8e%a7>#</a></h1><p>这个是main goroutine执行的主函数，此函数之后会调用用户定义main函数,我们在初始化一章已经提过
+<a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/#%e8%bf%9b%e5%85%a5main%e5%87%bd%e6%95%b0 class="book-btn ...">main goroutine执行的主函数</a></p><p>它的里面可以看到调用了newm函数生成新M,且新M将执行sysmon函数</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>    <span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>GOARCH</span> <span style=color:#f92672>!=</span> <span style=color:#e6db74>&#34;wasm&#34;</span> { <span style=color:#75715e>// no threads on wasm yet, so no sysmon
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>systemstack</span>(<span style=color:#66d9ef>func</span>() {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>newm</span>(<span style=color:#a6e22e>sysmon</span>, <span style=color:#66d9ef>nil</span>)
+</span></span><span style=display:flex><span>		})
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>    <span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><h2 id=sysmon>sysmon
+<a class=anchor href=#sysmon>#</a></h2><p>可以看到sysmon里面是一个for循环,它会一直运行,因为这个M没有关联P，所以不允许写屏障
+逻辑比较简单，延时睡眠，调用retake</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Always runs without a P, so write barriers are not allowed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//go:nowritebarrierrec
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>sysmon</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>nmsys</span><span style=color:#f92672>++</span> <span style=color:#75715e>//增加记录系统线程的值的个数
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>checkdead</span>()
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lock</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>lasttrace</span> <span style=color:#f92672>:=</span> int64(<span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>idle</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span> <span style=color:#75715e>// how many cycles in succession we had not wokeup somebody
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>delay</span> <span style=color:#f92672>:=</span> uint32(<span style=color:#ae81ff>0</span>)
+</span></span><span style=display:flex;background-color:#3c3d38><span>	<span style=color:#66d9ef>for</span> {
+</span></span><span style=display:flex;background-color:#3c3d38><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>idle</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> { <span style=color:#75715e>// start with 20us sleep...
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#a6e22e>delay</span> = <span style=color:#ae81ff>20</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		} <span style=color:#66d9ef>else</span> <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>idle</span> &gt; <span style=color:#ae81ff>50</span> { <span style=color:#75715e>// start doubling the sleep after 1ms...
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#a6e22e>delay</span> <span style=color:#f92672>*=</span> <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		}
+</span></span><span style=display:flex;background-color:#3c3d38><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>delay</span> &gt; <span style=color:#ae81ff>10</span><span style=color:#f92672>*</span><span style=color:#ae81ff>1000</span> { <span style=color:#75715e>// up to 10ms
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#a6e22e>delay</span> = <span style=color:#ae81ff>10</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>1000</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		}
+</span></span><span style=display:flex;background-color:#3c3d38><span>        <span style=color:#a6e22e>usleep</span>(<span style=color:#a6e22e>delay</span>)
+</span></span><span style=display:flex;background-color:#3c3d38><span>        
+</span></span><span style=display:flex;background-color:#3c3d38><span>        <span style=color:#75715e>//...
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		<span style=color:#75715e>// retake P&#39;s blocked in syscalls
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#75715e>// and preempt long running G&#39;s
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#75715e>// 抢占被系统调用阻塞的P和抢占长期运行的G
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>retake</span>(<span style=color:#a6e22e>now</span>) <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex;background-color:#3c3d38><span>			<span style=color:#a6e22e>idle</span> = <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex;background-color:#3c3d38><span>			<span style=color:#a6e22e>idle</span><span style=color:#f92672>++</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		}
+</span></span><span style=display:flex;background-color:#3c3d38><span>        <span style=color:#75715e>// check if we need to force a GC
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>        <span style=color:#75715e>//...
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>}</span></span></code></pre></div><h3 id=retake>retake
+<a class=anchor href=#retake>#</a></h3><p>retake是怎么区分是否是本次调度一直在运行?</p><ul><li>通过p结构体里面的sysmontick,快照p结构体中schedtick，所以下次再比较两者，参见下面的16-31行</li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>sysmontick</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>schedtick</span>   <span style=color:#66d9ef>uint32</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>schedwhen</span>   <span style=color:#66d9ef>int64</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>syscalltick</span> <span style=color:#66d9ef>uint32</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>syscallwhen</span> <span style=color:#66d9ef>int64</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><hr><p>retake怎么判断是否应该抢断?</p><p>只有P是<code>_Prunning/_Psyscall</code>状态,才会进行抢占</p><p>一种是用户代码运行太久会被抢占(参见下方的25行):如果<code>pd.schedwhen ～ now</code>这个时间段大于阀值<code>forcePreemptNS</code>,就会调用preemptone函数做抢断准备</p><p>一种是进入了系统调用的抢占:主要思想是如果P接下来没有其他工作可做(本地G队列为空了),这时候抢占它没有意义，但为了防止sysmon线程深度睡眠(上文有分析，retake的返回参数能决定sysmon的睡眠时长)</p><hr><p>retake判断不进行系统抢断逻辑，由第50行代码决定: <code>runqempty(_p_) && atomic.Load(&sched.nmspinning)+atomic.Load(&sched.npidle) > 0 && pd.syscallwhen+10*1000*1000 > now</code></p><ol><li>_p_的本地运行队列没有Gs; runqempty(<em>p</em>)返回true</li><li>有空闲的P,或者有正在自旋状态的M(正在偷其他P队列的Gs); atomic.Load(&sched.nmspinning)+atomic.Load(&sched.npidle) > 0返回true</li><li>上次观测到的系统调用还没有超过10毫秒; pd.syscallwhen+10<em>1000</em>1000 > now返回true
+所以当程序没有工作需要做,且系统调用没有超过10ms就不进行系统调用抢占;1和2说明这个程序没有工作需要做;3说明系统调用还没超过10ms</li></ol><hr><div class=highlight><div style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">65
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">66
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">67
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">68
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">69
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">70
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">71
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">72
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">73
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">74
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">75
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>retake</span>(<span style=color:#a6e22e>now</span> <span style=color:#66d9ef>int64</span>) <span style=color:#66d9ef>uint32</span> {
+</span></span><span style=display:flex;background-color:#3c3d38><span>	<span style=color:#a6e22e>n</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Prevent allp slice changes. This lock will be completely
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// uncontended unless we&#39;re already stopping the world.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>allpLock</span>)
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// We can&#39;t use a range loop over allp because we may
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// temporarily drop the allpLock. Hence, we need to re-fetch
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// allp each time around the loop.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span> <span style=color:#f92672>:=</span> <span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>i</span> &lt; len(<span style=color:#a6e22e>allp</span>); <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span> { <span style=color:#75715e>//遍历所有的P
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>_p_</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>allp</span>[<span style=color:#a6e22e>i</span>]
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>_p_</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// This can happen if procresize has grown
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// allp but not yet created new Ps.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#66d9ef>continue</span>
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex;background-color:#3c3d38><span>		<span style=color:#a6e22e>pd</span> <span style=color:#f92672>:=</span> <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>sysmontick</span> <span style=color:#75715e>// 最后一次被sysmon观察到的tick
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#a6e22e>s</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>status</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		<span style=color:#a6e22e>sysretake</span> <span style=color:#f92672>:=</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_Prunning</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_Psyscall</span> { <span style=color:#75715e>//只有当p处于 _Prunning 或 _Psyscall 状态时才会进行抢占
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#75715e>// Preempt G if it&#39;s running for too long.
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#a6e22e>t</span> <span style=color:#f92672>:=</span> int64(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>schedtick</span>)  <span style=color:#75715e>// _p_.schedtick：每发生一次调度，调度器对该值加一
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#66d9ef>if</span> int64(<span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>schedtick</span>) <span style=color:#f92672>!=</span> <span style=color:#a6e22e>t</span> { <span style=color:#75715e>// 监控线程监控到一次新的调度，所以重置跟sysmon相关的schedtick和schedwhen变量
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>				<span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>schedtick</span> = uint32(<span style=color:#a6e22e>t</span>)
+</span></span><span style=display:flex;background-color:#3c3d38><span>				<span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>schedwhen</span> = <span style=color:#a6e22e>now</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>			} <span style=color:#66d9ef>else</span> <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>schedwhen</span><span style=color:#f92672>+</span><span style=color:#a6e22e>forcePreemptNS</span> <span style=color:#f92672>&lt;=</span> <span style=color:#a6e22e>now</span> { <span style=color:#75715e>//  1. 没有进第一个if语句内,说明:pd.schedtick == t; 说明(pd.schedwhen ～ now)这段时间未发生过调度;
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>				<span style=color:#a6e22e>preemptone</span>(<span style=color:#a6e22e>_p_</span>)                            <span style=color:#75715e>//  2. 但是这个_P_上面的某个Goroutine被执行,一直在执行这个Goroutiine; 中间没有切换其他Goroutine,因为如果切会导致_P_.schedtick增长,导致进入第一个if语句内;
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>				<span style=color:#75715e>// In case of syscall, preemptone() doesn&#39;t // 3. 连续运行超过10毫秒了，设置抢占请求.
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>				<span style=color:#75715e>// work, because there is no M wired to P.
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>				<span style=color:#a6e22e>sysretake</span> = <span style=color:#66d9ef>true</span>   <span style=color:#75715e>// 需要系统抢占
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			}
+</span></span><span style=display:flex;background-color:#3c3d38><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>_Psyscall</span> { <span style=color:#75715e>// P处于系统调用之中，需要检查是否需要抢占
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// Retake P from syscall if it&#39;s there for more than 1 sysmon tick (at least 20us).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>t</span> <span style=color:#f92672>:=</span> int64(<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>syscalltick</span>) <span style=color:#75715e>// 用于记录系统调用的次数，主要由工作线程在完成系统调用之后加一
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#66d9ef>if</span> !<span style=color:#a6e22e>sysretake</span> <span style=color:#f92672>&amp;&amp;</span> int64(<span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>syscalltick</span>) <span style=color:#f92672>!=</span> <span style=color:#a6e22e>t</span> { <span style=color:#75715e>// 不相等---说明已经不是上次观察到的系统调用,开始了一个新的系统调用,所以重置一下
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>syscalltick</span> = uint32(<span style=color:#a6e22e>t</span>)
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>syscallwhen</span> = <span style=color:#a6e22e>now</span>
+</span></span><span style=display:flex><span>				<span style=color:#66d9ef>continue</span>
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// On the one hand we don&#39;t want to retake Ps if there is no other work to do,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// but on the other hand we want to retake them eventually
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// because they can prevent the sysmon thread from deep sleep.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// 1.  _p_的本地运行队列没有Gs; runqempty(_p_)返回true
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// 2. 有空闲的P,或者有正在自旋状态的M(正在偷其他P队列的Gs); atomic.Load(&amp;sched.nmspinning)+atomic.Load(&amp;sched.npidle) &gt; 0返回true
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// 3. 上次观测到的系统调用还没有超过10毫秒; pd.syscallwhen+10*1000*1000 &gt; now返回true
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// - concluing: 当程序没有工作需要做,且系统调用没有超过10ms就不进行系统调用抢占.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>//   - 1和2说明这个程序没有工作需要做;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>//   - 3说明系统调用还没超过10ms
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>runqempty</span>(<span style=color:#a6e22e>_p_</span>) <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>nmspinning</span>)<span style=color:#f92672>+</span><span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Load</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>npidle</span>) &gt; <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>pd</span>.<span style=color:#a6e22e>syscallwhen</span><span style=color:#f92672>+</span><span style=color:#ae81ff>10</span><span style=color:#f92672>*</span><span style=color:#ae81ff>1000</span><span style=color:#f92672>*</span><span style=color:#ae81ff>1000</span> &gt; <span style=color:#a6e22e>now</span> {
+</span></span><span style=display:flex;background-color:#3c3d38><span>				<span style=color:#66d9ef>continue</span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// Drop allpLock so we can take sched.lock.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>allpLock</span>)
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// Need to decrement number of idle locked M&#39;s
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// (pretending that one more is running) before the CAS.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// Otherwise the M from which we retake can exit the syscall,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// increment nmidle and report deadlock.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>incidlelocked</span>(<span style=color:#f92672>-</span><span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Cas</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>status</span>, <span style=color:#a6e22e>s</span>, <span style=color:#a6e22e>_Pidle</span>) { <span style=color:#75715e>// 需要抢占，则通过使用cas修改p的状态来获取p的使用权
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {                  <span style=color:#75715e>// CAS: 工作线程此时此刻可能正好从系统调用返回了，也正在获取p的使用权
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>					<span style=color:#a6e22e>traceGoSysBlock</span>(<span style=color:#a6e22e>_p_</span>)
+</span></span><span style=display:flex><span>					<span style=color:#a6e22e>traceProcStop</span>(<span style=color:#a6e22e>_p_</span>)
+</span></span><span style=display:flex><span>				}
+</span></span><span style=display:flex;background-color:#3c3d38><span>				<span style=color:#a6e22e>n</span><span style=color:#f92672>++</span>
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>syscalltick</span><span style=color:#f92672>++</span>
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>handoffp</span>(<span style=color:#a6e22e>_p_</span>)  <span style=color:#75715e>// 寻找一个新的m出来接管P
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			}
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>incidlelocked</span>(<span style=color:#ae81ff>1</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>lock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>allpLock</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>unlock</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>allpLock</span>)
+</span></span><span style=display:flex;background-color:#3c3d38><span>	<span style=color:#66d9ef>return</span> uint32(<span style=color:#a6e22e>n</span>)
+</span></span><span style=display:flex><span>}</span></span></code></pre></td></tr></table></div></div></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#开启系统监控>开启系统监控</a><ul><li><a href=#sysmon>sysmon</a><ul><li><a href=#retake>retake</a></li></ul></li></ul></li></ul></nav></div></aside></main></body></html>

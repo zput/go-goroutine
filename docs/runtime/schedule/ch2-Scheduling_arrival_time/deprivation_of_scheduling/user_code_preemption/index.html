@@ -1,0 +1,443 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="执行太久需要抢占 # preemptone设置抢占 # 继续上文看下preemptone函数，它设置了g.preempt(抢占标示)为true和g.stackguard0为很大的数((1<<(8*sys.PtrSize) - 1) & -1314 ---> 0xfffffffffffffade)，使被抢占的goroutine在进行函数调用会去检查栈溢出,然后处理抢占请求
+// Tell the goroutine running on processor P to stop. // This function is purely best-effort. It can incorrectly fail to inform the // goroutine. It can send inform the wrong goroutine. Even if it informs the // correct goroutine, that goroutine might ignore the request if it is // simultaneously executing newstack. // No lock needs to be held."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="执行太久"><meta property="og:description" content="执行太久需要抢占 # preemptone设置抢占 # 继续上文看下preemptone函数，它设置了g.preempt(抢占标示)为true和g.stackguard0为很大的数((1<<(8*sys.PtrSize) - 1) & -1314 ---> 0xfffffffffffffade)，使被抢占的goroutine在进行函数调用会去检查栈溢出,然后处理抢占请求
+// Tell the goroutine running on processor P to stop. // This function is purely best-effort. It can incorrectly fail to inform the // goroutine. It can send inform the wrong goroutine. Even if it informs the // correct goroutine, that goroutine might ignore the request if it is // simultaneously executing newstack. // No lock needs to be held."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/"><meta property="article:section" content="docs"><meta property="article:published_time" content="2020-05-04T12:35:00+00:00"><meta property="article:modified_time" content="2020-05-04T12:35:00+00:00"><title>执行太久 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.82c5dbd23447cee0b4c2aa3ed08ce0961faa40e1fa370eee4f8c9f02e0d46b5f.css integrity="sha256-gsXb0jRHzuC0wqo+0Izglh+qQOH6Nw7uT4yfAuDUa18=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.75f3025a21511955ad10f181cae208dd296ce24ee2a06def487a11decfa675f1.js integrity="sha256-dfMCWiFRGVWtEPGByuII3Sls4k7ioG3vSHoR3s+mdfE=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64 data-hotkeys=s/><div class="book-search-spinner hidden"></div><ul id=book-search-results></ul></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><input type=checkbox id=section-7d6b3fd068f9ea3865f7d1774807bfaf class=toggle>
+<label for=section-7d6b3fd068f9ea3865f7d1774807bfaf class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><input type=checkbox id=section-fb88ef1ea572c8bc68f803b54074fbd3 class=toggle checked>
+<label for=section-fb88ef1ea572c8bc68f803b54074fbd3 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle checked>
+<label for=section-99f41010918d678e89a7af90330cabe1 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/ class=active>执行太久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>系统调用抢占</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>执行太久</strong>
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#执行太久需要抢占>执行太久需要抢占</a><ul><li><a href=#preemptone设置抢占>preemptone设置抢占</a></li><li><a href=#触发抢占>触发抢占</a><ul><li><a href=#runtimemorestack>runtime·morestack</a></li><li><a href=#newstacksb>newstack(SB)</a></li></ul></li><li><a href=#栈增长相关代码>栈增长相关代码</a></li><li><a href=#实验验证环节>实验验证环节</a><ul><li><a href=#定义程序>定义程序</a></li><li><a href=#gdb调试前准备>gdb调试前准备</a></li><li><a href=#编译程序>编译程序</a></li></ul></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></aside></header><article class=markdown><h1 id=执行太久需要抢占>执行太久需要抢占
+<a class=anchor href=#%e6%89%a7%e8%a1%8c%e5%a4%aa%e4%b9%85%e9%9c%80%e8%a6%81%e6%8a%a2%e5%8d%a0>#</a></h1><h2 id=preemptone设置抢占>preemptone设置抢占
+<a class=anchor href=#preemptone%e8%ae%be%e7%bd%ae%e6%8a%a2%e5%8d%a0>#</a></h2><p>继续上文看下preemptone函数，它设置了<code>g.preempt</code>(抢占标示)为true和<code>g.stackguard0</code>为很大的数(<code>(1&lt;&lt;(8*sys.PtrSize) - 1) & -1314 ---> 0xfffffffffffffade</code>)，使被抢占的goroutine在进行函数调用会去检查栈溢出,然后处理抢占请求</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// Tell the goroutine running on processor P to stop.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// This function is purely best-effort. It can incorrectly fail to inform the
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// goroutine. It can send inform the wrong goroutine. Even if it informs the
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// correct goroutine, that goroutine might ignore the request if it is
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// simultaneously executing newstack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// No lock needs to be held.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Returns true if preemption request was issued.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// The actual preemption will happen at some point in the future
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// and will be indicated by the gp-&gt;status no longer being
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// Grunning
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>preemptone</span>(<span style=color:#a6e22e>_p_</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>p</span>) <span style=color:#66d9ef>bool</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>_p_</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>ptr</span>()
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>mp</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>mp</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>getg</span>().<span style=color:#a6e22e>m</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>gp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>curg</span> <span style=color:#75715e>// gp == 被抢占的goroutine
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>gp</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>gp</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>mp</span>.<span style=color:#a6e22e>g0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>preempt</span> = <span style=color:#66d9ef>true</span> <span style=color:#75715e>// 设置抢占信号preempt == true
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Every call in a go routine checks for stack overflow by
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// comparing the current stack pointer to gp-&gt;stackguard0.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// Setting gp-&gt;stackguard0 to StackPreempt folds
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// preemption into the normal stack overflow check.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// (1&lt;&lt;(8*sys.PtrSize) - 1) &amp; -1314 ---&gt; 0xfffffffffffffade, 很大的数
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stackguard0</span> = <span style=color:#a6e22e>stackPreempt</span> <span style=color:#75715e>//stackguard0==很大的数; 使被抢占的goroutine;在进行函数调用会去检查栈溢出;去处理抢占请求
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>return</span> <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h2 id=触发抢占>触发抢占
+<a class=anchor href=#%e8%a7%a6%e5%8f%91%e6%8a%a2%e5%8d%a0>#</a></h2><p>通过preemptone函数设置抢占后，我们继续来看实际触发抢占的，在前文我们讲述了编译器会在函数的头尾部分添加额外的汇编：
+<a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/#%e6%b7%bb%e5%8a%a0%e6%b1%87%e7%bc%96 class=book-btn>编译器加的函数头的部分</a></p><p>设置抢占后，只要执行函数调用就会执行下列函数调用:</p><pre tabindex=0><code>morestack_noctxt() -&gt; morestack() -&gt; newstack()
+</code></pre><h3 id=runtimemorestack>runtime·morestack
+<a class=anchor href=#runtimemorestack>#</a></h3><p>首先来看下runtime·morestack函数:</p><ul><li>类似于mcall<ul><li>保存调用morestack函数的goroutine(假设为gN)到它的sched成员 -> 将当前工作线程的g0与线程TLS关联 -> 将当前工作线程的g0栈恢复到CPU寄存器</li><li>在<strong>g0栈</strong>中call调用传入的参数(mcall)/执行<code>runtime·newstack(SB)</code>函数(morestack),所以不会影响gN,如果gN下一次被调度起来了，那么执行PC，又会重新到本函数头部执行，从上面分析也可以知道，这里的风险就是，如果执行过程没有调用其他函数，那么无法进行抢占，这个就是基于插入抢占，1.14基于信号抢占。</li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e># morestack but not preserving ctxt.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>TEXT</span> <span style=color:#66d9ef>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#66d9ef>morestack_noctxt</span>(<span style=color:#66d9ef>SB</span>),<span style=color:#66d9ef>NOSPLIT</span>,<span style=color:#66d9ef>$0</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVL</span>	<span style=color:#66d9ef>$0</span>, <span style=color:#66d9ef>DX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>JMP</span>	<span style=color:#66d9ef>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#66d9ef>morestack</span>(<span style=color:#66d9ef>SB</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># 
+</span></span></span><span style=display:flex><span><span style=color:#75715e># support for morestack
+</span></span></span><span style=display:flex><span><span style=color:#75715e># 
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#75715e># Called during function prolog when more stack is needed.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#
+</span></span></span><span style=display:flex><span><span style=color:#75715e># The traceback routines see morestack on a g0 as being
+</span></span></span><span style=display:flex><span><span style=color:#75715e># the top of a stack (for example, morestack calling newstack
+</span></span></span><span style=display:flex><span><span style=color:#75715e># calling the scheduler calling newm calling gc), so we must
+</span></span></span><span style=display:flex><span><span style=color:#75715e># record an argument size. For that purpose, it has no arguments.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#a6e22e>TEXT</span> <span style=color:#66d9ef>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#66d9ef>morestack</span>(<span style=color:#66d9ef>SB</span>),<span style=color:#66d9ef>NOSPLIT</span>,<span style=color:#66d9ef>$0-0</span>	
+</span></span><span style=display:flex><span><span style=color:#75715e># 开始是进行一些判断
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>#  Cannot grow scheduler stack (m-&gt;g0).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e># ...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>#  Cannot grow signal stack (m-&gt;gsignal).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e># ...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#75715e># 设置m-&gt;morebuf的PC，SP，g为相对应的&#39;main&#39;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e># Called from f.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e># Set m-&gt;morebuf to f&#39;s caller.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>NOP</span>	<span style=color:#66d9ef>SP</span>	<span style=color:#75715e># tell vet SP changed - stop checking offsets
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#ae81ff>8</span>(<span style=color:#66d9ef>SP</span>), <span style=color:#66d9ef>AX</span>	<span style=color:#75715e># f&#39;s caller&#39;s PC # 这里的路径比如我的：  &#39;main&#39;---&gt;&#39;sub_function&#39;。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>                                           <span style=color:#75715e># 但是抢占了，所以走下面的路径:-&gt;morestack_noctxt()-&gt;morestack()-&gt;newstack()
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>                                           <span style=color:#75715e># 所以这里的f在我这里应该是main.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>                                           <span style=color:#75715e># 需要注意morestack_noctxt与morestack使用的栈大小都是0，且他们的跳转没用call指令，使用的是JMP
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#66d9ef>AX</span>, (<span style=color:#66d9ef>m_morebuf</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_pc</span>)(<span style=color:#66d9ef>BX</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>LEAQ</span>	<span style=color:#ae81ff>16</span>(<span style=color:#66d9ef>SP</span>), <span style=color:#66d9ef>AX</span>	<span style=color:#75715e># f&#39;s caller&#39;s SP
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#66d9ef>AX</span>, (<span style=color:#66d9ef>m_morebuf</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_sp</span>)(<span style=color:#66d9ef>BX</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>get_tls</span>(<span style=color:#66d9ef>CX</span>)  <span style=color:#75715e>#...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#66d9ef>g</span>(<span style=color:#66d9ef>CX</span>), <span style=color:#66d9ef>SI</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#66d9ef>SI</span>, (<span style=color:#66d9ef>m_morebuf</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_g</span>)(<span style=color:#66d9ef>BX</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># 保存当前的寄存器信息到g-&gt;sched中
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e># Set g-&gt;sched to context in f.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#ae81ff>0</span>(<span style=color:#66d9ef>SP</span>), <span style=color:#66d9ef>AX</span> <span style=color:#75715e># f&#39;s PC
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#66d9ef>AX</span>, (<span style=color:#66d9ef>g_sched</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_pc</span>)(<span style=color:#66d9ef>SI</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#66d9ef>SI</span>, (<span style=color:#66d9ef>g_sched</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_g</span>)(<span style=color:#66d9ef>SI</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>LEAQ</span>	<span style=color:#ae81ff>8</span>(<span style=color:#66d9ef>SP</span>), <span style=color:#66d9ef>AX</span> <span style=color:#75715e># f&#39;s SP
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#66d9ef>AX</span>, (<span style=color:#66d9ef>g_sched</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_sp</span>)(<span style=color:#66d9ef>SI</span>) <span style=color:#75715e>#在morestack里面就已经保存了sp的值
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>MOVQ</span>	<span style=color:#66d9ef>BP</span>, (<span style=color:#66d9ef>g_sched</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_bp</span>)(<span style=color:#66d9ef>SI</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#66d9ef>DX</span>, (<span style=color:#66d9ef>g_sched</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_ctxt</span>)(<span style=color:#66d9ef>SI</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e># 把g0设置为m当前运行的G; 把g0-&gt;sched-&gt;sp恢复到SP寄存器中;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>#Call newstack on m-&gt;g0&#39;s stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#66d9ef>m_g0</span>(<span style=color:#66d9ef>BX</span>), <span style=color:#66d9ef>BX</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	<span style=color:#66d9ef>BX</span>, <span style=color:#66d9ef>g</span>(<span style=color:#66d9ef>CX</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>MOVQ</span>	(<span style=color:#66d9ef>g_sched</span><span style=color:#960050;background-color:#1e0010>+</span><span style=color:#66d9ef>gobuf_sp</span>)(<span style=color:#66d9ef>BX</span>), <span style=color:#66d9ef>SP</span> <span style=color:#75715e># 把g0的栈SP寄存器恢复到实际的寄存器中。所以下面就使用了g0的栈
+</span></span></span><span style=display:flex><span><span style=color:#75715e># 调用newstack
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>CALL</span>	<span style=color:#66d9ef>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#66d9ef>newstack</span>(<span style=color:#66d9ef>SB</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>CALL</span>	<span style=color:#66d9ef>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#66d9ef>abort</span>(<span style=color:#66d9ef>SB</span>)	<span style=color:#75715e>#crash if newstack returns
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>RET</span>
+</span></span></code></pre></div><h3 id=newstacksb>newstack(SB)
+<a class=anchor href=#newstacksb>#</a></h3><div class=highlight><div style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><table style=border-spacing:0;padding:0;margin:0;border:0><tr><td style=vertical-align:top;padding:0;margin:0;border:0><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><code><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 1
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 2
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 3
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 4
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 5
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 6
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 7
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 8
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f"> 9
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">10
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">11
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">12
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">13
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">14
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">15
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">16
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">17
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">18
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">19
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">20
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">21
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">22
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">23
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">24
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">25
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">26
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">27
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">28
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">29
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">30
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">31
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">32
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">33
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">34
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">35
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">36
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">37
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">38
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">39
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">40
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">41
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">42
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">43
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">44
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">45
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">46
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">47
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">48
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">49
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">50
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">51
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">52
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">53
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">54
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">55
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">56
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">57
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">58
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">59
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">60
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">61
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">62
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">63
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">64
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">65
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">66
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">67
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">68
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">69
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">70
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">71
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">72
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">73
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">74
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">75
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">76
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">77
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">78
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">79
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">80
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">81
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">82
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">83
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">84
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">85
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">86
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">87
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">88
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">89
+</span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">90
+</span></span><span style=background-color:#3c3d38><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">91
+</span></span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">92
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">93
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">94
+</span><span style="white-space:pre;user-select:none;margin-right:.4em;padding:0 .4em;color:#7f7f7f">95
+</span></code></pre></td><td style=vertical-align:top;padding:0;margin:0;border:0;width:100%><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>newstack</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>thisg</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>getg</span>() <span style=color:#75715e>//到这里我们又是在g0栈里面。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>	<span style=color:#a6e22e>gp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>curg</span> <span style=color:#75715e>//这个就是原来的Goroutine.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// NOTE: stackguard0 may change underfoot, if another thread
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// is about to try to preempt gp. Read it just once and use that same
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// value now and below.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>preempt</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>atomic</span>.<span style=color:#a6e22e>Loaduintptr</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stackguard0</span>) <span style=color:#f92672>==</span> <span style=color:#a6e22e>stackPreempt</span> <span style=color:#75715e>//这里判断是否是抢占 打了stackguard0;
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Be conservative about where we preempt.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// We are interested in preempting user Go code, not runtime code.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// If we&#39;re holding locks, mallocing, or preemption is disabled, don&#39;t
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// preempt.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// This check is very early in newstack so that even the status change
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// from Grunning to Gwaiting and back doesn&#39;t happen in this case.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// That status change by itself can be viewed as a small preemption,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// because the GC might change Gwaiting to Gscanwaiting, and then
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// this goroutine has to wait for the GC to finish before continuing.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// If the GC is in some way dependent on this goroutine (for example,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// it needs a lock held by the goroutine), that small preemption turns
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// into a real deadlock.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>preempt</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// 这里还检查了一系列的状态，如果满足就不抢占它了， 让它继续执行。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>mallocing</span> <span style=color:#f92672>!=</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>preemptoff</span> <span style=color:#f92672>!=</span> <span style=color:#e6db74>&#34;&#34;</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>status</span> <span style=color:#f92672>!=</span> <span style=color:#a6e22e>_Prunning</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// Let the goroutine keep running for now.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// gp-&gt;preempt is set, so it will be preempted next time.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stackguard0</span> = <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> <span style=color:#f92672>+</span> <span style=color:#a6e22e>_StackGuard</span> <span style=color:#75715e>//还原stackguard0为正常值，表示我们已经处理过抢占请求了
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>gogo</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>) <span style=color:#75715e>// never return
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		}
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;missing stack in newstack&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>sp</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>sp</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>ArchFamily</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>AMD64</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>ArchFamily</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>I386</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>ArchFamily</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>WASM</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// The call to morestack cost a word.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#a6e22e>sp</span> <span style=color:#f92672>-=</span> <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>PtrSize</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>stackDebug</span> <span style=color:#f92672>&gt;=</span> <span style=color:#ae81ff>1</span> <span style=color:#f92672>||</span> <span style=color:#a6e22e>sp</span> &lt; <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> {
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;runtime: newstack sp=&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>sp</span>), <span style=color:#e6db74>&#34; stack=[&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span>), <span style=color:#e6db74>&#34;, &#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>hi</span>), <span style=color:#e6db74>&#34;]\n&#34;</span>,
+</span></span><span style=display:flex><span>			<span style=color:#e6db74>&#34;\tmorebuf={pc:&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>morebuf</span>.<span style=color:#a6e22e>pc</span>), <span style=color:#e6db74>&#34; sp:&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>morebuf</span>.<span style=color:#a6e22e>sp</span>), <span style=color:#e6db74>&#34; lr:&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>morebuf</span>.<span style=color:#a6e22e>lr</span>), <span style=color:#e6db74>&#34;}\n&#34;</span>,
+</span></span><span style=display:flex><span>			<span style=color:#e6db74>&#34;\tsched={pc:&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>pc</span>), <span style=color:#e6db74>&#34; sp:&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>sp</span>), <span style=color:#e6db74>&#34; lr:&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>lr</span>), <span style=color:#e6db74>&#34; ctxt:&#34;</span>, <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>.<span style=color:#a6e22e>ctxt</span>, <span style=color:#e6db74>&#34;}\n&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>sp</span> &lt; <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> {
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;runtime: gp=&#34;</span>, <span style=color:#a6e22e>gp</span>, <span style=color:#e6db74>&#34;, goid=&#34;</span>, <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>goid</span>, <span style=color:#e6db74>&#34;, gp-&gt;status=&#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>readgstatus</span>(<span style=color:#a6e22e>gp</span>)), <span style=color:#e6db74>&#34;\n &#34;</span>)
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;runtime: split stack overflow: &#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>sp</span>), <span style=color:#e6db74>&#34; &lt; &#34;</span>, <span style=color:#a6e22e>hex</span>(<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span>), <span style=color:#e6db74>&#34;\n&#34;</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;runtime: split stack overflow&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex;background-color:#3c3d38><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>preempt</span> {
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>gp</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>g0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;runtime: preempt g0&#34;</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>thisg</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>locks</span> <span style=color:#f92672>==</span> <span style=color:#ae81ff>0</span> {
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;runtime: g is running but p is not&#34;</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Synchronize with scang.
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Grunning</span>, <span style=color:#a6e22e>_Gwaiting</span>) <span style=color:#75715e>// 设置gp状态变为等待状态。处理gc时把gp的状态修改成_Gwaiting
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>preemptscan</span> { <span style=color:#75715e>//gc相关，暂时忽略。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#66d9ef>for</span> !<span style=color:#a6e22e>castogscanstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gwaiting</span>, <span style=color:#a6e22e>_Gscanwaiting</span>) {
+</span></span><span style=display:flex><span>				<span style=color:#75715e>// Likely to be racing with the GC as
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#75715e>// it sees a _Gwaiting and does the
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#75715e>// stack scan. If so, gcworkdone will
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#75715e>// be set and gcphasework will simply
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#75715e>// return.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			}
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> !<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>gcscandone</span> {
+</span></span><span style=display:flex><span>				<span style=color:#75715e>// gcw is safe because we&#39;re on the
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#75715e>// system stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>				<span style=color:#a6e22e>gcw</span> <span style=color:#f92672>:=</span> <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>m</span>.<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>ptr</span>().<span style=color:#a6e22e>gcw</span>
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>scanstack</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>gcw</span>)
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>gcscandone</span> = <span style=color:#66d9ef>true</span>
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>preemptscan</span> = <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>preempt</span> = <span style=color:#66d9ef>false</span>
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>casfrom_Gscanstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gscanwaiting</span>, <span style=color:#a6e22e>_Gwaiting</span>)
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// This clears gcscanvalid.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gwaiting</span>, <span style=color:#a6e22e>_Grunning</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stackguard0</span> = <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span> <span style=color:#f92672>+</span> <span style=color:#a6e22e>_StackGuard</span>
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>gogo</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>) <span style=color:#75715e>// never return
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>		<span style=color:#75715e>// Act like goroutine called runtime.Gosched.
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gwaiting</span>, <span style=color:#a6e22e>_Grunning</span>) <span style=color:#75715e>//恢复状态。
+</span></span></span><span style=display:flex;background-color:#3c3d38><span><span style=color:#75715e></span>		<span style=color:#a6e22e>gopreempt_m</span>(<span style=color:#a6e22e>gp</span>) <span style=color:#75715e>// 放入全局队列，重新schedule(); never return === gopreempt_m(gp)---call---&gt;goschedImpl(gp)----call--&gt;globrunqput()放入全局队列/schedule()
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}</span></span></code></pre></td></tr></table></div></div><p>主要把被抢占的Goroutine重新放入全局队列：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// gopreempt_m(gp) ---&gt; goschedImpl(gp)
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>gopreempt_m</span>(<span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>) {
+</span></span><span style=display:flex><span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>trace</span>.<span style=color:#a6e22e>enabled</span> {
+</span></span><span style=display:flex><span>        <span style=color:#a6e22e>traceGoPreempt</span>()
+</span></span><span style=display:flex><span>    }
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>goschedImpl</span>(<span style=color:#a6e22e>gp</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><p>goschedImpl我们之前讲过:
+<a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/#goschedImpl%e5%87%bd%e6%95%b0 class=book-btn>goschedImpl</a></p><h2 id=栈增长相关代码>栈增长相关代码
+<a class=anchor href=#%e6%a0%88%e5%a2%9e%e9%95%bf%e7%9b%b8%e5%85%b3%e4%bb%a3%e7%a0%81>#</a></h2><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>newstack</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...省略抢占的代码
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Allocate a bigger segment and move the stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>oldsize</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>hi</span> <span style=color:#f92672>-</span> <span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>stack</span>.<span style=color:#a6e22e>lo</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>newsize</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>oldsize</span> <span style=color:#f92672>*</span> <span style=color:#ae81ff>2</span>  <span style=color:#75715e>// 新的栈大小直接*2
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>newsize</span> &gt; <span style=color:#a6e22e>maxstacksize</span> {
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;runtime: goroutine stack exceeds &#34;</span>, <span style=color:#a6e22e>maxstacksize</span>, <span style=color:#e6db74>&#34;-byte limit\n&#34;</span>)
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;stack overflow&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// The goroutine must be executing in order to call newstack,
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// so it must be Grunning (or Gscanrunning).
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Grunning</span>, <span style=color:#a6e22e>_Gcopystack</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// The concurrent GC will not scan the stack while we are doing the copy since
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// the gp is in a Gcopystack status.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>copystack</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>newsize</span>, <span style=color:#66d9ef>true</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>stackDebug</span> <span style=color:#f92672>&gt;=</span> <span style=color:#ae81ff>1</span> {
+</span></span><span style=display:flex><span>		print(<span style=color:#e6db74>&#34;stack grow done\n&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>casgstatus</span>(<span style=color:#a6e22e>gp</span>, <span style=color:#a6e22e>_Gcopystack</span>, <span style=color:#a6e22e>_Grunning</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>gogo</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>copystack</span>(<span style=color:#a6e22e>gp</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>g</span>, <span style=color:#a6e22e>newsize</span> <span style=color:#66d9ef>uintptr</span>, <span style=color:#a6e22e>sync</span> <span style=color:#66d9ef>bool</span>) {
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// allocate new stack
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>new</span> <span style=color:#f92672>:=</span> <span style=color:#a6e22e>stackalloc</span>(uint32(<span style=color:#a6e22e>newsize</span>))
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><ul><li>stackalloc</li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// stackalloc allocates an n byte stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// stackalloc must run on the system stack because it uses per-P
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// resources and must not split the stack.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//go:systemstack
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>stackalloc</span>(<span style=color:#a6e22e>n</span> <span style=color:#66d9ef>uint32</span>) <span style=color:#a6e22e>stack</span> {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// Small stacks are allocated with a fixed-size free-list allocator.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// If we need a stack of a bigger size, we fall back on allocating
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#75715e>// a dedicated span.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>v</span> <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>n</span> &lt; <span style=color:#a6e22e>_FixedStack</span><span style=color:#f92672>&lt;&lt;</span><span style=color:#a6e22e>_NumStackOrders</span> <span style=color:#f92672>&amp;&amp;</span> <span style=color:#a6e22e>n</span> &lt; <span style=color:#a6e22e>_StackCacheSize</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>//小堆栈用固定大小的自由列表分配器进行分配。
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	} <span style=color:#66d9ef>else</span> {
+</span></span><span style=display:flex><span>		<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>		<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>			<span style=color:#75715e>// 如果我们需要一个更大的堆栈，我们会重新分配一个span.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#75715e>// Allocate a new stack from the heap.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>			<span style=color:#a6e22e>s</span> = <span style=color:#a6e22e>mheap_</span>.<span style=color:#a6e22e>allocManual</span>(<span style=color:#a6e22e>npage</span>, <span style=color:#f92672>&amp;</span><span style=color:#a6e22e>memstats</span>.<span style=color:#a6e22e>stacks_inuse</span>)
+</span></span><span style=display:flex><span>			<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>s</span> <span style=color:#f92672>==</span> <span style=color:#66d9ef>nil</span> {
+</span></span><span style=display:flex><span>				<span style=color:#a6e22e>throw</span>(<span style=color:#e6db74>&#34;out of memory&#34;</span>)
+</span></span><span style=display:flex><span>			}
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>osStackAlloc</span>(<span style=color:#a6e22e>s</span>)
+</span></span><span style=display:flex><span>			<span style=color:#a6e22e>s</span>.<span style=color:#a6e22e>elemsize</span> = uintptr(<span style=color:#a6e22e>n</span>)
+</span></span><span style=display:flex><span>		}
+</span></span><span style=display:flex><span>		<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	}
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//...
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><h2 id=实验验证环节>实验验证环节
+<a class=anchor href=#%e5%ae%9e%e9%aa%8c%e9%aa%8c%e8%af%81%e7%8e%af%e8%8a%82>#</a></h2><h3 id=定义程序>定义程序
+<a class=anchor href=#%e5%ae%9a%e4%b9%89%e7%a8%8b%e5%ba%8f>#</a></h3><blockquote><p>main.go</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> <span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>call_some_job</span>() {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;complete this job&#34;</span>)
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>for</span> <span style=color:#a6e22e>i</span><span style=color:#f92672>:=</span><span style=color:#ae81ff>0</span>; <span style=color:#a6e22e>i</span>&lt;<span style=color:#ae81ff>100000</span>; <span style=color:#a6e22e>i</span><span style=color:#f92672>++</span>{
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>i</span>=<span style=color:#a6e22e>i</span>
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>call_some_job</span>()
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h3 id=gdb调试前准备>gdb调试前准备
+<a class=anchor href=#gdb%e8%b0%83%e8%af%95%e5%89%8d%e5%87%86%e5%a4%87>#</a></h3><h3 id=编译程序>编译程序
+<a class=anchor href=#%e7%bc%96%e8%af%91%e7%a8%8b%e5%ba%8f>#</a></h3><p>编译一下源代码: <code>go build -gcflags "-N -l" -o test .</code>.</p><h4 id=准备mcall函数断点的文件>准备mcall函数断点的文件
+<a class=anchor href=#%e5%87%86%e5%a4%87mcall%e5%87%bd%e6%95%b0%e6%96%ad%e7%82%b9%e7%9a%84%e6%96%87%e4%bb%b6>#</a></h4><ul><li>gdb<ul><li><code>list /usr/lib/golang/src/runtime/proc.go:267</code></li><li><code>list /tmp/kubernets/test_preempt/main.go:1</code></li><li><code>list /usr/lib/golang/src/runtime/asm_amd64.s:454</code></li></ul></li></ul><h4 id=gdb调试自定义函数>gdb调试自定义函数
+<a class=anchor href=#gdb%e8%b0%83%e8%af%95%e8%87%aa%e5%ae%9a%e4%b9%89%e5%87%bd%e6%95%b0>#</a></h4><pre tabindex=0><code class=language-gdb data-lang=gdb>define zxc
+info threads
+info register rbp rsp pc
+end
+</code></pre><h4 id=gdb>gdb
+<a class=anchor href=#gdb>#</a></h4><pre tabindex=0><code class=language-test data-lang=test>[root@gitlab test_preempt]# gdb ./test
+GNU gdb (GDB) Red Hat Enterprise Linux 7.6.1-119.el7
+Copyright (C) 2013 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;http://gnu.org/licenses/gpl.html&gt;
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type &#34;show copying&#34;
+and &#34;show warranty&#34; for details.
+This GDB was configured as &#34;x86_64-redhat-linux-gnu&#34;.
+For bug reporting instructions, please see:
+&lt;http://www.gnu.org/software/gdb/bugs/&gt;...
+Reading symbols from /tmp/kubernets/test_preempt/test...done.
+Loading Go Runtime support.
+(gdb) list
+1	package main
+2
+3	import &#34;fmt&#34;
+4
+5	func call_some_job() {
+6
+7		fmt.Println(&#34;complete this job&#34;)
+8	}
+9
+10	func main() {
+(gdb)
+11		call_some_job()
+12	}
+(gdb) b 10
+Breakpoint 1 at 0x48cf90: file /tmp/kubernets/test_preempt/main.go, line 10.
+(gdb) run
+Starting program: /tmp/kubernets/test_preempt/./test
+
+Breakpoint 1, main.main () at /tmp/kubernets/test_preempt/main.go:10
+10	func main() {
+(gdb) disas
+Dump of assembler code for function main.main:
+=&gt; 0x000000000048cf90 &lt;+0&gt;:	    mov    %fs:0xfffffffffffffff8,%rcx     --------------------------------here
+   0x000000000048cf99 &lt;+9&gt;: 	cmp    0x10(%rcx),%rsp                     --------------------------------here
+   0x000000000048cf9d &lt;+13&gt;:	jbe    0x48cfb9 &lt;main.main+41&gt;
+   0x000000000048cf9f &lt;+15&gt;:	sub    $0x8,%rsp
+   0x000000000048cfa3 &lt;+19&gt;:	mov    %rbp,(%rsp)
+   0x000000000048cfa7 &lt;+23&gt;:	lea    (%rsp),%rbp
+   0x000000000048cfab &lt;+27&gt;:	callq  0x48cef0 &lt;main.call_some_job&gt;
+   0x000000000048cfb0 &lt;+32&gt;:	mov    (%rsp),%rbp
+   0x000000000048cfb4 &lt;+36&gt;:	add    $0x8,%rsp
+   0x000000000048cfb8 &lt;+40&gt;:	retq
+   0x000000000048cfb9 &lt;+41&gt;:	callq  0x4517d0 &lt;runtime.morestack_noctxt&gt; --------------------------------here
+   0x000000000048cfbe &lt;+46&gt;:	jmp    0x48cf90 &lt;main.main&gt;
+End of assembler dump.
+</code></pre><p>上面三个<code>--------------------------------here</code>,前面我们说的很清楚,就是g.stack.stackguard0与sp寄存器进行比较,如果sp小于g.stack.stackguard0
+就跳转到<code>runtime.morestack_noctxt</code>;而我们前面设置preempt:<code>gp.stackguard0 = stackPreempt //stackguard0==很大的数; 使被抢占的goroutine;在进行函数调用会去检查栈溢出;去处理抢占请求</code>,它必定比sp要大,所以肯定跳转到了<code>runtime.morestack_noctxt</code></p><blockquote><p><code>MOVQ 0(SP), AX // f's PC</code>,就是caller&rsquo;s pc是因为它的rbp在那一步还没有保存到callee‘s stack空间.</p></blockquote><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200918212350.png alt="MOVQ	0(SP), AX // f&amp;rsquo;s PC"></p><p>那继续来看如果如果调用<code>&lt;runtime.morestack_noctxt></code>,它的下一个PC就是<code>jmp 0x48cf90 &lt;main.main></code>又重新跳回来了.
+看这个
+<img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20200921193622.png alt=disas></p><h2 id=附录>附录
+<a class=anchor href=#%e9%99%84%e5%bd%95>#</a></h2><ul><li><a href="https://medium.com/a-journey-with-go/go-how-does-the-goroutine-stack-size-evolve-447fc02085e5#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjAzYjJkMjJjMmZlY2Y4NzNlZDE5ZTViOGNmNzA0YWZiN2UyZWQ0YmUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYmYiOjE2MTIxNjkyMDEsImF1ZCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsInN1YiI6IjEwMzk2OTgxODc3ODk3MjQyMjU0OSIsImVtYWlsIjoiZmZ6eGMuZG9AZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImF6cCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsIm5hbWUiOiJ0aW0gWmhhbyIsInBpY3R1cmUiOiJodHRwczovL2xoNS5nb29nbGV1c2VyY29udGVudC5jb20vLVVrRk9jak5NWUJzL0FBQUFBQUFBQUFJL0FBQUFBQUFBQUFBL0FNWnV1Y25LajAwY21MVkhuZGpYakxGVVZWX1JHWnJ0OXcvczk2LWMvcGhvdG8uanBnIiwiZ2l2ZW5fbmFtZSI6InRpbSIsImZhbWlseV9uYW1lIjoiWmhhbyIsImlhdCI6MTYxMjE2OTUwMSwiZXhwIjoxNjEyMTczMTAxLCJqdGkiOiI5ZWZhMzYwMDUwOGNhZjg0MWMyYjQ5YmE1NDQxMWNkMGQzNmE0YzliIn0.qaSr0IXzZ3BXiIndb18-qLZpwNMDi3fEGlR-OtbQryxR8MkhONlgB-BTN5vHjYuvmWdCdGywJn26T71jPqBRVuIXMNlriZLFwPvHKdTBRrvpkPoFs8LprEpsCyZbTN7qNU5-CfDzcC1fHZji2j7992Ngo3XVd9v-6LiKCGUeolZ7CGH6KvT1e67ckiCzEN2oG5q6v7zKW32FmF7cajuOHl12p2pn6LaHxlYm3o38N3O9c96cO04meQ7WzZKn6QVoZeDIvmzq1iIKYOCbU0edZiOXgRgGHkBeBOowi-DHCz9kSJ1HkNrdzyjEC2nKUqerVGTCAc08w9BjtA8o_RmA8g">https://medium.com/a-journey-with-go/go-how-does-the-goroutine-stack-size-evolve-447fc02085e5#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjAzYjJkMjJjMmZlY2Y4NzNlZDE5ZTViOGNmNzA0YWZiN2UyZWQ0YmUiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYmYiOjE2MTIxNjkyMDEsImF1ZCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsInN1YiI6IjEwMzk2OTgxODc3ODk3MjQyMjU0OSIsImVtYWlsIjoiZmZ6eGMuZG9AZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImF6cCI6IjIxNjI5NjAzNTgzNC1rMWs2cWUwNjBzMnRwMmEyamFtNGxqZGNtczAwc3R0Zy5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsIm5hbWUiOiJ0aW0gWmhhbyIsInBpY3R1cmUiOiJodHRwczovL2xoNS5nb29nbGV1c2VyY29udGVudC5jb20vLVVrRk9jak5NWUJzL0FBQUFBQUFBQUFJL0FBQUFBQUFBQUFBL0FNWnV1Y25LajAwY21MVkhuZGpYakxGVVZWX1JHWnJ0OXcvczk2LWMvcGhvdG8uanBnIiwiZ2l2ZW5fbmFtZSI6InRpbSIsImZhbWlseV9uYW1lIjoiWmhhbyIsImlhdCI6MTYxMjE2OTUwMSwiZXhwIjoxNjEyMTczMTAxLCJqdGkiOiI5ZWZhMzYwMDUwOGNhZjg0MWMyYjQ5YmE1NDQxMWNkMGQzNmE0YzliIn0.qaSr0IXzZ3BXiIndb18-qLZpwNMDi3fEGlR-OtbQryxR8MkhONlgB-BTN5vHjYuvmWdCdGywJn26T71jPqBRVuIXMNlriZLFwPvHKdTBRrvpkPoFs8LprEpsCyZbTN7qNU5-CfDzcC1fHZji2j7992Ngo3XVd9v-6LiKCGUeolZ7CGH6KvT1e67ckiCzEN2oG5q6v7zKW32FmF7cajuOHl12p2pn6LaHxlYm3o38N3O9c96cO04meQ7WzZKn6QVoZeDIvmzq1iIKYOCbU0edZiOXgRgGHkBeBOowi-DHCz9kSJ1HkNrdzyjEC2nKUqerVGTCAc08w9BjtA8o_RmA8g</a></li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#执行太久需要抢占>执行太久需要抢占</a><ul><li><a href=#preemptone设置抢占>preemptone设置抢占</a></li><li><a href=#触发抢占>触发抢占</a><ul><li><a href=#runtimemorestack>runtime·morestack</a></li><li><a href=#newstacksb>newstack(SB)</a></li></ul></li><li><a href=#栈增长相关代码>栈增长相关代码</a></li><li><a href=#实验验证环节>实验验证环节</a><ul><li><a href=#定义程序>定义程序</a></li><li><a href=#gdb调试前准备>gdb调试前准备</a></li><li><a href=#编译程序>编译程序</a></li></ul></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></div></aside></main></body></html>
