@@ -1,9 +1,9 @@
-<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="Golang基本用法 # Golang基本用法 数据结构 string 单引号 slice和数组的异同 slice的自动扩容后的大小是多少? 延伸 map 哈希扩容 扩容规则 struct和内存对齐 chan error.Unwrap 跟类型相关 类型系统 跟函数定义的结构相关 函数调用栈细节 闭包 方法(method) defer三阶段 before 1.13 测试题 1.13 1.14 panic AND recover 测验 跟interface相关 接口 eface iface 类型断言 reflect reflect.Type reflect.Value 运行时: 并发编程 同步原语 内存顺序保证 sync包 context(上下文) 内存管理 GC 逃逸分析 内存泄漏 附录 0.方法 new And make example 值类型和引用类型的区别 计算golang中类型的大小的方式 golang的chan archive 数据结构 # 这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址. 然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能? string # string类型的底层结构.它的大小是几个字节?
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="Golang基本用法 # Golang基本用法 数据结构 string 单引号 slice和数组的异同 slice的自动扩容后的大小是多少? 延伸 map 哈希扩容 扩容规则 struct和内存对齐 chan error.Unwrap 跟类型相关 类型系统 跟函数定义的结构相关 函数调用栈细节 闭包 方法(method) defer三阶段 before 1.13 测试题 1.13 1.14 panic AND recover 测验 跟interface相关 c++多态 接口 eface iface 类型断言 reflect reflect.Type reflect.Value 运行时: 并发编程 同步原语 内存顺序保证 sync包 context(上下文) 内存管理 GC 逃逸分析 内存泄漏 附录 0.方法 new And make example 值类型和引用类型的区别 计算golang中类型的大小的方式 golang的chan archive 数据结构 # 这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址. 然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能? string # string类型的底层结构.它的大小是几个字节?
 指针和字节大小
-0xxxxxxx 110xxxxx 10xxxxxx 1110xxxx 10xxxxxx 10xxxxxx package main import ( &#34;fmt&#34; &#34;reflect&#34; &#34;unicode/utf8&#34; &#34;unsafe&#34; ) func String2Bytes(s string) []byte { sh := (*reflect."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="基本用法"><meta property="og:description" content="Golang基本用法 # Golang基本用法 数据结构 string 单引号 slice和数组的异同 slice的自动扩容后的大小是多少? 延伸 map 哈希扩容 扩容规则 struct和内存对齐 chan error.Unwrap 跟类型相关 类型系统 跟函数定义的结构相关 函数调用栈细节 闭包 方法(method) defer三阶段 before 1.13 测试题 1.13 1.14 panic AND recover 测验 跟interface相关 接口 eface iface 类型断言 reflect reflect.Type reflect.Value 运行时: 并发编程 同步原语 内存顺序保证 sync包 context(上下文) 内存管理 GC 逃逸分析 内存泄漏 附录 0.方法 new And make example 值类型和引用类型的区别 计算golang中类型的大小的方式 golang的chan archive 数据结构 # 这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址. 然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能? string # string类型的底层结构.它的大小是几个字节?
+0xxxxxxx 110xxxxx 10xxxxxx 1110xxxx 10xxxxxx 10xxxxxx package main import ( &#34;fmt&#34; &#34;reflect&#34; &#34;unicode/utf8&#34; &#34;unsafe&#34; ) func String2Bytes(s string) []byte { sh := (*reflect."><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="基本用法"><meta property="og:description" content="Golang基本用法 # Golang基本用法 数据结构 string 单引号 slice和数组的异同 slice的自动扩容后的大小是多少? 延伸 map 哈希扩容 扩容规则 struct和内存对齐 chan error.Unwrap 跟类型相关 类型系统 跟函数定义的结构相关 函数调用栈细节 闭包 方法(method) defer三阶段 before 1.13 测试题 1.13 1.14 panic AND recover 测验 跟interface相关 c++多态 接口 eface iface 类型断言 reflect reflect.Type reflect.Value 运行时: 并发编程 同步原语 内存顺序保证 sync包 context(上下文) 内存管理 GC 逃逸分析 内存泄漏 附录 0.方法 new And make example 值类型和引用类型的区别 计算golang中类型的大小的方式 golang的chan archive 数据结构 # 这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址. 然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能? string # string类型的底层结构.它的大小是几个字节?
 指针和字节大小
 0xxxxxxx 110xxxxx 10xxxxxx 1110xxxx 10xxxxxx 10xxxxxx package main import ( &#34;fmt&#34; &#34;reflect&#34; &#34;unicode/utf8&#34; &#34;unsafe&#34; ) func String2Bytes(s string) []byte { sh := (*reflect."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/foundation/golang_basic/"><meta property="article:section" content="docs"><title>基本用法 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.76f6dbe75c94e688c018dd8b54e7f880916b14ab4cf3881b81f75d6bb916603c.css integrity="sha256-dvbb51yU5ojAGN2LVOf4gJFrFKtM84gbgfdda7kWYDw=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
-<script defer src=/go-goroutine/en.search.min.be279b0848d859417f25ed8f6b74f5b970b9d714b5a41ba5a55715b5c4c1fff1.js integrity="sha256-viebCEjYWUF/Je2Pa3T1uXC51xS1pBulpVcVtcTB//E=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/en.search.min.14b2a87bfd7b883f0be458f970274a8ffe3154cd6b812b6224fa27a7d767e3b3.js integrity="sha256-FLKoe/17iD8L5Fj5cCdKj/4xVM1rgStiJPonp9dn47M=" crossorigin=anonymous></script>
 <script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
 <span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/ class=active>基本用法</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle>
@@ -11,7 +11,7 @@
 <script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
 <strong>基本用法</strong>
 <label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#golang基本用法>Golang基本用法</a><ul><li><a href=#数据结构>数据结构</a><ul><li><a href=#string>string</a></li><li><a href=#slice和数组的异同>slice和数组的异同</a></li><li><a href=#map>map</a></li><li><a href=#struct和内存对齐>struct和内存对齐</a></li><li><a href=#chan>chan</a></li><li><a href=#errorunwrap>error.Unwrap</a></li></ul></li><li><a href=#跟类型相关>跟类型相关</a><ul><li><a href=#类型系统>类型系统</a></li><li><a href=#跟函数定义的结构相关>跟函数定义的结构相关</a></li><li><a href=#跟interface相关>跟interface相关</a></li></ul></li><li><a href=#运行时>运行时:</a><ul><li><a href=#并发编程>并发编程</a></li><li><a href=#内存管理>内存管理</a></li></ul></li><li><a href=#附录>附录</a><ul><li><a href=#0方法>0.方法</a></li><li><a href=#1-new-and-make>1. new And make</a></li><li><a href=#2-值类型和引用类型的区别>2. 值类型和引用类型的区别</a></li><li><a href=#3-计算golang中类型的大小的方式>3. 计算golang中类型的大小的方式</a></li><li><a href=#golang的chan>golang的chan</a></li></ul></li><li><a href=#archive>archive</a></li></ul></li></ul></nav></aside></header><article class=markdown><h1 id=golang基本用法>Golang基本用法
-<a class=anchor href=#golang%e5%9f%ba%e6%9c%ac%e7%94%a8%e6%b3%95>#</a></h1><ul><li>Golang基本用法<ul><li>数据结构<ul><li>string<ul><li>单引号</li></ul></li><li>slice和数组的异同<ul><li>slice的自动扩容后的大小是多少?</li><li>延伸</li></ul></li><li>map<ul><li>哈希扩容</li><li>扩容规则</li></ul></li><li>struct和内存对齐</li><li>chan</li><li>error.Unwrap</li></ul></li><li>跟类型相关<ul><li>类型系统</li><li>跟函数定义的结构相关<ul><li>函数调用栈细节</li><li>闭包</li><li>方法(method)</li><li>defer三阶段<ul><li>before 1.13<ul><li>测试题</li></ul></li><li>1.13</li><li>1.14</li></ul></li><li>panic AND recover<ul><li>测验</li></ul></li></ul></li><li>跟interface相关<ul><li>接口<ul><li>eface</li><li>iface</li></ul></li><li>类型断言</li><li>reflect<ul><li>reflect.Type</li><li>reflect.Value</li></ul></li></ul></li></ul></li><li>运行时:<ul><li>并发编程<ul><li>同步原语<ul><li>内存顺序保证</li><li>sync包</li></ul></li><li>context(上下文)</li></ul></li><li>内存管理<ul><li>GC</li><li>逃逸分析</li><li>内存泄漏</li></ul></li></ul></li><li>附录<ul><li>0.方法</li><li><ol><li>new And make</li></ol><ul><li>example</li></ul></li><li><ol start=2><li>值类型和引用类型的区别</li></ol></li><li><ol start=3><li>计算golang中类型的大小的方式</li></ol></li><li>golang的chan</li></ul></li><li>archive</li></ul></li></ul><h2 id=数据结构>数据结构
+<a class=anchor href=#golang%e5%9f%ba%e6%9c%ac%e7%94%a8%e6%b3%95>#</a></h1><ul><li>Golang基本用法<ul><li>数据结构<ul><li>string<ul><li>单引号</li></ul></li><li>slice和数组的异同<ul><li>slice的自动扩容后的大小是多少?</li><li>延伸</li></ul></li><li>map<ul><li>哈希扩容</li><li>扩容规则</li></ul></li><li>struct和内存对齐</li><li>chan</li><li>error.Unwrap</li></ul></li><li>跟类型相关<ul><li>类型系统</li><li>跟函数定义的结构相关<ul><li>函数调用栈细节</li><li>闭包</li><li>方法(method)</li><li>defer三阶段<ul><li>before 1.13<ul><li>测试题</li></ul></li><li>1.13</li><li>1.14</li></ul></li><li>panic AND recover<ul><li>测验</li></ul></li></ul></li><li>跟interface相关<ul><li>c++多态</li><li>接口<ul><li>eface</li><li>iface</li></ul></li><li>类型断言</li><li>reflect<ul><li>reflect.Type</li><li>reflect.Value</li></ul></li></ul></li></ul></li><li>运行时:<ul><li>并发编程<ul><li>同步原语<ul><li>内存顺序保证</li><li>sync包</li></ul></li><li>context(上下文)</li></ul></li><li>内存管理<ul><li>GC</li><li>逃逸分析</li><li>内存泄漏</li></ul></li></ul></li><li>附录<ul><li>0.方法</li><li><ol><li>new And make</li></ol><ul><li>example</li></ul></li><li><ol start=2><li>值类型和引用类型的区别</li></ol></li><li><ol start=3><li>计算golang中类型的大小的方式</li></ol></li><li>golang的chan</li></ul></li><li>archive</li></ul></li></ul><h2 id=数据结构>数据结构
 <a class=anchor href=#%e6%95%b0%e6%8d%ae%e7%bb%93%e6%9e%84>#</a></h2><ul><li>这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址.</li><li>然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能?</li></ul><hr><h3 id=string>string
 <a class=anchor href=#string>#</a></h3><p>string类型的底层结构.它的大小是几个字节?</p><p>指针和字节大小</p><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210130201754.png alt=UTF-8></p><pre tabindex=0><code>0xxxxxxx
 110xxxxx 10xxxxxx
@@ -297,19 +297,165 @@ second: 异常信息的输出方式:所有还在panic链表上的项都会被输
 </span></span><span style=display:flex><span>	<span style=color:#a6e22e>A</span>()
 </span></span><span style=display:flex><span>}
 </span></span></code></pre></div><p><a href=https://goplay.tools/snippet/phXUi8KDi61>https://goplay.tools/snippet/phXUi8KDi61</a></p><h3 id=跟interface相关>跟interface相关
-<a class=anchor href=#%e8%b7%9finterface%e7%9b%b8%e5%85%b3>#</a></h3><h4 id=接口>接口
-<a class=anchor href=#%e6%8e%a5%e5%8f%a3>#</a></h4><pre tabindex=0><code>eface
-iface
-	interfacetype
-</code></pre><h5 id=eface>eface
-<a class=anchor href=#eface>#</a></h5><blockquote><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210118205914.png alt=20210118205914></p><blockquote><p>其中<code>_type</code>
+<a class=anchor href=#%e8%b7%9finterface%e7%9b%b8%e5%85%b3>#</a></h3><h4 id=c多态>c++多态
+<a class=anchor href=#c%e5%a4%9a%e6%80%81>#</a></h4><p>多态有什么好处？
+有两个好处：</p><ol><li>应用程序不必为每一个派生类编写功能调用，只需要对抽象基类进行处理即可。大大提高程序的可复用性。//继承</li><li>派生类的功能可以被基类的方法或引用变量所调用，这叫向后兼容，可以提高可扩充性和可维护性。 //多态的真正作用，</li></ol><ul><li>多态需要两个特性：<ul><li>方法重写（override）：父类与子类具有函数签名完全相同的方法。</li><li>向上类型转换（upcasting）：用一个父类指针指向子类对象的时候，假如调用的是虚函数，会自动暂时将该指针转换为子类类型的指针。<ul><li>派生类的功能可以被基类的方法或引用变量所调用, 向上类型转换(父类->子类)</li></ul></li></ul></li></ul><p><a href=https://blog.csdn.net/weixin_43940314/article/details/125499272>https://blog.csdn.net/weixin_43940314/article/details/125499272</a></p><p>go语言实现多态:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> <span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// go里面的多态就像是interface
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Itest</span> <span style=color:#66d9ef>interface</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>Test</span>()
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>First</span> <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>f</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>First</span>) <span style=color:#a6e22e>Test</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;this is First&#34;</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Second</span> <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>s</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>Second</span>) <span style=color:#a6e22e>Test</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;this is Second&#34;</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>p</span> <span style=color:#a6e22e>Itest</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>p</span> = new(<span style=color:#a6e22e>First</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>Test</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>p</span> = new(<span style=color:#a6e22e>Second</span>)
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>p</span>.<span style=color:#a6e22e>Test</span>()
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h4 id=接口>接口
+<a class=anchor href=#%e6%8e%a5%e5%8f%a3>#</a></h4><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220722144048.png alt=20220722144048></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> <span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// go里面的多态就像是interface
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>Itest</span> <span style=color:#66d9ef>interface</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>Test</span>()
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>First</span> <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> (<span style=color:#a6e22e>f</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>First</span>) <span style=color:#a6e22e>Test</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;this is First&#34;</span>)
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>return</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>emptyFace</span> <span style=color:#66d9ef>interface</span>{}
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>interfaceFace</span> <span style=color:#a6e22e>Itest</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>object</span> = new(<span style=color:#a6e22e>First</span>)
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// 都是保存的一个东西，那么在底层会表现出不一样？
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>emptyFace</span> = <span style=color:#a6e22e>object</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>interfaceFace</span> = <span style=color:#a6e22e>object</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// -----------------------------------
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_</span> = <span style=color:#a6e22e>emptyFace</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>_</span> = <span style=color:#a6e22e>interfaceFace</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>interfaceFace</span>.<span style=color:#a6e22e>Test</span>()
+</span></span><span style=display:flex><span><span style=color:#75715e>// -----------------------------------
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pre></div><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>structtype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>     <span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>pkgPath</span> <span style=color:#a6e22e>name</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>fields</span>  []<span style=color:#a6e22e>structfield</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>slicetype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>  <span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>elem</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>arraytype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>   <span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>elem</span>  <span style=color:#f92672>*</span><span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>slice</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>len</span>   <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>functype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>      <span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>inCount</span>  <span style=color:#66d9ef>uint16</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>outCount</span> <span style=color:#66d9ef>uint16</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>ptrtype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>  <span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>elem</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>chantype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>  <span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>elem</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>_type</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>dir</span>  <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>uncommontype</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>pkgpath</span> <span style=color:#a6e22e>nameOff</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>mcount</span>  <span style=color:#66d9ef>uint16</span> <span style=color:#75715e>// number of methods
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>xcount</span>  <span style=color:#66d9ef>uint16</span> <span style=color:#75715e>// number of exported methods
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>moff</span>    <span style=color:#66d9ef>uint32</span> <span style=color:#75715e>// offset from this uncommontype to [mcount]method
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_</span>       <span style=color:#66d9ef>uint32</span> <span style=color:#75715e>// unused
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// tflag is documented in reflect/type.go.
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// tflag values must be kept in sync with copies in:
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//	cmd/compile/internal/reflectdata/reflect.go
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//	cmd/link/internal/ld/decodesym.go
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//	reflect/type.go
+</span></span></span><span style=display:flex><span><span style=color:#75715e>//	internal/reflectlite/type.go
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>tflag</span> <span style=color:#66d9ef>uint8</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>const</span> (
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>tflagUncommon</span>      <span style=color:#a6e22e>tflag</span> = <span style=color:#ae81ff>1</span> <span style=color:#f92672>&lt;&lt;</span> <span style=color:#ae81ff>0</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>tflagExtraStar</span>     <span style=color:#a6e22e>tflag</span> = <span style=color:#ae81ff>1</span> <span style=color:#f92672>&lt;&lt;</span> <span style=color:#ae81ff>1</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>tflagNamed</span>         <span style=color:#a6e22e>tflag</span> = <span style=color:#ae81ff>1</span> <span style=color:#f92672>&lt;&lt;</span> <span style=color:#ae81ff>2</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>tflagRegularMemory</span> <span style=color:#a6e22e>tflag</span> = <span style=color:#ae81ff>1</span> <span style=color:#f92672>&lt;&lt;</span> <span style=color:#ae81ff>3</span> <span style=color:#75715e>// equal and hash can treat values of this type as a single region of t.size bytes
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>)
+</span></span></code></pre></div><ul><li><a href=https://github.com/teh-cmc/go-internals/blob/master/chapter2_interfaces/README.md#reconstructing-an-itab-from-an-executable>https://github.com/teh-cmc/go-internals/blob/master/chapter2_interfaces/README.md#reconstructing-an-itab-from-an-executable</a></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#f92672>import</span> <span style=color:#e6db74>&#34;fmt&#34;</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>selfDefTypeA</span> = <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>selfDefTypeB</span> <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>testAnotherName</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>a1</span> <span style=color:#a6e22e>selfDefTypeA</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>var</span> <span style=color:#a6e22e>a2</span> <span style=color:#66d9ef>int</span>
+</span></span><span style=display:flex><span>	<span style=color:#66d9ef>if</span> <span style=color:#a6e22e>a1</span> <span style=color:#f92672>==</span> <span style=color:#a6e22e>a2</span> {
+</span></span><span style=display:flex><span>		<span style=color:#a6e22e>fmt</span>.<span style=color:#a6e22e>Println</span>(<span style=color:#e6db74>&#34;selfDefTypeA is same with int&#34;</span>)
+</span></span><span style=display:flex><span>	}
+</span></span><span style=display:flex><span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#75715e>// func testSelfDefineType() {
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// 	var b1 selfDefTypeB
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// 	var b2 int
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// 	if b1 == b2 { // 编译不通过：invalid operation: b1 == b2 (mismatched types selfDefTypeB and int)
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// 		fmt.Println(&#34;selfDefTypeB is same with int&#34;)
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// 	}
+</span></span></span><span style=display:flex><span><span style=color:#75715e>// }
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>testAnotherName</span>()
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//testSelfDefineType()
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h5 id=eface>eface
+<a class=anchor href=#eface>#</a></h5><p><a href="https://sourcegraph.com/github.com/golang/go@642329f/-/blob/src/runtime/runtime2.go?L208:6&popover=pinned">eface</a></p><blockquote><blockquote><p>其中<code>_type</code>
 <a href=https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L31>type _type struct</a></p></blockquote></blockquote><h5 id=iface>iface
-<a class=anchor href=#iface>#</a></h5><blockquote><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119141924.png alt=20210119141924></p><blockquote><p><a href=https://github.com/golang/go/blob/642329fdd55aabafc67b3a7c50902e29125621ab/src/runtime/type.go#L366>type interfacetype struct {</a></p></blockquote></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>interfacetype</span> <span style=color:#66d9ef>struct</span> {
+<a class=anchor href=#iface>#</a></h5><p><a href="https://sourcegraph.com/github.com/golang/go@642329f/-/blob/src/runtime/runtime2.go?L203:6&popover=pinned">iface</a></p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>interfacetype</span> <span style=color:#66d9ef>struct</span> {
 </span></span><span style=display:flex><span>	<span style=color:#a6e22e>typ</span>     <span style=color:#a6e22e>_type</span>
 </span></span><span style=display:flex><span>	<span style=color:#a6e22e>pkgpath</span> <span style=color:#a6e22e>name</span>
 </span></span><span style=display:flex><span>	<span style=color:#a6e22e>mhdr</span>    []<span style=color:#a6e22e>imethod</span>
 </span></span><span style=display:flex><span>}
-</span></span></code></pre></div><ul><li>如果接口类型与动态类型确定了,那么itab的就固定了,此时它是可以复用的.<ul><li>go会把itab缓存起来.</li></ul></li></ul><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210119142057.png alt=20210119142057></p><h4 id=类型断言>类型断言
+</span></span></code></pre></div><ul><li><p>如果接口类型与动态类型确定了,那么itab的就固定了,此时它是可以复用的.</p><ul><li>go会把itab缓存起来.</li></ul></li><li><p><a href=https://sourcegraph.com/github.com/golang/go/-/blob/src/runtime/iface.go?L29>https://sourcegraph.com/github.com/golang/go/-/blob/src/runtime/iface.go?L29</a></p></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span>  <span style=color:#66d9ef>func</span> <span style=color:#a6e22e>itabHashFunc</span>(<span style=color:#a6e22e>inter</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>interfacetype</span>, <span style=color:#a6e22e>typ</span> <span style=color:#f92672>*</span><span style=color:#a6e22e>_type</span>) <span style=color:#66d9ef>uintptr</span> {
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// compiler has provided some good hash codes for us.
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#66d9ef>return</span> uintptr(<span style=color:#a6e22e>inter</span>.<span style=color:#a6e22e>typ</span>.<span style=color:#a6e22e>hash</span> ^ <span style=color:#a6e22e>typ</span>.<span style=color:#a6e22e>hash</span>)
+</span></span><span style=display:flex><span>}
+</span></span></code></pre></div><h4 id=类型断言>类型断言
 <a class=anchor href=#%e7%b1%bb%e5%9e%8b%e6%96%ad%e8%a8%80>#</a></h4><h4 id=reflect>reflect
 <a class=anchor href=#reflect>#</a></h4><h5 id=reflecttype>reflect.Type
 <a class=anchor href=#reflecttype>#</a></h5><ul><li>what:<ul><li><a href=https://github.com/golang/go/blob/9ec21a8f347e760945ca0f58ad72062588f08577/src/reflect/type.go#L1368>TypeOf</a></li></ul></li></ul><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// TypeOf returns the reflection Type that represents the dynamic type of i.
