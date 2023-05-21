@@ -1,26 +1,88 @@
-<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="结构 # on-heap 和 off-heap 的区别是这个对象占用的内存是否支持垃圾自动回收
-off-heap的对象，必须只能手动管理，比如heapArena，mspan等runtime中的数据结构
-type mheap struct { _ sys.NotInHeap // lock must only be acquired on the system stack, otherwise a g // could self-deadlock if its stack grows with the lock held. lock mutex pages pageAlloc // page allocation data structure pageAlloc：页面分配器把整个虚拟地址空间划分（假想的）成一个个8KB对齐的大小为8KB的页面，分配器采用位图管理页面分配情况。因为虚拟地址空间过于庞大，所以对位图做了划分，每512个页面，使用一个位图。
-https://github.com/golang/go/blob/fe10464358057778732e9c958683039beb64e61a/src/runtime/mpagealloc.go#L179
-2^13 * sizeof(pallocData) 2^13*(16*8)=2^13*128=2^(13+7)=2^20=1M 2^13*2^13*512*8*2^10=256*2^40=2^48=256T 由于每个 runtime.heapArena 都会管理 64MB 的内存，整个堆区最多可以管理 256TB 的内存，这比之前的 512GB 多好几个数量级。
-mheap.allocSpan函数利用pageAlloc来分配mspan 都是在mspan的基础之上来进一步分配的;
-golang对象分配采用的是:
-sequential allocation sequential allocation 的实现方式非常简单，只需要把维护的空间直接分配出去就好，每次分配以后挪动指针，指向剩余空闲的位置的首地址，runtime off-heap object allocator一节中介绍的persistent allocator采用的就是sequential allocation这个方式。 free-list allocation free list allocation 这种分配方式相对sequential allocation这种方式没能更好的利用上缓存的空间局部性原理，并且分配的时候速度慢，虽然有first fit 、next fit、best fit三种寻找空闲块的策略 ，但是多少还是会造成外部碎片。但是free list allocation 可以支持立马把释放的空间放到list中用于后续的分配。 segregated-fit allocator 设置K个size class ，各自的大小是s1,s2&mldr;sk (从小到大排队)，当程序需要S大小空间的时候，给其分配sn这么多的空间(sn<=S<sn+1)，每种size class都有一个分配器，专门分配这个大小，这样相比 free list allocation 可以免去寻找合适内存块的过程。但是会造成更多的浪费，因为对象的大小不一定正好等于slot的大小。调整size class 的个数和每个的大小是减少浪费的关键。 segregated-fit allocation 还有一个好处是可以非常方便的处理指向对象内部的指针，这可以为垃圾回收提供便利，对于任何一个指针，可以很轻松的找到这个指针所指向的对象的首地址。 堆内存的数据结构 # mheap # Go语言的runtime将堆内存用数据结构mheap来管理。 它的主要字段如下："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="内存分配器"><meta property="og:description" content="结构 # on-heap 和 off-heap 的区别是这个对象占用的内存是否支持垃圾自动回收
-off-heap的对象，必须只能手动管理，比如heapArena，mspan等runtime中的数据结构
-type mheap struct { _ sys.NotInHeap // lock must only be acquired on the system stack, otherwise a g // could self-deadlock if its stack grows with the lock held. lock mutex pages pageAlloc // page allocation data structure pageAlloc：页面分配器把整个虚拟地址空间划分（假想的）成一个个8KB对齐的大小为8KB的页面，分配器采用位图管理页面分配情况。因为虚拟地址空间过于庞大，所以对位图做了划分，每512个页面，使用一个位图。
-https://github.com/golang/go/blob/fe10464358057778732e9c958683039beb64e61a/src/runtime/mpagealloc.go#L179
-2^13 * sizeof(pallocData) 2^13*(16*8)=2^13*128=2^(13+7)=2^20=1M 2^13*2^13*512*8*2^10=256*2^40=2^48=256T 由于每个 runtime.heapArena 都会管理 64MB 的内存，整个堆区最多可以管理 256TB 的内存，这比之前的 512GB 多好几个数量级。
-mheap.allocSpan函数利用pageAlloc来分配mspan 都是在mspan的基础之上来进一步分配的;
-golang对象分配采用的是:
-sequential allocation sequential allocation 的实现方式非常简单，只需要把维护的空间直接分配出去就好，每次分配以后挪动指针，指向剩余空闲的位置的首地址，runtime off-heap object allocator一节中介绍的persistent allocator采用的就是sequential allocation这个方式。 free-list allocation free list allocation 这种分配方式相对sequential allocation这种方式没能更好的利用上缓存的空间局部性原理，并且分配的时候速度慢，虽然有first fit 、next fit、best fit三种寻找空闲块的策略 ，但是多少还是会造成外部碎片。但是free list allocation 可以支持立马把释放的空间放到list中用于后续的分配。 segregated-fit allocator 设置K个size class ，各自的大小是s1,s2&mldr;sk (从小到大排队)，当程序需要S大小空间的时候，给其分配sn这么多的空间(sn<=S<sn+1)，每种size class都有一个分配器，专门分配这个大小，这样相比 free list allocation 可以免去寻找合适内存块的过程。但是会造成更多的浪费，因为对象的大小不一定正好等于slot的大小。调整size class 的个数和每个的大小是减少浪费的关键。 segregated-fit allocation 还有一个好处是可以非常方便的处理指向对象内部的指针，这可以为垃圾回收提供便利，对于任何一个指针，可以很轻松的找到这个指针所指向的对象的首地址。 堆内存的数据结构 # mheap # Go语言的runtime将堆内存用数据结构mheap来管理。 它的主要字段如下："><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/golang_memery/"><meta property="article:section" content="docs"><title>内存分配器 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.76f6dbe75c94e688c018dd8b54e7f880916b14ab4cf3881b81f75d6bb916603c.css integrity="sha256-dvbb51yU5ojAGN2LVOf4gJFrFKtM84gbgfdda7kWYDw=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="arm64 # 16 8 4 2 1 1 1 1 1 1 5位的系统，只使用了4位的虚拟地址，所以虚拟空间只是占用两头，而中间没有使用到,总共占用2^4=16个地址空间。
+11111 11110 11101 11100 11011 11010 11001 11000 ----- 10111 ..... 01000 ----- 00111 00110 00101 00100 00011 00010 00001 00000 +--------------------+ 111 | | | | | | | | | | | | | | |--------------------| 11000 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |--------------------- 00111 | | | | | | | | | | | | | | +--------------------+ 需要把这两块地址空间串联起来，高位地址空间距离00000的偏移量为11000，所以减去11000(非符号位取反+1,符号位不变;注意这里没有符号位，00111+1=01000);从而得到两块地址空间如下："><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="内存分配器"><meta property="og:description" content="arm64 # 16 8 4 2 1 1 1 1 1 1 5位的系统，只使用了4位的虚拟地址，所以虚拟空间只是占用两头，而中间没有使用到,总共占用2^4=16个地址空间。
+11111 11110 11101 11100 11011 11010 11001 11000 ----- 10111 ..... 01000 ----- 00111 00110 00101 00100 00011 00010 00001 00000 +--------------------+ 111 | | | | | | | | | | | | | | |--------------------| 11000 | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |--------------------- 00111 | | | | | | | | | | | | | | +--------------------+ 需要把这两块地址空间串联起来，高位地址空间距离00000的偏移量为11000，所以减去11000(非符号位取反+1,符号位不变;注意这里没有符号位，00111+1=01000);从而得到两块地址空间如下："><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/golang_memery/"><meta property="article:section" content="docs"><title>内存分配器 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.76f6dbe75c94e688c018dd8b54e7f880916b14ab4cf3881b81f75d6bb916603c.css integrity="sha256-dvbb51yU5ojAGN2LVOf4gJFrFKtM84gbgfdda7kWYDw=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
 <script defer src=/go-goroutine/en.search.min.c282ec4e193a9e68f93a9e4cfe4ce8b40f3f33d292675901d4e6b3e426acb499.js integrity="sha256-woLsThk6nmj5Op5M/kzotA8/M9KSZ1kB1Oaz5CastJk=" crossorigin=anonymous></script>
 <script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
-<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/runtime/golang_memery/ class=active>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle>
+<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/runtime/complement-source-reverse/>源码-反码-补码</a></li><li><a href=/go-goroutine/docs/runtime/golang_memery/ class=active>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle>
 <label for=section-99f41010918d678e89a7af90330cabe1 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script>
 <script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
 <strong>内存分配器</strong>
-<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><a href=#结构>结构</a></li><li><a href=#堆内存的数据结构>堆内存的数据结构</a><ul><li><a href=#mheap>mheap</a></li></ul></li><li><a href=#heaparena>heaparena</a><ul><li><a href=#mspan>mspan</a><ul><li><a href=#heaparena-1>heapArena</a></li><li><a href=#span>span</a></li></ul></li></ul></li></ul></li></ul></nav></aside></header><article class=markdown><h2 id=结构>结构
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><a href=#arm64>arm64</a></li><li><a href=#结构>结构</a></li><li><a href=#堆内存的数据结构>堆内存的数据结构</a><ul><li><a href=#mheap>mheap</a></li></ul></li><li><a href=#heaparena>heaparena</a><ul><li><a href=#mspan>mspan</a><ul><li><a href=#heaparena-1>heapArena</a></li><li><a href=#span>span</a></li></ul></li></ul></li></ul></li></ul></nav></aside></header><article class=markdown><h2 id=arm64>arm64
+<a class=anchor href=#arm64>#</a></h2><pre tabindex=0><code>16 8  4  2  1
+1  1  1  1  1
+</code></pre><p>5位的系统，只使用了4位的虚拟地址，所以虚拟空间只是占用两头，而中间没有使用到,总共占用<code>2^4=16</code>个地址空间。</p><pre tabindex=0><code>11111
+11110
+11101
+11100
+11011
+11010
+11001
+11000
+-----
+10111
+.....
+01000
+-----
+00111
+00110
+00101
+00100
+00011
+00010
+00001
+00000
+</code></pre><pre tabindex=0><code>+--------------------+   111      
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|--------------------| 11000      
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|--------------------- 00111      
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
+|                    |            
++--------------------+            
+</code></pre><p>需要把这两块地址空间串联起来，高位地址空间距离<code>00000</code>的偏移量为<code>11000</code>，所以减去11000(非符号位取反+1,符号位不变;注意这里没有符号位，00111+1=01000);从而得到两块地址空间如下：</p><pre tabindex=0><code>00111
+00110
+00101
+00100
+00011
+00010
+00001
+00000
+
+01111
+01110
+01101
+01100
+01011
+01010
+01001
+01000
+</code></pre><h2 id=结构>结构
 <a class=anchor href=#%e7%bb%93%e6%9e%84>#</a></h2><p>on-heap 和 off-heap 的区别是这个对象占用的内存是否支持垃圾自动回收</p><p>off-heap的对象，必须只能手动管理，比如heapArena，mspan等runtime中的数据结构</p><pre tabindex=0><code>type mheap struct {
 	_ sys.NotInHeap
 
@@ -96,4 +158,4 @@ sequential allocation sequential allocation 的实现方式非常简单，只需
 </span></span></code></pre></div><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210408201124.png alt=20210408201124></p><h4 id=heaparena-1>heapArena
 <a class=anchor href=#heaparena-1>#</a></h4><p><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210120104547.png alt=20210120104547></p><ul><li>mheap中每个arena对应一个HeapArena，记录arena的元数据信息。HeapArena中有一个<strong>bitmap和一个spans</strong>字段。<ul><li>1.bitmap<ul><li>bitmap中每两个bit对应标记arena中一个指针大小的word，也就是说bitmap中<strong>一个byte</strong>可以标记<strong>arena中连续四个指针大小</strong>的内存。<ul><li>每个word对应的两个bit中，<strong>低位bit用于标记是否为指针</strong>，0为非指针，1为指针；<strong>高位bit用于标记是否要继续扫描</strong>，<code>高位bit为1</code>就代表扫描完当前word并不能完成当前数据对象的扫描。</li></ul></li></ul></li><li>2.spans<ul><li>spans是一个*mspan类型的数组，用于记录当前arena中每一页对应到哪一个mspan。(看这个mspan的结构可以知道，它有startAddr与npages,说明一个mspan管理多个page)</li></ul></li></ul></li></ul><blockquote><p>基于HeapArena记录的元数据信息，我们只要知道一个对象的地址，</p><blockquote><p>就可以根据HeapArena.bitmap信息扫描它内部是否含有指针；
 也可以根据对象地址计算出它在哪一页，然后通过HeapArena.spans信息查到该对象存在哪一个mspan中。</p></blockquote></blockquote><h4 id=span>span
-<a class=anchor href=#span>#</a></h4><ul><li>而每个span都对应两个位图标记：mspan.allocBits和mspan.gcmarkBits。<ul><li>（1）allocBits中每一位用于标记一个对象存储单元是否已分配。<ul><li><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202836.png alt=20210113202836></li></ul></li><li>（2）<code>gcmarkBits</code>中每一位用于标记<strong>一个对象是否存活</strong>。<ul><li><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202858.png alt=20210113202858></li></ul></li></ul></li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><ul><li><a href=#结构>结构</a></li><li><a href=#堆内存的数据结构>堆内存的数据结构</a><ul><li><a href=#mheap>mheap</a></li></ul></li><li><a href=#heaparena>heaparena</a><ul><li><a href=#mspan>mspan</a><ul><li><a href=#heaparena-1>heapArena</a></li><li><a href=#span>span</a></li></ul></li></ul></li></ul></li></ul></nav></div></aside></main></body></html>
+<a class=anchor href=#span>#</a></h4><ul><li>而每个span都对应两个位图标记：mspan.allocBits和mspan.gcmarkBits。<ul><li>（1）allocBits中每一位用于标记一个对象存储单元是否已分配。<ul><li><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202836.png alt=20210113202836></li></ul></li><li>（2）<code>gcmarkBits</code>中每一位用于标记<strong>一个对象是否存活</strong>。<ul><li><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20210113202858.png alt=20210113202858></li></ul></li></ul></li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><ul><li><a href=#arm64>arm64</a></li><li><a href=#结构>结构</a></li><li><a href=#堆内存的数据结构>堆内存的数据结构</a><ul><li><a href=#mheap>mheap</a></li></ul></li><li><a href=#heaparena>heaparena</a><ul><li><a href=#mspan>mspan</a><ul><li><a href=#heaparena-1>heapArena</a></li><li><a href=#span>span</a></li></ul></li></ul></li></ul></li></ul></nav></div></aside></main></body></html>

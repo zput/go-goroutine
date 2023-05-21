@@ -1,0 +1,88 @@
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="概念 # 机器数
+真值
+真值符号部分 真值部分 举例： -1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
+原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1) 计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式. 但为什么需要三种不同的编码方式呢？
+使用原码，反码和补码的原因 # 人脑与机器计算的差异 # 人脑可以知道第一位是符号位, 在计算的时候我们会根据符号位, 选择对真值区域的加减。但是对于计算机, 加减乘数已经是最基础的运算, 要设计的尽量简单. 计算机辨别&#34;符号位&#34;显然会让计算机的基础电路设计变得十分复杂! 于是人们转而设计出将符号位也参与运算的方法。
+反码诞生原因 # 如果只使用原码，当我们计算1-1=0 => 1 - 1 = 1 + (-1) = [00000001]原 + [10000001]原 = [10000010]原 = -2，这显然不符合我们的预期。
+为了解决原码符号位也参与运算做减法的问题, 出现了反码,会到前面的例子，用反码来表示一下:1 - 1 = 1 + (-1) = [0000 0001]原 + [1000 0001]原= [0000 0001]反 + [1111 1110]反 = [1111 1111]反 = [1000 0000]原 = -0用反码计算减法, 结果真值区域是正确的"><meta name=theme-color content="#FFFFFF"><meta name=color-scheme content="light dark"><meta property="og:title" content="源码-反码-补码"><meta property="og:description" content="概念 # 机器数
+真值
+真值符号部分 真值部分 举例： -1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
+原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1) 计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式. 但为什么需要三种不同的编码方式呢？
+使用原码，反码和补码的原因 # 人脑与机器计算的差异 # 人脑可以知道第一位是符号位, 在计算的时候我们会根据符号位, 选择对真值区域的加减。但是对于计算机, 加减乘数已经是最基础的运算, 要设计的尽量简单. 计算机辨别&#34;符号位&#34;显然会让计算机的基础电路设计变得十分复杂! 于是人们转而设计出将符号位也参与运算的方法。
+反码诞生原因 # 如果只使用原码，当我们计算1-1=0 => 1 - 1 = 1 + (-1) = [00000001]原 + [10000001]原 = [10000010]原 = -2，这显然不符合我们的预期。
+为了解决原码符号位也参与运算做减法的问题, 出现了反码,会到前面的例子，用反码来表示一下:1 - 1 = 1 + (-1) = [0000 0001]原 + [1000 0001]原= [0000 0001]反 + [1111 1110]反 = [1111 1111]反 = [1000 0000]原 = -0用反码计算减法, 结果真值区域是正确的"><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/"><meta property="article:section" content="docs"><title>源码-反码-补码 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png type=image/x-icon><link rel=stylesheet href=/go-goroutine/book.min.76f6dbe75c94e688c018dd8b54e7f880916b14ab4cf3881b81f75d6bb916603c.css integrity="sha256-dvbb51yU5ojAGN2LVOf4gJFrFKtM84gbgfdda7kWYDw=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.c282ec4e193a9e68f93a9e4cfe4ce8b40f3f33d292675901d4e6b3e426acb499.js integrity="sha256-woLsThk6nmj5Op5M/kzotA8/M9KSZ1kB1Oaz5CastJk=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
+<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><a href=/go-goroutine/docs/runtime/complement-source-reverse/ class=active>源码-反码-补码</a></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle>
+<label for=section-99f41010918d678e89a7af90330cabe1 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script>
+<script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>源码-反码-补码</strong>
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><a href=#概念>概念</a></li><li><a href=#使用原码反码和补码的原因>使用原码，反码和补码的原因</a><ul><li><a href=#人脑与机器计算的差异>人脑与机器计算的差异</a></li><li><a href=#反码诞生原因>反码诞生原因</a></li><li><a href=#补码的诞生>补码的诞生</a></li></ul></li><li><a href=#重探反码>重探反码</a><ul><li><a href=#模运算的定义>模运算的定义</a></li><li><a href=#同余>同余</a><ul><li><a href=#同余定理的反身性>同余定理的反身性</a></li><li><a href=#同余的线性运算>同余的线性运算</a></li></ul></li></ul></li></ul></li></ul></nav></aside></header><article class=markdown><h2 id=概念>概念
+<a class=anchor href=#%e6%a6%82%e5%bf%b5>#</a></h2><ul><li><p>机器数</p></li><li><p>真值</p><ul><li>真值符号部分</li><li>真值部分</li></ul></li></ul><p>举例：
+-1的真值是:<code>1000 0001</code>, 其中真值<strong>符号区域</strong>为最高位的<code>1</code>,他的<strong>真值区域</strong>为<code>000 0001</code>。</p><hr><ul><li>原码</li></ul><pre tabindex=0><code>[+1] = 0000 0001
+[-1] = 1000 0001
+</code></pre><ul><li>反码：<ul><li>正数的反码是其本身</li><li>负数的反码是在其原码的基础上, 符号位不变，其余各个位取反.</li></ul></li><li>补码：<ul><li>正数的补码就是其本身</li><li>负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1)</li></ul></li></ul><p>计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式.
+但为什么需要三种不同的编码方式呢？</p><h2 id=使用原码反码和补码的原因>使用原码，反码和补码的原因
+<a class=anchor href=#%e4%bd%bf%e7%94%a8%e5%8e%9f%e7%a0%81%e5%8f%8d%e7%a0%81%e5%92%8c%e8%a1%a5%e7%a0%81%e7%9a%84%e5%8e%9f%e5%9b%a0>#</a></h2><h3 id=人脑与机器计算的差异>人脑与机器计算的差异
+<a class=anchor href=#%e4%ba%ba%e8%84%91%e4%b8%8e%e6%9c%ba%e5%99%a8%e8%ae%a1%e7%ae%97%e7%9a%84%e5%b7%ae%e5%bc%82>#</a></h3><p>人脑可以知道第一位是符号位, 在计算的时候我们会根据符号位, 选择对真值区域的加减。但是对于计算机, 加减乘数已经是最基础的运算, 要设计的尽量简单. 计算机辨别"符号位"显然会让<strong>计算机的基础电路设计</strong>变得十分复杂! 于是人们转而设计出将<strong>符号位也参与运算</strong>的方法。</p><h3 id=反码诞生原因>反码诞生原因
+<a class=anchor href=#%e5%8f%8d%e7%a0%81%e8%af%9e%e7%94%9f%e5%8e%9f%e5%9b%a0>#</a></h3><p>如果只使用原码，当我们计算<code>1-1=0</code> => <code>1 - 1 = 1 + (-1) = [00000001]原 + [10000001]原 = [10000010]原 = -2</code>，这显然不符合我们的预期。</p><p>为了解决<strong>原码符号位也参与运算做减法</strong>的问题, 出现了反码,会到前面的例子，用反码来表示一下:<code>1 - 1 = 1 + (-1) = [0000 0001]原 + [1000 0001]原= [0000 0001]反 + [1111 1110]反 = [1111 1111]反 = [1000 0000]原 = -0</code>用反码计算减法, 结果<strong>真值区域</strong>是正确的</p><p>再看一个<code>1-2</code>=><code>[0000 0001]原 + [1000 0010]原= [0000 0001]反 + [1111 1101]反 = [1111 1110]反 = [1000 0001]原</code>,就为<code>-1</code></p><p>但对于<strong>0这个特殊的数值</strong>. 虽然人们理解上+0和-0是一样的, 但是0带符号是没有任何意义的. 且会用[0000 0000]原和[1000 0000]原两个编码表示0,导致浪费。</p><h3 id=补码的诞生>补码的诞生
+<a class=anchor href=#%e8%a1%a5%e7%a0%81%e7%9a%84%e8%af%9e%e7%94%9f>#</a></h3><p>于是补码的出现, 解决了0的符号以及两个编码的问题: <code>1-1 = 1 + (-1) = [0000 0001]原 + [1000 0001]原 = [0000 0001]补 + [1111 1111]补 = [0000 0000]补=[0000 0000]原</code></p><p>这样0用[0000 0000]表示, 而以前出现问题的-0则不存在了.而且可以用[1000 0000]表示-128:</p><h2 id=重探反码>重探反码
+<a class=anchor href=#%e9%87%8d%e6%8e%a2%e5%8f%8d%e7%a0%81>#</a></h2><p>计算机巧妙地把符号位参与运算, 并且将减法变成了加法, 背后蕴含了怎样的数学原理呢?</p><p>将钟表想象成是一个1位的12进制数. 如果当前时间是6点, 我希望将时间设置成4点, 需要怎么做呢?我们可以:</p><pre tabindex=0><code>1. 往回拨2个小时: 6 - 2 = 4
+2. 往前拨10个小时: (6 + 10) mod 12 = 4
+3. 往前拨10+12=22个小时: (6+22) mod 12 =4
+</code></pre><p>2,3方法中的mod是指取模操作, 16 mod 12 =4 即用16除以12后的余数是4.</p><p>所以钟表往回拨(减法)的结果可以用往前拨(加法)替代!</p><p>现在的焦点就落在了如何用一个正数, 来替代一个负数. 上面的例子我们能感觉出来一些端倪, 发现一些规律. 但是数学是严谨的. 不能靠感觉.</p><h3 id=模运算的定义>模运算的定义
+<a class=anchor href=#%e6%a8%a1%e8%bf%90%e7%ae%97%e7%9a%84%e5%ae%9a%e4%b9%89>#</a></h3><p>定义：对于任意实数x,y,可以有
+$$ x \bmod y=x-y\left[\frac{x}{y}\right], \quad y \neq 0 $$ 取下界</p><p>-3 mod 2:</p><pre tabindex=0><code>-3 mod 2
+  = -3 - 2x[-3/2]
+  = -3 - 2x[-1.5]
+  = -3 - 2x(-2) // 取下界
+  = -3 + 4 = 1
+</code></pre><h3 id=同余>同余
+<a class=anchor href=#%e5%90%8c%e4%bd%99>#</a></h3><pre tabindex=0><code>同余是数论中的一个概念，指两个整数在除以某个正整数时所得的余数相等，可以用符号 ≡ 表示。具体来说，如果整数 a 和 b 在模 m 的意义下同余，即有：
+
+a ≡ b (mod m)
+
+其中 mod 是取模运算符，表示对两个操作数进行除法运算后取余数的结果。
+
+这个式子的含义是，a 与 b 除以 m 的余数相同。例如，假设 m = 7，a = 25，b = 11，则有：
+
+25 ≡ 4 (mod 7)
+
+11 ≡ 4 (mod 7)
+
+因此，在模 7 的意义下，25 和 11 是同余的。同样地，对于任何整数 k，都有：
+
+25 + 7k ≡ 4 + 7k (mod 7)
+
+这是因为 25 + 7k 和 4 + 7k 在除以 7 后的余数相同。
+
+同余关系在数论中非常重要，因为它可以用于证明和推导各种定理和公式。同时，同余关系还广泛应用于密码学、编码解码等领域。
+</code></pre><h4 id=同余定理的反身性>同余定理的反身性
+<a class=anchor href=#%e5%90%8c%e4%bd%99%e5%ae%9a%e7%90%86%e7%9a%84%e5%8f%8d%e8%ba%ab%e6%80%a7>#</a></h4><pre tabindex=0><code>同余定理的反身性是指，如果两个整数 a 和 b 模 m 同余，即 a ≡ b (mod m)，那么也可以推导出 b ≡ a (mod m)。
+
+例如，假设 a = 7，b = 17，m = 5，则有：
+
+a ≡ 7 ≡ 2 (mod 5)
+
+b ≡ 17 ≡ 2 (mod 5)
+
+因此，a 和 b 在模 5 下是同余的。根据同余定理的反身性，我们可以得出：
+
+2 ≡ a ≡ 7 (mod 5)
+
+2 ≡ b ≡ 17 (mod 5)
+
+这表明在模 5 的意义下，a 和 b 是等价的，它们对于同一模数的余数相同。这个结论符合同余定理的定义，因此同余定理的反身性成立。
+</code></pre><h4 id=同余的线性运算>同余的线性运算
+<a class=anchor href=#%e5%90%8c%e4%bd%99%e7%9a%84%e7%ba%bf%e6%80%a7%e8%bf%90%e7%ae%97>#</a></h4><ul><li>同余式相加：若 $$ a \equiv b(\bmod m) ， c \equiv d(\bmod m) ，则 a \pm c \equiv b d \mathrm{m} (mod m) $$</li><li>同余式相乘：若 $$ a \equiv b(\bmod m) ， c \equiv d(\bmod m) ，则 a c \equiv b d(\bmod m) $$</li></ul><p>一个数的反码, 实际上是这个数对于一个膜的同余数. 而这个膜并不是我们的二进制, 而是所能表示的最大值</p><ul><li><code>2-1=2+(-1) = [0000 0010]原 + [1000 0001]原= [0000 0010]反 + [1111 1110]反 = [0000 0010]补 + [1111 1111]补</code></li></ul><p>-1的反码表示是1111 1110. 如果这里将[1111 1110]认为是原码, 则[1111 1110]原 = -126, 这里将符号位除去(<strong>符号位是参与计算的, 正好和溢出的最高位形成正确的运算结果</strong>), 即认为是126</p><pre tabindex=0><code>(-1) mod 127 = 126 //负数取模
+126 mod 127 = 126
+
+(-1) ≡ 126 (mod 127)
+所以：2-1 ≡ 2+126 (mod 127), 这个就是内涵的数学原理
+</code></pre><pre tabindex=0><code>其实, 在反码的基础上+1, 只是相当于增加了膜的值:
+(-1) mod 128 = 127
+127 mod 128 = 127
+
+2-1 ≡ 2+127 (mod 128)
+</code></pre><ul><li><a href=https://www.cnblogs.com/zhangziqiu/archive/2011/03/30/computercode.html>https://www.cnblogs.com/zhangziqiu/archive/2011/03/30/computercode.html</a></li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><ul><li><a href=#概念>概念</a></li><li><a href=#使用原码反码和补码的原因>使用原码，反码和补码的原因</a><ul><li><a href=#人脑与机器计算的差异>人脑与机器计算的差异</a></li><li><a href=#反码诞生原因>反码诞生原因</a></li><li><a href=#补码的诞生>补码的诞生</a></li></ul></li><li><a href=#重探反码>重探反码</a><ul><li><a href=#模运算的定义>模运算的定义</a></li><li><a href=#同余>同余</a><ul><li><a href=#同余定理的反身性>同余定理的反身性</a></li><li><a href=#同余的线性运算>同余的线性运算</a></li></ul></li></ul></li></ul></li></ul></nav></div></aside></main></body></html>
