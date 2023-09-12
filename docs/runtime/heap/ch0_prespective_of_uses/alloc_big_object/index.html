@@ -1,79 +1,67 @@
-<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="https://miloyip.github.io/graphvizuml/graphvizuml.pdf
-rankdir确定整个图的layout走向，在其他位置不生效
-https://graphviz.org/docs/attrs/rankdir/ 如果想要在layout中的走向是TOP-BUTTOM，中指定从左到右的效果，使用rank{rank=same; growS1->growS2; growS2->growS3;}
-constraint=false在不同级别中起作用；作用范围edges
-在等级分配期间，边的头部节点被约束为比尾节点处于更高的等级。但是，如果边具有constraint=false，则不会强制执行此要求。 基于上面的陈述，(我猜) constraint = false选项在不同的等级之间生效，而不是在同一等级中生效。 简言之它作用与边，当为false，就相当于这条边的两个节点没有连接在一起，它们的顺序(rank)被其他的边关系影响。 https://cloud.tencent.com/developer/ask/sof/60940 https://www.coder.work/article/6490069 https://graphviz.org/docs/attrs/constraint/ Mrecord
-对我来说，子图和集群是非常不同的东西 集群本身更像是迷你图 子图更像是具有共同属性的节点集，这些节点可能（也可能不）定位在一起 仅供参考，将节点定位在您想要的位置（而不是点想要的位置）可能具有挑战性，但通常您可以做到。将集群定位在您想要的位置通常~是不可能的。我通常使用 gvpr 程序对点输出进行后处理以定位集群。
-https://graphviz.org/doc/char.html digraph { compound=true fontsize=10 margin=&#34;0,0&#34; ranksep = .15 nodesep = .06 node [shape=ellipse fontname=&#34;Inconsolata, Consolas&#34;, fontsize=12, penwidth=0.5; constraint=false] edge [fontname=&#34;Inconsolata, Consolas&#34;, fontsize=10, arrowhead=normal] // 栈区 subgraph cluster_stack { style = dotted margin = 10 &#34;栈(包括系统栈)&#34; [shape = plaintext; fontsize = 24;] &#34;largeAlloc&#34;; &#34;Alloc&#34;; &#34;notice2&#34; [shape=plain;label=&#34;系统栈执行;\n初始化申请的内存&#34;] {rank=same; &#34;notice2&#34; -> &#34;Alloc&#34;[dir=none]; } } // 处理mspan subgraph cluster_span { style = dotted margin = 10 &#34;块(span)&#34; [shape = plaintext;fontsize = 24] &#34;mheap."><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:title" content="概述"><meta property="og:description" content="https://miloyip.github.io/graphvizuml/graphvizuml.pdf
-rankdir确定整个图的layout走向，在其他位置不生效
-https://graphviz.org/docs/attrs/rankdir/ 如果想要在layout中的走向是TOP-BUTTOM，中指定从左到右的效果，使用rank{rank=same; growS1->growS2; growS2->growS3;}
-constraint=false在不同级别中起作用；作用范围edges
-在等级分配期间，边的头部节点被约束为比尾节点处于更高的等级。但是，如果边具有constraint=false，则不会强制执行此要求。 基于上面的陈述，(我猜) constraint = false选项在不同的等级之间生效，而不是在同一等级中生效。 简言之它作用与边，当为false，就相当于这条边的两个节点没有连接在一起，它们的顺序(rank)被其他的边关系影响。 https://cloud.tencent.com/developer/ask/sof/60940 https://www.coder.work/article/6490069 https://graphviz.org/docs/attrs/constraint/ Mrecord
-对我来说，子图和集群是非常不同的东西 集群本身更像是迷你图 子图更像是具有共同属性的节点集，这些节点可能（也可能不）定位在一起 仅供参考，将节点定位在您想要的位置（而不是点想要的位置）可能具有挑战性，但通常您可以做到。将集群定位在您想要的位置通常~是不可能的。我通常使用 gvpr 程序对点输出进行后处理以定位集群。
-https://graphviz.org/doc/char.html digraph { compound=true fontsize=10 margin=&#34;0,0&#34; ranksep = .15 nodesep = .06 node [shape=ellipse fontname=&#34;Inconsolata, Consolas&#34;, fontsize=12, penwidth=0.5; constraint=false] edge [fontname=&#34;Inconsolata, Consolas&#34;, fontsize=10, arrowhead=normal] // 栈区 subgraph cluster_stack { style = dotted margin = 10 &#34;栈(包括系统栈)&#34; [shape = plaintext; fontsize = 24;] &#34;largeAlloc&#34;; &#34;Alloc&#34;; &#34;notice2&#34; [shape=plain;label=&#34;系统栈执行;\n初始化申请的内存&#34;] {rank=same; &#34;notice2&#34; -> &#34;Alloc&#34;[dir=none]; } } // 处理mspan subgraph cluster_span { style = dotted margin = 10 &#34;块(span)&#34; [shape = plaintext;fontsize = 24] &#34;mheap."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/"><meta property="article:section" content="docs"><title>概述 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
-<script defer src=/go-goroutine/en.search.min.35551729189884b932c2897cc53dddb4700f7ca68acb4bc819b124a428141bed.js integrity="sha256-NVUXKRiYhLkywol8xT3dtHAPfKaKy0vIGbEkpCgUG+0=" crossorigin=anonymous></script>
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content=" "><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:title" content="概述"><meta property="og:description" content=" "><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/"><meta property="article:section" content="docs"><title>概述 | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.e3f4dac8efb8da00e02f84b149eccf23a4d528e3db081e741cf432e5c985db11.js integrity="sha256-4/TayO+42gDgL4SxSezPI6TVKOPbCB50HPQy5cmF2xE=" crossorigin=anonymous></script>
 <script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
 <span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/ class=active>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/complement-source-reverse/>源码-反码-补码</a></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle>
 <label for=section-99f41010918d678e89a7af90330cabe1 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script>
 <script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
 <strong>概述</strong>
-<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><ul><li><a href=#constraint>constraint</a></li><li><a href=#rank的作用确定方向>rank的作用，确定方向</a></li></ul></li></ul></li></ul></nav></aside></header><article class=markdown><ul><li><p><a href=https://miloyip.github.io/graphvizuml/graphvizuml.pdf>https://miloyip.github.io/graphvizuml/graphvizuml.pdf</a></p></li><li><p>rankdir确定整个图的layout走向，在其他位置不生效</p><ul><li><a href=https://graphviz.org/docs/attrs/rankdir/>https://graphviz.org/docs/attrs/rankdir/</a></li></ul></li><li><p>如果想要在layout中的走向是TOP-BUTTOM，中指定从左到右的效果，使用rank<code>{rank=same; growS1->growS2; growS2->growS3;}</code></p></li><li><p>constraint=false在不同级别中起作用；作用范围edges</p><ul><li>在等级分配期间，边的头部节点被约束为比尾节点处于更高的等级。但是，如果边具有constraint=false，则不会强制执行此要求。<ul><li>基于上面的陈述，(我猜) constraint = false选项在不同的等级之间生效，而不是在同一等级中生效。</li></ul></li><li>简言之它作用与边，当为false，就相当于这条边的两个节点没有连接在一起，它们的顺序(rank)被其他的边关系影响。</li><li><a href=https://cloud.tencent.com/developer/ask/sof/60940>https://cloud.tencent.com/developer/ask/sof/60940</a></li><li><a href=https://www.coder.work/article/6490069>https://www.coder.work/article/6490069</a></li><li><a href=https://graphviz.org/docs/attrs/constraint/>https://graphviz.org/docs/attrs/constraint/</a></li></ul></li><li><p>Mrecord</p></li></ul><p>对我来说，子图和集群是非常不同的东西
-集群本身更像是迷你图
-子图更像是具有共同属性的节点集，这些节点可能（也可能不）定位在一起
-仅供参考，将节点定位在您想要的位置（而不是点想要的位置）可能具有挑战性，但通常您可以做到。将集群定位在您想要的位置通常~是不可能的。我通常使用 gvpr 程序对点输出进行后处理以定位集群。</p><ul><li><a href=https://graphviz.org/doc/char.html>https://graphviz.org/doc/char.html</a></li></ul><pre tabindex=0><code class=language-graphviz data-lang=graphviz>digraph {
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents></nav></aside></header><article class=markdown><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><p class=graphviz id=graphviz-pic></p><script class=graphviz type=text/javascript>(function(){srcG=`
+
+\`\`\`graphviz
+digraph {
 	compound=true
 	fontsize=10
-	margin=&#34;0,0&#34;
+	margin="0,0"
 	ranksep = .15
 	nodesep = .06
 
-	node [shape=ellipse fontname=&#34;Inconsolata, Consolas&#34;, fontsize=12, penwidth=0.5; constraint=false]
-	edge [fontname=&#34;Inconsolata, Consolas&#34;, fontsize=10, arrowhead=normal]
+	node [shape=ellipse fontname="Inconsolata, Consolas", fontsize=12, penwidth=0.5; constraint=false]
+	edge [fontname="Inconsolata, Consolas", fontsize=10, arrowhead=normal]
 
 
     // 栈区
 	subgraph cluster_stack {
 		style = dotted
 		margin = 10
-   	    &#34;栈(包括系统栈)&#34; [shape = plaintext; fontsize = 24;]
+   	    "栈(包括系统栈)" [shape = plaintext; fontsize = 24;]
 
-        &#34;largeAlloc&#34;;
-        &#34;Alloc&#34;;
+        "largeAlloc";
+        "Alloc";
 
-        &#34;notice2&#34; [shape=plain;label=&#34;系统栈执行;\n初始化申请的内存&#34;] 
-        {rank=same; &#34;notice2&#34; -&gt; &#34;Alloc&#34;[dir=none]; }
+        "notice2" [shape=plain;label="系统栈执行;\\n初始化申请的内存"] 
+        {rank=same; "notice2" -> "Alloc"[dir=none]; }
 	}
 
     // 处理mspan
 	subgraph cluster_span {
 		style = dotted
 		margin = 10
-		&#34;块(span)&#34; [shape = plaintext;fontsize = 24]
+		"块(span)" [shape = plaintext;fontsize = 24]
 
-        &#34;mheap.alloc_m&#34;
-        &#34;notice1&#34; [shape=plain;label=&#34;在这里才设置mspan中的spanclass&#34;] 
-        {rank=same; &#34;notice1&#34; -&gt; &#34;mheap.alloc_m&#34;[dir=none]; }
+        "mheap.alloc_m"
+        "notice1" [shape=plain;label="在这里才设置mspan中的spanclass"] 
+        {rank=same; "notice1" -> "mheap.alloc_m"[dir=none]; }
 
-    	subgraph &#34;cluster_mheap.AllocSpanLock&#34; {
+    	subgraph "cluster_mheap.AllocSpanLock" {
     		style = dotted
     		margin = 10
-            label = &#34;mheap.AllocSpanLock&#34;;
+            label = "mheap.AllocSpanLock";
 
             DUMMY_1 [shape=point; style=invis;]
 
             {rank=same; DUMMY_1}
 
-            k1[label=&#34;先从treap获取至少npage大小mspan&#34;]
-            k2[label=&#34;treap没有期望的mspan,调用grow生成&#34;]
-            k3[label=&#34;再次从treap获取至少npage大小mspan&#34;]
-            k4[label=&#34;如果得到的mspan页数大于我们期望的npage,\n则拆分出一个新的mspan放入treap中,\n此mspan大小为两者只差(注意此时没有设置spanclass)&#34;]
-            k5[label=&#34;设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)&#34;]
+            k1[label="先从treap获取至少npage大小mspan"]
+            k2[label="treap没有期望的mspan,调用grow生成"]
+            k3[label="再次从treap获取至少npage大小mspan"]
+            k4[label="如果得到的mspan页数大于我们期望的npage,\\n则拆分出一个新的mspan放入treap中,\\n此mspan大小为两者只差(注意此时没有设置spanclass)"]
+            k5[label="设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)"]
 
-            {rank=same; k1-&gt;k2[label=&#34;失败&#34;]}
-            k2-&gt;k3;
-            k1-&gt;k4;
-            k3-&gt;k4-&gt;k5;
+            {rank=same; k1->k2[label="失败"]}
+            k2->k3;
+            k1->k4;
+            k3->k4->k5;
 
         }
 	}
@@ -83,306 +71,38 @@ https://graphviz.org/doc/char.html digraph { compound=true fontsize=10 margin=&#
 		style = dotted
 		margin = 10
 
-		heapArenaTitle[label = &#34;区(堆区/heap arena)&#34;; shape = plaintext;fontsize = 24]
+		heapArenaTitle[label = "区(堆区/heap arena)"; shape = plaintext;fontsize = 24]
 
     	subgraph cluster_grow {
     		style = dotted
     		margin = 10
-            label = &#34;mheap.grow&#34;
+            label = "mheap.grow"
 
             DUMMY_grow [shape=point; style=invis;]
             {rank=source; DUMMY_grow; }
             
 
-            growS1[label=&#34;先从arena获取(heapArenas中的线性分配器中)&#34;]
-            growS2[label=&#34;再从系统中获取mmap&#34;]
-            growS3[label=&#34;设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)&#34;]
-            growS4[label=&#34;放入treap中(注意此时没有设置spanclass)&#34;]
+            growS1[label="先从arena获取(heapArenas中的线性分配器中)"]
+            growS2[label="再从系统中获取mmap"]
+            growS3[label="设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)"]
+            growS4[label="放入treap中(注意此时没有设置spanclass)"]
 
-            {rank=same; growS1-&gt;growS2[label=&#34;失败&#34;]}
-            growS1-&gt;growS3[label=&#34;成功&#34;]
-            growS2-&gt;growS3
-            growS3-&gt;growS4
+            {rank=same; growS1->growS2[label="失败"]}
+            growS1->growS3[label="成功"]
+            growS2->growS3
+            growS3->growS4
         }
 
 	}
  
-	&#34;分配大对象过程&#34; [shape = &#34;plaintext&#34;, fontsize = 16]
+	"分配大对象过程" [shape = "plaintext", fontsize = 16]
 
-    &#34;largeAlloc&#34; -&gt; &#34;Alloc&#34;[label=&#34;调用&#34;];
-    &#34;Alloc&#34; -&gt; &#34;mheap.alloc_m&#34;;
-    &#34;mheap.alloc_m&#34; -&gt; &#34;DUMMY_1&#34;[lhead=&#34;cluster_mheap.AllocSpanLock&#34;];
-    &#34;k2&#34; -&gt; &#34;DUMMY_grow&#34; [lhead=cluster_grow];
-
-}
-</code></pre><hr><hr><hr><pre tabindex=0><code class=language-graphviz data-lang=graphviz>digraph finite_state_machine {
-    rankdir=LR;
-    size=&#34;8,5&#34;;
-
-    node [shape = doublecircle] S;
-    {node [shape = point; color=red] begin;}
-    node [shape = circle ];
-
-    begin -&gt; S [ label = &#34;c&#34;];
-
-    S  -&gt; q1 [ label = &#34;a&#34; ];
-    S  -&gt; S  [ label = &#34;a&#34; ];
-    q1 -&gt; S  [ label = &#34;a&#34; ];
-    q1 -&gt; q2 [ label = &#34;ddb&#34; ];
-    q2 -&gt; q1 [ label = &#34;b&#34; ];
-    q2 -&gt; q2 [ label = &#34;b&#34; ];
-}
-</code></pre><hr><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph b {
-    overlap = false;
-    splines = true;
-    
-    subgraph g{
-        rankdir = LR;
-        rank = same;
-        
-        start [style = invis;];
-        start -&gt; s2 [style = invis;];
-        s2 -&gt; s3 [style = invis;];
-        s3 -&gt; s5 [style = invis;];
-    }
-    
-    s8 [label = 8;group = g1;];
-    
-    s2 [label = 2;group = g2;];
-    s3 [label = 3;group = g2;];
-    s5 [label = 5;group = g2;];
-
-    s8 -&gt; s3 [dir = back;];
-    
-    s2 -&gt; s3;
-    s3 -&gt; s2;
-    s3 -&gt; s5;
-    s5 -&gt; s3;
-    
-}
-</code></pre><h3 id=constraint>constraint
-<a class=anchor href=#constraint>#</a></h3><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph b {
-    overlap = false;
-    splines = true;
-    
-    s8 [label = 8;group = g1;];
-    s2 [label = 2;group = g2;];
-    s3 [label = 3;group = g2;];
-    s5 [label = 5;group = g2;];
-
-    {rank = source; s8;}
-    
-    {
-        rank = same;
-
-        start [style = invis;];
-        start -&gt; s2 [style = invis;];
-        s2 -&gt; s3 [style = invis;];
-        s3 -&gt; s5 [style = invis;];
-    }
-
-    s8 -&gt; s3 [dir = back;];
-    s2 -&gt; s3[constraint=false];
-    s3 -&gt; s2[constraint=false];
-    s3 -&gt; s5;
-    s5 -&gt; s3;
+    "largeAlloc" -> "Alloc"[label="调用"];
+    "Alloc" -> "mheap.alloc_m";
+    "mheap.alloc_m" -> "DUMMY_1"[lhead="cluster_mheap.AllocSpanLock"];
+    "k2" -> "DUMMY_grow" [lhead=cluster_grow];
 
 }
-</code></pre><h3 id=rank的作用确定方向>rank的作用，确定方向
-<a class=anchor href=#rank%e7%9a%84%e4%bd%9c%e7%94%a8%e7%a1%ae%e5%ae%9a%e6%96%b9%e5%90%91>#</a></h3><blockquote><p>将排名留空或使用rank=same的使用频率要高得多。其他四种通常仅在特殊情况下使用。</p></blockquote><ul><li>单独使用时，min 和 source 具有相同的功能：将所有这些节点放在最低排名（TB 图的第一行）上。<ul><li>它们之间的区别在于 min 将允许最低排名中的其他子图。来源不会。Source 仅允许 min 或 source 的其他子图处于最低排名。</li></ul></li><li><a href=https://stackoverflow.com/questions/6149834/rank-attribute-is-confusing-to-me/6155783#6155783>https://stackoverflow.com/questions/6149834/rank-attribute-is-confusing-to-me/6155783#6155783</a></li></ul><ol><li>只有在cluster中才能起作用</li></ol><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph b {
-    subgraph clusterxx{
-        { rank=source; a-&gt;b; }
-        { rank=same;   c -&gt; d; }
-    }
-}
-</code></pre><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph b {
+\`\`\`
 
-    
-	node [shape=ellipse fontname=&#34;Inconsolata, Consolas&#34;, fontsize=12, penwidth=0.5; constraint=false]
-    { rank=source; a -&gt; b; }
-    { rank=same;   c -&gt; d; }
-
-}
-</code></pre><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph b {
-    {rank=min; a -&gt; b;}
-    {rank=same;c -&gt; d;}
-}
-</code></pre><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph b {
-    overlap = false;
-    splines = true;
-    
-    s8 [label = 8;group = g1;];
-    s2 [label = 2;group = g2;];
-    s3 [label = 3;group = g2;];
-    s5 [label = 5;group = g2;];
-
-    {rank = source; s8;}
-    
-    {
-        rank = same;
-
-        start [style = invis;];
-        start -&gt; s2 [style = invis;];
-        s2 -&gt; s3 [style = invis;];
-        s3 -&gt; s5 [style = invis;];
-    }
-
-    s8 -&gt; s3 [dir = back;];
-    s2 -&gt; s3;
-    s3 -&gt; s2;
-    s3 -&gt; s5;
-    s5 -&gt; s3;
-
-}
-</code></pre><ul><li><p>Two useful techniques for reproducing graph layouts are:</p><ul><li>Invisible nodes</li><li>Rank constraints
-Here&rsquo;s a quick try for the top nodes:</li></ul></li><li><p><a href=https://stackoverflow.com/questions/7374108/graphviz-node-placement-and-rankdir>https://stackoverflow.com/questions/7374108/graphviz-node-placement-and-rankdir</a></p></li></ul><pre tabindex=0><code class=language-graphviz data-lang=graphviz>digraph g{
-ranksep=0.2;
-
-node[shape=box3d, width=2.3, height=0.6, fontname=&#34;Arial&#34;];
-n1[label=&#34;Incident Commander&#34;];
-n2[label=&#34;Public Information\nOfficer&#34;];
-n3[label=&#34;Liaison Officer&#34;];
-n4[label=&#34;Safety Officer&#34;];
-n5[label=&#34;Operations Section&#34;];
-n6[label=&#34;Planning Section&#34;];
-n7[label=&#34;Logistics Section&#34;];
-n8[label=&#34;Finance/Admin. Section&#34;];
-
-node[shape=none, width=0, height=0, label=&#34;&#34;];
-edge[dir=none];
-
-n1 -&gt; p1 -&gt; p2 -&gt; p3;
-{rank=same; n2 -&gt; p1 -&gt; n3;}
-{rank=same; n4 -&gt; p2;}
-{rank=same; p4 -&gt; p5 -&gt; p3 -&gt; p6 -&gt; p7;}
-p4 -&gt; n5;
-p5 -&gt; n6;
-p6 -&gt; n7;
-p7 -&gt; n8;
-}
-</code></pre><ul><li>rank为same时它意味着所有的节点在同一级，这时候不能指定竖排列.<ul><li>rank=same // all nodes on same rank</li></ul></li><li>rankdir 只在graph中有效；</li></ul><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph ok {
-  subgraph cluster_0{
-    rankcluster=local;
-     { 
-       rank=same  // all nodes on same rank
-       node [shape =&#34;rectangle&#34;]    // for all nodes in this subgraph
-       edge [style=invis]           // for all edges, invisible links
-       // we use the invisible edges to establish their sequence (kludge)
-       name0 -&gt;  name1 -&gt;  name2 
-     }
-    rankdir=RL // 不生效
-  }
-}
-</code></pre><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph okk {
-  subgraph cluster_0{
-    rankcluster=local;
-    { 
-       // rank=same  // all nodes on same rank
-       node [shape =&#34;rectangle&#34;]    // for all nodes in this subgraph
-       edge [style=invis]           // for all edges, invisible links
-       // we use the invisible edges to establish their sequence (kludge)
-       name0 -&gt;  name1 -&gt;  name2 ;
-       gg;
-       rankdir=BT // 不生效
-    }
-    rankdir=BT // 不生效
-  }
-  rankdir=LR // 生效
-}
-</code></pre><hr><pre tabindex=0><code class=language-graphviz data-lang=graphviz>digraph{
-
-	node [shape=ellipse fontname=&#34;Inconsolata, Consolas&#34;, fontsize=12,constraint=false];
-    	subgraph cluster_grow {
-    		style = dotted
-    		margin = 10
-            label = &#34;mheap.grow&#34;
-            clusterrank=local
-
-            
-            DUMMY_grow [shape=point;style=invis;]
-
-            growS1[label=&#34;从arena获取(heapArenas中的线性分配器中)&#34;;]
-            growS2[label=&#34;从系统中获取mmap&#34;;];
-            growS3[label=&#34;xxx&#34;]
-
-            {rank=same; growS1-&gt;growS2; growS2-&gt;growS3;}
-            
-        }
-        // rankdir=RL
-	}
-</code></pre><pre tabindex=0><code class=language-graphviz data-lang=graphviz>digraph {
-	// ranksep = .15
-	nodesep = .15
-
-	// node [shape=ellipse fontname=&#34;Inconsolata, Consolas&#34;, fontsize=12, penwidth=0.5; constraint=false]
-	// edge [fontname=&#34;Inconsolata, Consolas&#34;, fontsize=10, arrowhead=normal]
-
-
-	subgraph cluster_heap_arena {
-		style = dotted
-		margin = 10
-
-		&#34;区(堆区/heap arena)&#34; [shape = plaintext;fontsize = 14]
-
-    	subgraph cluster_grow {
-    		style = dotted
-    		margin = 10
-            label = &#34;mheap.grow&#34;
-            
-            DUMMY_grow [shape=point;style=invis;]
-
-            growS1[label=&#34;从arena获取(heapArenas中的线性分配器中)&#34;;]
-            growS2[label=&#34;从系统中获取mmap&#34;;]
-            growS3[label=&#34;放入treap中&#34;]
-
-            {rank=same; growS1-&gt;growS2-&gt;growS3[len=0.1];}
-        }
-	}
- 
-
-    &#34;largeAlloc&#34; -&gt; &#34;Alloc&#34;[label=&#34;调用&#34;];
-
-}
-</code></pre><hr><hr><hr><pre tabindex=0><code class=language-graphviz data-lang=graphviz>
-digraph{
-
-    	subgraph &#34;cluster_mheap.AllocSpanLock&#34; {
-    		style = dotted
-    		margin = 10
-            label = &#34;mheap.AllocSpanLock&#34;;
-
-            DUMMY_1 [shape=point; style=invis;]
-
-
-            k1[label=&#34;先从treap获取至少npage大小mspan&#34;]
-            k2[label=&#34;treap没有期望的mspan,调用grow生成&#34;]
-            k3[label=&#34;再次从treap获取至少npage大小mspan&#34;]
-            k4[label=&#34;如果得到的mspan页数大于我们期望的npage,\n则拆分出一个新的mspan放入treap中,\n此mspan大小为两者只差(注意此时没有设置spanclass)&#34;]
-            k5[label=&#34;设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)&#34;]
-
-            p1[shape=none,width=0,height=0,label=&#34;&#34;];
-
-            DUMMY_1 -&gt; p1 [dir=none, style=invis];
-
-            {rank=same; k1-&gt;p1[dir=none]; p1-&gt;k2[label=&#34;失败&#34;]}
-
-            k2-&gt;k3;
-            k1-&gt;k4;
-            k3-&gt;k4-&gt;k5;
-
-        }
-
-    rankdir = TB
-
-}
-</code></pre><pre><code>    start [style = invis;];
-    start -&gt; s2 [style = invis;];
-</code></pre><pre tabindex=0><code class=language-graphviz data-lang=graphviz></code></pre></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><ul><li><ul><li><a href=#constraint>constraint</a></li><li><a href=#rank的作用确定方向>rank的作用，确定方向</a></li></ul></li></ul></li></ul></nav></div></aside></main></body></html><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><script type=text/javascript>(function(){var e="language-viz-";Array.prototype.forEach.call(document.querySelectorAll("[class^="+e+"]"),function(t){console.log(t),t.getAttribute("class").split(" ").forEach(function(t){t.startsWith(e)&&(s=t.substr(e.length))}),console.log("------------MIDDLE--------");var s,o=Viz(t.innerText,{format:"svg",engine:s}),n=(new DOMParser).parseFromString(o,"image/svg+xml");n.documentElement.setAttribute("style","max-width:100%; max-height:100%;"),t.parentNode.insertBefore(n.documentElement,t),t.style.display="none",t.parentNode.style.backgroundColor="white",t.style.width=n.documentElement.getAttribute("width")+"px",t.style.height=n.documentElement.getAttribute("height")+"px",console.log("--------------END------")})})()</script>
+`,srcG=srcG.replace(/^\s*```graphviz/,""),srcG=srcG.replace(/```\s*$/,""),image=Viz(srcG,{format:"png-image-element"}),document.getElementById("graphviz-pic").appendChild(image)})()</script></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents></nav></div></aside></main></body></html><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><script type=text/javascript>(function(){var e="language-viz-";Array.prototype.forEach.call(document.querySelectorAll("[class^="+e+"]"),function(t){console.log(t),t.getAttribute("class").split(" ").forEach(function(t){t.startsWith(e)&&(s=t.substr(e.length))}),console.log("------------MIDDLE--------");var s,o=Viz(t.innerText,{format:"svg",engine:s}),n=(new DOMParser).parseFromString(o,"image/svg+xml");n.documentElement.setAttribute("style","max-width:100%; max-height:100%;"),t.parentNode.insertBefore(n.documentElement,t),t.style.display="none",t.parentNode.style.backgroundColor="white",t.style.width=n.documentElement.getAttribute("width")+"px",t.style.height=n.documentElement.getAttribute("height")+"px",console.log("--------------END------")})})()</script>
