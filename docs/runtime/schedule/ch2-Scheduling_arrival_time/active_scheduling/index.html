@@ -20,7 +20,7 @@ package main import ( &#34;runtime&#34; &#34;sync/atomic&#34; ) var existFlag in
 </span></span><span style=display:flex><span>	<span style=color:#a6e22e>checkTimeouts</span>()
 </span></span><span style=display:flex><span>	<span style=color:#a6e22e>mcall</span>(<span style=color:#a6e22e>gosched_m</span>)
 </span></span><span style=display:flex><span>}
-</span></span></code></pre></div><p>在go1.14前,编译器不会插入抢占点,用户代码可能会陷入CPU计算循环(即使代码中有函数调用),它可能会一直霸占CPU,这时候可能需要runtime.Gosched, 在go1.14,编译器会在函数前加入自动抢占点.所以对于go1.14+，无需手动调用它。</p></div><div class="flex-even markdown-inner"><p align=middle><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624193034.png width=35% height=35% alt=gosched></div></div><h2 id=gdb主动调度>gdb主动调度
+</span></span></code></pre></div><p>在go1.14前,编译器不会插入抢占点,用户代码可能会陷入CPU计算循环(即使代码中有函数调用),它可能会一直霸占CPU,这时候可能需要runtime.Gosched, 在go1.14,编译器会在函数前加入自动抢占点.所以对于go1.14+，无需手动调用它。</p></div><div class="flex-even markdown-inner"><p align=middle><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624193034.png width=35% height=35% alt=gosched></p></div></div><h2 id=gdb主动调度>gdb主动调度
 <a class=anchor href=#gdb%e4%b8%bb%e5%8a%a8%e8%b0%83%e5%ba%a6>#</a></h2><blockquote><p>main.go</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#f92672>package</span> <span style=color:#a6e22e>main</span>
 </span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span><span style=color:#f92672>import</span> (
