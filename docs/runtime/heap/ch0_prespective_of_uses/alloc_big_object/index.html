@@ -6,7 +6,7 @@
 </label><strong>分配大对象</strong>
 <label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents></nav></aside></header><article class=markdown><p>分配大对象会涉及到的三个部分：栈/块/区</p><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><p class=graphviz id=graphviz-pic></p><script class=graphviz type=text/javascript>(function(){srcG=`
 
-```graphviz
+\`\`\`graphviz
 digraph {
 	compound=true
 	fontsize=10
@@ -101,6 +101,6 @@ digraph {
     "k2" -> "DUMMY_grow" [lhead=cluster_grow];
 
 }
-```
+\`\`\`
 
 `,srcG=srcG.replace(/^\s*```graphviz/,""),srcG=srcG.replace(/```\s*$/,""),image=Viz(srcG,{format:"png-image-element"}),document.getElementById("graphviz-pic").appendChild(image)})()</script></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents></nav></div></aside></main></body></html><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><script type=text/javascript>(function(){var e="language-viz-";Array.prototype.forEach.call(document.querySelectorAll("[class^="+e+"]"),function(t){console.log(t),t.getAttribute("class").split(" ").forEach(function(t){t.startsWith(e)&&(s=t.substr(e.length))}),console.log("------------MIDDLE--------");var s,o=Viz(t.innerText,{format:"svg",engine:s}),n=(new DOMParser).parseFromString(o,"image/svg+xml");n.documentElement.setAttribute("style","max-width:100%; max-height:100%;"),t.parentNode.insertBefore(n.documentElement,t),t.style.display="none",t.parentNode.style.backgroundColor="white",t.style.width=n.documentElement.getAttribute("width")+"px",t.style.height=n.documentElement.getAttribute("height")+"px",console.log("--------------END------")})})()</script>
