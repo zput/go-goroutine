@@ -22,6 +22,7 @@ Span：包含一个或多个页大小的内存。golang给出了67种预置的�
 类别(class) 内存块对象大小(bytes/obj) Span大小(bytes/span) Span中内存块对象个数(objects) 尾部浪费(tail waste) 最大浪费百分比(max waste) 1 8 8192 1024 0 87.50% 2 16 8192 512 0 43.75% 3 24 8192 341 8 29.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>二色标记法
 缺点：是需要stw
 三色标记法
+就是在执行写操作时,额外做些标记工作,避免垃圾误判
 删除写屏障 插入写屏障 缺点：性能太低了
 只在堆上进行混合写屏障
 golang垃圾回收 # golang垃圾回收 理论 三色标记法 golang GC what: why: how: 三色 新分配对象的颜色 写屏障 写屏障的步骤推导 插入写屏障 删除写屏障 混合写屏障 其他的变种 golang实现 扩展 mutator? FQA 谈一谈golang的gc. 二：为什么清扫阶段不需要屏障了呢？ 三：golang的heap结构 四: 工作队列相关的问题：并发标记的分工问题？写屏障记录集的竞争问题？ 五： CUP utilization TODO: 并发GC如何缓解内存分配压力？ 附录 archive 202104-conclusion what,why,how 理论 # 三色标记法 # 黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。 灰色：基于当前节点展开的追踪还未完成。 白色： 黑色对象如果指向白色对象,会导致白色对象被错误回收。 有两种方法来避免: 强三色：黑色对象只能引用灰色对象。 弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态.
