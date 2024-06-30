@@ -54,7 +54,7 @@ cacheMap: nil key---&amp;gt;ValuePtr(第三方句柄) / \ / \ / ---&amp;gt;value
 cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只能读或者改。
 golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。
 读取 Map.Load
-if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses &amp;gt;= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>1 前言：变量的存放区 # 通常情况下，变量的分配位置就是，一般是下列三个区：
+if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses &amp;gt;= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
 全局数据区 栈区 堆区 堆区:主要用于程序运行阶段的动态分配。 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。 栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
 内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。
 2 定义 # 垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：垃圾识别和垃圾清理。
@@ -64,18 +64,14 @@ golang支持垃圾自动回收，主要是降低人的心智负担，从堆（he
 双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。
 双色标记在停顿、再次重启过程中，无法完成状态的自描述，它只能描述对象节点自身是否扫描，而不能描述子节点是否完成。这导致重启后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，改进后的三色标记法产生了。
 由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。但对双色标记而言，这非问题关键所在。因为我们可以将新增对象直接标记为黑色。最坏的情况就是下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。
-2.1.2 三色标记法 # 全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
-问题：
-并发执行,如果将白色对象写入黑色对象,同时设有其它未扫描豹路径,可抚达该白色对象,它就不会被Mark Worker发现,继而被误判为垃圾
-解决方案:
-插入写屏障:就是在执行写操作时,额外做些标记工作,避免垃圾误判.
-取消栈上的写屏障,标记完以后,重新扫描活跃栈帧
-混合写屏障，在栈之外设置：插入写屏障+删除写屏障。目标是不在栈上加写屏,不重新扫描协程栈, 还要没有误判风险
-删除写屏障
-插入写屏障
-缺点：性能太低了
-只在堆上进行混合写屏障
-golang垃圾回收 # 1 前言：变量的存放区 2 定义 2.1 垃圾识别 2.1.1 双色标记法 2.1.2 三色标记法 golang垃圾回收 理论 三色标记法 golang GC what: why: how: 三色 新分配对象的颜色 写屏障 写屏障的步骤推导 插入写屏障 删除写屏障 混合写屏障 其他的变种 golang实现 扩展 mutator?</description></item><item><title>sort</title><link>https://zput.github.io/go-goroutine/docs/foundation/sort/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/sort/</guid><description>在实际开发中，我们如何利用sort包，进行快速排序呢。
+2.1.2 三色标记法 # 黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。 灰色：基于当前节点展开的追踪还未完成。 白色： 黑色对象如果指向白色对象,会导致白色对象被错误回收。 有两种方法来避免: 强三色：黑色对象只能引用灰色对象。 弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态.
+全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
+问题： 原因： 并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。
+当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)
+处理措施：
+引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。
+分为两种，一种是插入写屏障，一种是删除写屏障。
+插入写屏障 writePointer(slot, ptr): // ⚠️:slot现在指向的还是旧对象 shade(ptr) //shade函数尝试改变指针的颜色--&amp;gt;改变ptr的颜色 *slot = ptr 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。 writePointer(slot, ptr) // ⚠️:slot现在指向的还是旧对象 shade(*slot) //shade函数尝试改变指针的颜色--&amp;gt;改变(*slot)的颜色---&amp;gt;注意这个是*slot(旧对象),slot保存着它原先的保存的地址。 *slot = ptr 引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为忽略协程栈上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。</description></item><item><title>sort</title><link>https://zput.github.io/go-goroutine/docs/foundation/sort/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/sort/</guid><description>在实际开发中，我们如何利用sort包，进行快速排序呢。
 首先我们来看一下sort中最重要的一个接口:
 sort # type Interface interface { // Len is the number of elements in the collection. Len() int // Less reports whether the element with // index i should sort before the element with index j. Less(i, j int) bool // Swap swaps the elements with indexes i and j. Swap(i, j int) } // 内部实现的四种排序算法 // 插入排序 func insertionSort(data Interface, a, b int) // 堆排序 func heapSort(data Interface, a, b int) // 快速排序 func quickSort(data Interface, a, b, maxDepth int) // 归并排序 func symMerge(data Interface, a, m, b int) 一般我们利用下面三种方式进行排序:</description></item><item><title>代码执行过久</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</guid><description>执行太久需要抢占 # preemptone设置抢占 # 继续上文看下preemptone函数，它设置了g.preempt(抢占标示)为true和g.stackguard0为很大的数((1&amp;lt;&amp;lt;(8*sys.PtrSize) - 1) &amp;amp; -1314 ---&amp;gt; 0xfffffffffffffade)，使被抢占的goroutine在进行函数调用会去检查栈溢出,然后处理抢占请求
 // Tell the goroutine running on processor P to stop. // This function is purely best-effort. It can incorrectly fail to inform the // goroutine. It can send inform the wrong goroutine. Even if it informs the // correct goroutine, that goroutine might ignore the request if it is // simultaneously executing newstack. // No lock needs to be held.</description></item><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>进入main函数前的初始化 # 我们首先来gdb调试一下这个程序
