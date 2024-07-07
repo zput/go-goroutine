@@ -55,7 +55,9 @@ cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只�
 golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。
 读取 Map.Load
 if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses &amp;gt;= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
-全局数据区 栈区 堆区 堆区:主要用于程序运行阶段的动态分配。 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。 栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
+全局数据区 栈区 堆区 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。
+栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
+堆区:主要用于程序运行阶段的动态分配。
 内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。
 2 定义 # 垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：垃圾识别和垃圾清理。
 golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。
