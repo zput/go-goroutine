@@ -105,69 +105,7 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">execute&lt;/span>(&lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>内存大小端</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</guid><description>&lt;h1 id="内存大小端">
- 内存大小端
- &lt;a class="anchor" href="#%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f%e7%ab%af">#&lt;/a>
-&lt;/h1>
-&lt;p>对于这两种存储方式，如果联系下我们常用 “异或” 操作，就能得到一个很好的记忆规则。总结来说就是：&lt;/p>
-&lt;ul>
-&lt;li>低地址存储低字节即为小端存储；高地址存储高字节即为小端存储；&lt;/li>
-&lt;li>低地址存储高字节即为大端存储；高地址存储低字节即为大端存储；&lt;/li>
-&lt;/ul>
-&lt;p>我们把 “低” 、“小” 认作 “0”， 把 “高”、“大” 认作 “1”，这样就可以利用 “异或” 的结果来加强记忆了。&lt;/p>
-&lt;table>
- &lt;thead>
- &lt;tr>
- &lt;th style="text-align: left">内存&lt;/th>
- &lt;th style="text-align: left">字节&lt;/th>
- &lt;th style="text-align: left">大端/小端&lt;/th>
- &lt;/tr>
- &lt;/thead>
- &lt;tbody>
- &lt;tr>
- &lt;td style="text-align: left">低地址&lt;/td>
- &lt;td style="text-align: left">低字节&lt;/td>
- &lt;td style="text-align: left">小端存储&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">高地址&lt;/td>
- &lt;td style="text-align: left">高字节&lt;/td>
- &lt;td style="text-align: left">小端存储&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">低地址&lt;/td>
- &lt;td style="text-align: left">高字节&lt;/td>
- &lt;td style="text-align: left">大端存储&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">高地址&lt;/td>
- &lt;td style="text-align: left">低字节&lt;/td>
- &lt;td style="text-align: left">大端存储&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;/tr>
- &lt;/tbody>
-&lt;/table>
-&lt;hr>
-&lt;p>intel 存储字节的顺序是小端优先：即低有效字节存储在低内存地址中。写值是从低地址向高地址写入，如SP指向0xf000，往栈中写入一个字（8字节），占用0xf000到0xf007的8个字节。&lt;/p></description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
  goroutine被动调度
  &lt;a class="anchor" href="#goroutine%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
 &lt;/h1>

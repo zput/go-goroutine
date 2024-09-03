@@ -1,13 +1,13 @@
 <!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/tags/goroutine/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="Goroutine"><meta property="og:locale" content="zh"><meta property="og:type" content="website"><title>Goroutine | go调度源码分析</title>
-<link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.eb0fdd7ffd964568dd43388fbd75d156ee26e9dd2a2d5825e0caaf2b09c55958.js integrity="sha256-6w/df/2WRWjdQziPvXXRVu4m6d0qLVgl4MqvKwnFWVg=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://zput.github.io/go-goroutine/tags/goroutine/index.xml title=go调度源码分析></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+<link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.c6f146e119ed38047ecf17ab29f9ae84e568069696e6d4c10599847f2476b14a.js integrity="sha256-xvFG4RntOAR+zxerKfmuhOVoBpaW5tTBBZmEfyR2sUo=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script><link rel=alternate type=application/rss+xml href=https://zput.github.io/go-goroutine/tags/goroutine/index.xml title=go调度源码分析></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
-<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-740657f38f0c4de9a986bda642ff0388 class=toggle>
+<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-740657f38f0c4de9a986bda642ff0388 class=toggle>
 <label for=section-740657f38f0c4de9a986bda642ff0388 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script><script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu>
 </label><strong>Goroutine</strong>
 <label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav><ul><li class=book-section-flat><strong>Categories</strong><ul><li class="flex justify-between"><a href=/go-goroutine/categories/golang%E8%B0%83%E5%BA%A6/>Golang调度</a>
-<span>14</span></li></ul></li><li class=book-section-flat><strong>Tags</strong><ul><li class="flex justify-between"><a href=/go-goroutine/tags/golang/>Golang</a>
-<span>14</span></li><li class="flex justify-between"><a href=/go-goroutine/tags/goroutine/>Goroutine</a>
-<span>14</span></li></ul></li></ul></nav></aside></header><article class="markdown book-post"><h2><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></h2><h5>May 4, 2020</h5><div><a href=/go-goroutine/categories/golang%E8%B0%83%E5%BA%A6/>Golang调度</a></div><div><a href=/go-goroutine/tags/golang/>Golang</a>,
+<span>13</span></li></ul></li><li class=book-section-flat><strong>Tags</strong><ul><li class="flex justify-between"><a href=/go-goroutine/tags/golang/>Golang</a>
+<span>13</span></li><li class="flex justify-between"><a href=/go-goroutine/tags/goroutine/>Goroutine</a>
+<span>13</span></li></ul></li></ul></nav></aside></header><article class="markdown book-post"><h2><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></h2><h5>May 4, 2020</h5><div><a href=/go-goroutine/categories/golang%E8%B0%83%E5%BA%A6/>Golang调度</a></div><div><a href=/go-goroutine/tags/golang/>Golang</a>,
 <a href=/go-goroutine/tags/goroutine/>Goroutine</a></div><p><h1 id=开启系统监控>开启系统监控
 <a class=anchor href=#%e5%bc%80%e5%90%af%e7%b3%bb%e7%bb%9f%e7%9b%91%e6%8e%a7>#</a></h1><p>这个是main goroutine执行的主函数，此函数之后会调用用户定义main函数,我们在初始化一章已经提过
 <a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/#%e8%bf%9b%e5%85%a5main%e5%87%bd%e6%95%b0 class="book-btn ...">main goroutine执行的主函数</a></p><p>它的里面可以看到调用了newm函数生成新M,且新M将执行sysmon函数</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>func</span> <span style=color:#a6e22e>main</span>() {
@@ -170,101 +170,6 @@
 </span></span><span style=display:flex><span>}
 </span></span></code></pr
         <a href="/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/">...</a>
-      
-    </p>
-  </article>
-  
-  <article class="markdown book-post">
-    <h2>
-      <a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a>
-    </h2>
-    
-  <h5>January 20, 2019</h5>
-
-
-
-  
-  <div>
-    
-      <a href=/go-goroutine/categories/golang%E8%B0%83%E5%BA%A6/>Golang调度</a>
-  </div>
-  
-
-  
-  <div>
-    
-      <a href=/go-goroutine/tags/golang/>Golang</a>, 
-      <a href=/go-goroutine/tags/goroutine/>Goroutine</a>
-  </div>
-  
-
-
-
-
-    <p><h1 id=内存大小端>
-  内存大小端
-  <a class=anchor href=#%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f%e7%ab%af>#</a>
-</h1>
-<p>对于这两种存储方式，如果联系下我们常用  “异或”  操作，就能得到一个很好的记忆规则。总结来说就是：</p>
-<ul>
-<li>低地址存储低字节即为小端存储；高地址存储高字节即为小端存储；</li>
-<li>低地址存储高字节即为大端存储；高地址存储低字节即为大端存储；</li>
-</ul>
-<p>我们把 “低” 、“小” 认作 “0”， 把 “高”、“大” 认作 “1”，这样就可以利用 “异或” 的结果来加强记忆了。</p>
-<table>
-  <thead>
-      <tr>
-          <th style=text-align:left>内存</th>
-          <th style=text-align:left>字节</th>
-          <th style=text-align:left>大端/小端</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td style=text-align:left>低地址</td>
-          <td style=text-align:left>低字节</td>
-          <td style=text-align:left>小端存储</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>0</td>
-          <td style=text-align:left>0</td>
-          <td style=text-align:left>0</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>高地址</td>
-          <td style=text-align:left>高字节</td>
-          <td style=text-align:left>小端存储</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>1</td>
-          <td style=text-align:left>1</td>
-          <td style=text-align:left>0</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>低地址</td>
-          <td style=text-align:left>高字节</td>
-          <td style=text-align:left>大端存储</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>0</td>
-          <td style=text-align:left>1</td>
-          <td style=text-align:left>1</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>高地址</td>
-          <td style=text-align:left>低字节</td>
-          <td style=text-align:left>大端存储</td>
-      </tr>
-      <tr>
-          <td style=text-align:left>1</td>
-          <td style=text-align:left>0</td>
-          <td style=text-align:left>1</td>
-      </tr>
-  </tbody>
-</table>
-<hr>
-<p>intel 存储字节的顺序是小端优先：即低有效字节存储在低内存地址中。写值是从低地址向高地址写入，如SP指向0xf000，往栈中写入一个字（8字节），占用0xf000到0xf007的8个字节。</p>
-        <a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>...</a>
       
     </p>
   </article>
@@ -776,6 +681,77 @@
     </p>
   </article>
   
+  <article class="markdown book-post">
+    <h2>
+      <a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a>
+    </h2>
+    
+  <h5>January 20, 2019</h5>
+
+
+
+  
+  <div>
+    
+      <a href=/go-goroutine/categories/golang%E8%B0%83%E5%BA%A6/>Golang调度</a>
+  </div>
+  
+
+  
+  <div>
+    
+      <a href=/go-goroutine/tags/golang/>Golang</a>, 
+      <a href=/go-goroutine/tags/goroutine/>Goroutine</a>
+  </div>
+  
+
+
+
+
+    <p><p>
+  <a href=https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html>https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html</a></p>
+<h1 id=g结构>
+  g结构
+  <a class=anchor href=#g%e7%bb%93%e6%9e%84>#</a>
+</h1>
+<div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>g</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// 栈相关的两个字段
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>stack</span>       <span style=color:#a6e22e>stack</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>stackguard0</span> <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>stackguard1</span> <span style=color:#66d9ef>uintptr</span> <span style=color:#75715e>// offset known to liblink
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// defer 和 panic 
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_panic</span>       <span style=color:#f92672>*</span><span style=color:#a6e22e>_panic</span> <span style=color:#75715e>// 最内侧的 panic 结构体
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>_defer</span>       <span style=color:#f92672>*</span><span style=color:#a6e22e>_defer</span> <span style=color:#75715e>// 最内侧的延迟函数结构体
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>//
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>m</span>              <span style=color:#f92672>*</span><span style=color:#a6e22e>m</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>sched</span>          <span style=color:#a6e22e>gobuf</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>atomicstatus</span>   <span style=color:#66d9ef>uint32</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>goid</span>           <span style=color:#66d9ef>int64</span>
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span>	<span style=color:#75715e>// 抢占
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>preempt</span>       <span style=color:#66d9ef>bool</span> <span style=color:#75715e>// 抢占信号
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>preemptStop</span>   <span style=color:#66d9ef>bool</span> <span style=color:#75715e>// 抢占时将状态修改成 `_Gpreempted`
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>preemptShrink</span> <span style=color:#66d9ef>bool</span> <span style=color:#75715e>// 在同步安全点收缩栈
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span><span style=display:flex><span>
+</span></span><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>gobuf</span> <span style=color:#66d9ef>struct</span> {
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>sp</span>   <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>pc</span>   <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>g</span>    <span style=color:#a6e22e>guintptr</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>ctxt</span> <span style=color:#a6e22e>unsafe</span>.<span style=color:#a6e22e>Pointer</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>ret</span>  <span style=color:#a6e22e>sys</span>.<span style=color:#a6e22e>Uintreg</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>lr</span>   <span style=color:#66d9ef>uintptr</span>
+</span></span><span style=display:flex><span>	<span style=color:#a6e22e>bp</span>   <span style=color:#66d9ef>uintptr</span> <span style=color:#75715e>// for GOEXPERIMENT=framepointer   ------------------------here
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>}
+</span></span></code></pr
+        <a href="/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/">...</a>
+      
+    </p>
+  </article>
+  
 
   
     <ul class="pagination pagination-default">
@@ -841,7 +817,7 @@
       
         <li class="flex justify-between">
           <a href=/go-goroutine/categories/golang%E8%B0%83%E5%BA%A6/>Golang调度</a>
-          <span>14</span>
+          <span>13</span>
         </li>
       
       </ul>
@@ -855,12 +831,12 @@
       
         <li class="flex justify-between">
           <a href=/go-goroutine/tags/golang/>Golang</a>
-          <span>14</span>
+          <span>13</span>
         </li>
       
         <li class="flex justify-between">
           <a href=/go-goroutine/tags/goroutine/>Goroutine</a>
-          <span>14</span>
+          <span>13</span>
         </li>
       
       </ul>
