@@ -1,5 +1,63 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>调度 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/</link><description>Recent content in 调度 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 10 Feb 2020 10:09:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/schedule/index.xml" rel="self" type="application/rss+xml"/><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>进入main函数前的初始化 # 我们首先来gdb调试一下这个程序
-// main.go package main import &amp;#34;fmt&amp;#34; // the function&amp;#39;s body is empty func add(x, y int64) int64 func main() { gg:=add(2, 3) fmt.Println(gg) } // add_amd.s TEXT ·add(SB),$0-24 MOVQ x+0(FP), BX MOVQ y+8(FP), BP ADDQ BP, BX MOVQ BX, ret+16(FP) RET 编译一下源代码: go build -gcflags &amp;quot;-N -l&amp;quot; -o test ..
-程序加载到内存入口 # Expand ↕ (gdb) info files Symbols from &amp;#34;/tmp/kubernets/test&amp;#34;. Local exec file: `/tmp/kubernets/test&amp;#39;, file type elf64-x86-64.</description></item><item><title>退出</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</link><pubDate>Mon, 10 Feb 2020 10:09:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</guid><description>goroutine退出过程 # goroutine退出,即执行完callee代码后，返回到caller中去，前面一节我们看到，编译器自己把goexit()的地址设置为了caller的pc保存到栈上方,所以退出后，会执行goexit()函数,但是main goroutine比较特殊，这个groutine运行的代码 main函数直接调用了操作系统exit()这个API退出,没有机会返回到caller层.
-main goroutine的退出 # 在上节中我们看到程序执行到了 mian函数
-// The main goroutine. func main() { g := getg() //... //main包 init函数，递归的调用import包中定义的init函数 fn := main_init // make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime fn() //... //调用main.main函数(用户定义的main函数):进行间接调用是因为链接器在放置运行时不知道主包的地址 fn = main_main // make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime fn() //.</description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>调度 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/</link><description>Recent content in 调度 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 10 Feb 2020 10:09:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/schedule/index.xml" rel="self" type="application/rss+xml"/><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>&lt;h1 id="进入main函数前的初始化">
+ 进入main函数前的初始化
+ &lt;a class="anchor" href="#%e8%bf%9b%e5%85%a5main%e5%87%bd%e6%95%b0%e5%89%8d%e7%9a%84%e5%88%9d%e5%a7%8b%e5%8c%96">#&lt;/a>
+&lt;/h1>
+&lt;p>我们首先来gdb调试一下这个程序&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// main.go
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> &lt;span style="color:#e6db74">&amp;#34;fmt&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// the function&amp;#39;s body is empty
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#a6e22e">x&lt;/span>, &lt;span style="color:#a6e22e">y&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>) &lt;span style="color:#66d9ef">int64&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">gg&lt;/span>&lt;span style="color:#f92672">:=&lt;/span>&lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#ae81ff">2&lt;/span>, &lt;span style="color:#ae81ff">3&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">gg&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// add_amd.s
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#a6e22e">TEXT&lt;/span> &lt;span style="color:#960050;background-color:#1e0010">·&lt;/span>&lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#a6e22e">SB&lt;/span>),&lt;span style="color:#960050;background-color:#1e0010">$&lt;/span>&lt;span style="color:#ae81ff">0&lt;/span>&lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">24&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">x&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">0&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>), &lt;span style="color:#a6e22e">BX&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">y&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">8&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>), &lt;span style="color:#a6e22e">BP&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ADDQ&lt;/span> &lt;span style="color:#a6e22e">BP&lt;/span>, &lt;span style="color:#a6e22e">BX&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">BX&lt;/span>, &lt;span style="color:#a6e22e">ret&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">16&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">RET&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>退出</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</link><pubDate>Mon, 10 Feb 2020 10:09:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</guid><description>&lt;h1 id="goroutine退出过程">
+ goroutine退出过程
+ &lt;a class="anchor" href="#goroutine%e9%80%80%e5%87%ba%e8%bf%87%e7%a8%8b">#&lt;/a>
+&lt;/h1>
+&lt;p>goroutine退出,即执行完callee代码后，返回到caller中去，前面一节我们看到，编译器自己把&lt;code>goexit()&lt;/code>的地址设置为了caller的pc保存到栈上方,所以退出后，会执行&lt;code>goexit()&lt;/code>函数,但是main goroutine比较特殊，这个groutine运行的代码
+ &lt;a href="https://github.com/golang/go/blob/release-branch.go1.15/src/runtime/proc.go#L114">main函数&lt;/a>直接调用了操作系统exit()这个API退出,没有机会返回到caller层.&lt;/p>
+&lt;h2 id="main-goroutine的退出">
+ main goroutine的退出
+ &lt;a class="anchor" href="#main-goroutine%e7%9a%84%e9%80%80%e5%87%ba">#&lt;/a>
+&lt;/h2>
+&lt;p>在上节中我们看到程序执行到了
+ &lt;a href="https://github.com/golang/go/blob/release-branch.go1.15/src/runtime/proc.go#L114">mian函数&lt;/a>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// The main goroutine.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//main包 init函数，递归的调用import包中定义的init函数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">main_init&lt;/span> &lt;span style="color:#75715e">// make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//调用main.main函数(用户定义的main函数):进行间接调用是因为链接器在放置运行时不知道主包的地址
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span> = &lt;span style="color:#a6e22e">main_main&lt;/span> &lt;span style="color:#75715e">// make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//系统API:exit函数,退出进程
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">exit&lt;/span>(&lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">for&lt;/span> { 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">x&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#66d9ef">int32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">x&lt;/span> = &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#75715e">// 无效指针代码，会导致程序退出
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>

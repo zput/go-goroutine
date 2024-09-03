@@ -1,98 +1,1251 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>go调度源码分析</title><link>https://zput.github.io/go-goroutine/</link><description>Recent content on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Tue, 23 Jun 2020 20:50:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/index.xml" rel="self" type="application/rss+xml"/><item><title>开启系统监控</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/</guid><description>开启系统监控 # 这个是main goroutine执行的主函数，此函数之后会调用用户定义main函数,我们在初始化一章已经提过 main goroutine执行的主函数 它的里面可以看到调用了newm函数生成新M,且新M将执行sysmon函数
-func main() { //... if GOARCH != &amp;#34;wasm&amp;#34; { // no threads on wasm yet, so no sysmon systemstack(func() { newm(sysmon, nil) }) } //... } sysmon # 可以看到sysmon里面是一个for循环,它会一直运行,因为这个M没有关联P，所以不允许写屏障 逻辑比较简单，延时睡眠，调用retake
-// Always runs without a P, so write barriers are not allowed. // //go:nowritebarrierrec func sysmon() { lock(&amp;amp;sched.lock) sched.nmsys++ //增加记录系统线程的值的个数 checkdead() unlock(&amp;amp;sched.lock) lasttrace := int64(0) idle := 0 // how many cycles in succession we had not wokeup somebody delay := uint32(0) for { if idle == 0 { // start with 20us sleep.</description></item><item><title>主动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</link><pubDate>Thu, 02 Apr 2020 11:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</guid><description>goroutine主动调度 # 探寻runtime.Gosched() # goroutine主动调度就是调用runtime.Gosched()函数, 此函数会主动放弃与M的关联,并把自身(G)放入全局空闲G队列.当前的goroutine并不会退出,它进入全局G队列后可能会再次被调度运行.
-src/runtime/proc.go:267
-// Gosched yields the processor, allowing other goroutines to run. It does not // suspend the current goroutine, so execution resumes automatically. func Gosched() { checkTimeouts() mcall(gosched_m) } 在go1.14前,编译器不会插入抢占点,用户代码可能会陷入CPU计算循环(即使代码中有函数调用),它可能会一直霸占CPU,这时候可能需要runtime.Gosched, 在go1.14,编译器会在函数前加入自动抢占点.所以对于go1.14+，无需手动调用它。
-gdb主动调度 # main.go
-package main import ( &amp;#34;runtime&amp;#34; &amp;#34;sync/atomic&amp;#34; ) var existFlag int32 = 2 // the function&amp;#39;s body is empty func addAssemble(x, y int64) int64 func add(a int64){ addAssemble(a, a) atomic.AddInt32(&amp;amp;existFlag, -1) } func main() { runtime.</description></item><item><title>从全局/本P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</link><pubDate>Mon, 02 Mar 2020 13:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</guid><description>从本地队列或全局队列获取goroutine # 分析schedule函数整个流程:
-src/runtime/proc.go
-// One round of scheduler: find a runnable goroutine and execute it. // Never returns. func schedule() { _g_ := getg() //... top: //... var gp *g var inheritTime bool //... if gp == nil { // Check the global runnable queue once in a while to ensure fairness. // Otherwise two goroutines can completely occupy the local runqueue // by constantly respawning each other. if _g_.</description></item><item><title>内存大小端</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</guid><description>内存大小端 # 对于这两种存储方式，如果联系下我们常用 “异或” 操作，就能得到一个很好的记忆规则。总结来说就是：
-低地址存储低字节即为小端存储；高地址存储高字节即为小端存储； 低地址存储高字节即为大端存储；高地址存储低字节即为大端存储； 我们把 “低” 、“小” 认作 “0”， 把 “高”、“大” 认作 “1”，这样就可以利用 “异或” 的结果来加强记忆了。
-内存 字节 大端/小端 低地址 低字节 小端存储 0 0 0 高地址 高字节 小端存储 1 1 0 低地址 高字节 大端存储 0 1 1 高地址 低字节 大端存储 1 0 1 intel 存储字节的顺序是小端优先：即低有效字节存储在低内存地址中。写值是从低地址向高地址写入，如SP指向0xf000，往栈中写入一个字（8字节），占用0xf000到0xf007的8个字节。</description></item><item><title>GMP</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>golang GMP概念 # what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P&amp;quot;用来调度goruntine，被称为&amp;quot;GMP模型”。
-GMP G:为了调度方便，保存寄存器，栈地址等-&amp;gt;对应cpu切换[1.cpu寄存器的值；2.stack地址] M:与系统线程一一对应 P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。 why:
-单进程时代不需要调度器
-1.单一的执行流程，计算机只能一个任务一个任务处理。 2.进程阻塞所带来的CPU时间浪费。 多进程/线程时代有了调度器需求
-1.解决了阻塞的问题 2.CPU有很大的一部分都被浪费在进程调度 设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。 协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)
-为什么。 线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。 Go调度器可以做出只在它知道内存是一致的点进行调度的决定。 如何进行调度。 一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。 另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。 M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。 摆脱上下文(在这里P就是上下文)？ 不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。 以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？ why: threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.</description></item><item><title>基本用法</title><link>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</guid><description>数据结构 # 这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址. 然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能? 引用 # 通常意义上来说，引用就是某块内存的别名, 我们常常拿指针与引用进行比较, 那么看看引用在底层是怎么实现的:
-一种是c++里的引用实现，它其实是一个语法糖，经过编译器编译后，汇编代码引用就是指针，只不过是const指针，初始化的时候就需要赋值，且以后不能再更改[ c++里的引用实现;且两者地址相同。 特别说明由于引用只是指针包装, 也存在风险:
-int *a = new int; int &amp;amp;b = *a; delete a; b = 12; // 对已经释放的内存解引用 另-种是用结构体来包装一层，它的里面是实际内容的指针
-type slice struct { array unsafe.Pointer len int cap int } string # string类型的底层结构.它的大小是几个字节?
-指针和字节大小
-0xxxxxxx 110xxxxx 10xxxxxx 1110xxxx 10xxxxxx 10xxxxxx package main import ( &amp;#34;fmt&amp;#34; &amp;#34;reflect&amp;#34; &amp;#34;unicode/utf8&amp;#34; &amp;#34;unsafe&amp;#34; ) func String2Bytes(s string) []byte { sh := (*reflect.StringHeader)(unsafe.Pointer(&amp;amp;s)) bh := reflect.</description></item><item><title>测试相关函数</title><link>https://zput.github.io/go-goroutine/docs/robustness_and_performance/golang_test/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/robustness_and_performance/golang_test/</guid><description>golang测试相关函数 # test函数的种类 # func TestXxx(t *testing.T) { ... } 注意下这个Xxx需要大写 func BenchmarkXxx(b *testing.B) { ... } 注意下这个Xxx需要大写 ExampleXxx prints output to os.Stdout &amp;ldquo;Output:&amp;rdquo; &amp;ldquo;Unordered output:&amp;rdquo; go help testfunc
-Expand ↕ The &amp;#39;go test&amp;#39; command expects to find test, benchmark, and example functions in the &amp;#34;*_test.go&amp;#34; files corresponding to the package under test. A test function is one named TestXxx (where Xxx does not start with a lower case letter) and should have the signature, func TestXxx(t *testing.</description></item><item><title>源码-反码-补码</title><link>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</guid><description>概念 # 机器数
-真值
-真值符号部分 真值部分 举例： -1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
-原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 十进制数 带符号位二进制原码 带符号位二进制补码 -8 N 1000 -7 1111 1001 -6 1110 1010 -5 1101 1011 -4 1100 1100 -3 1011 1101 -2 1010 1110 -1 1001 1111 -0 1000 0000 +0 0000 0000 1 0001 0001 2 0010 0010 3 0011 0011 4 0100 0100 5 0101 0101 6 0110 0110 7 0111 0111 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1.</description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>goroutine被动调度 # 什么是被动调度: goroutine执行某个操作因条件不满足需要等待而发生的调度
-goroutine进入睡眠 比如是goroutineN发送数据到无缓冲chan上面,当没有其他Goroutine从chan上面读数据的时候,goroutineN阻塞在chan上面. 此刻睡眠含义:进入chan的缓存读取队列(goroutine链表) 重新运行schedule() 唤醒睡眠中的goroutine; 唤醒空闲的P和唤醒/创建工作线程; goroutine(被创建出来后/创建运行了一段时间后)如何放入运行队列P中 被动进入睡眠 # goroutine因某个条件而阻塞 chan waitGroup 等这些都会发生阻塞 package main import ( &amp;#34;fmt&amp;#34; &amp;#34;runtime&amp;#34; &amp;#34;sync&amp;#34; &amp;#34;sync/atomic&amp;#34; ) func main() { var n int32 var wg sync.WaitGroup runtime.GOMAXPROCS(2) wg.Add(1) go func() { wg.Done() for{ atomic.AddInt32(&amp;amp;n, 1) } }() wg.Wait() fmt.Println(atomic.LoadInt32(&amp;amp;n)) // 1 } gdb调试前准备 # 编译程序 # 编译一下源代码: go build -gcflags &amp;quot;-N -l&amp;quot; -o test ..
-准备mcall函数断点的文件 # 进入wg.Wait()
-我们都知道main函数里面的wg.Wait()这个只有当wg的计数器到0后才会继续执行,来看看当wg还没有到0的时候,这里会发生什么呢?
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 // src/sync/waitgroup.</description></item><item><title>从其他P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</link><pubDate>Sun, 08 Mar 2020 10:05:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</guid><description>从其他队列盗取goroutine # 盗取Goroutine的过程就是:如果在所有运行队列找g都找不到,M就进入睡眠状态
-findrunnable函数 # // Finds a runnable goroutine to execute. // Tries to steal from other P&amp;#39;s, get g from global queue, poll network. func findrunnable() (gp *g, inheritTime bool) { _g_ := getg() // The conditions here and in handoffp must agree: if // findrunnable would return a G to run, handoffp must start // an M. top: _p_ := _g_.m.p.ptr() //... // local runq //再次看一下本地运行队列是否有需要运行的goroutine if gp, inheritTime := runqget(_p_); gp !</description></item><item><title>伪寄存器与函数栈帧</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</guid><description>伪寄存器 &amp;amp; 函数栈 # 伪寄存器 # 伪寄存器常用的一般是下面的四个:
-FP: Frame pointer: arguments and locals. PC: Program counter: jumps and branches. SB: Static base pointer: global symbols. SP: Stack pointer: top of stack. 下面我们来翻译一下 官网1的对他们的解释，然后做一个总结,方便理解。
-FP # FP伪寄存器是一个用于引用函数参数的虚拟帧指针。编译器维护一个虚拟帧指针，并将堆栈上的参数引用为该伪寄存器的偏移量。因此0(FP)是函数的第一个参数，8(FP)是第二个参数(在64位机器上)，以此类推。但是，当以这种方式引用一个函数参数时，有必要将名称放在开头，如first_arg+0(FP)和second_arg+8(FP)。(偏移量的含义(从帧指针出发的偏移量)与它在SB中的使用不同，在SB中，它是从符号出发的偏移量。) 汇编器强制执行这个约定，拒绝普通的0(FP)和8(FP)。实际的名称在语义上是不相关的，但应该用来记录参数的名称。值得强调的是，FP始终是一个伪寄存器，而不是硬件寄存器，即使在具有硬件帧指针的架构上也是如此。
-The FP pseudo-register is a virtual frame pointer used to refer to function arguments. The compilers maintain a virtual frame pointer and refer to the arguments on the stack as offsets from that pseudo-register.</description></item><item><title>slice</title><link>https://zput.github.io/go-goroutine/docs/foundation/slice/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/slice/</guid><description> 使用slice # 使用slice的时候，如果能预先确定它的大小，最好先设置好它的容量，避免后期扩容拷贝。预先大小也可能为零，所以总担心初始化能不能先申明容量为零。
-func testMakeSlice() { var ( a = make([]int, 0) b = make([]int, 0, 0) ) fmt.Printf(&amp;#34;a=%+v; b=%+v&amp;#34;, a, b) fmt.Println() fmt.Printf(&amp;#34;a&amp;#39;s Length=%+v; b&amp;#39;s Length=%+v&amp;#34;, len(a), len(b)) fmt.Println() fmt.Printf(&amp;#34;a&amp;#39;s Capacity=%+v; b&amp;#39;s Capacity=%+v&amp;#34;, cap(a), cap(b)) fmt.Println() if a == nil { fmt.Println(&amp;#34;a is nil&amp;#34;) } else { fmt.Println(&amp;#34;a is not nil&amp;#34;) } if b == nil { fmt.Println(&amp;#34;b is nil&amp;#34;) } else { fmt.Println(&amp;#34;b is not nil&amp;#34;) } } func main() { testMakeSlice() } a=[]; b=[] a&amp;#39;s Length=0; b&amp;#39;s Length=0 a&amp;#39;s Capacity=0; b&amp;#39;s Capacity=0 a is not nil b is not nil</description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>1 前言 # 从程序的角度来看， 我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。
-细化下上述所说的内容，主要包含如下：
-怎么评估变量所需的内存大小? 如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？ 如果第二点都使用后者的方式，那么如何进行管理？ 2 评估内存大小 # 2.1 内存对齐 # what 什么是内存对齐呢？官方解释是：xxxx
-why 为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。 3 分配内存 # 没有内存管理，每次申请都直接向操作系统申请
-通过程序级别的内存管理
-因程序运行起来所需要分配的内存块有大有小，而分散的、大小不一的碎片化内存，一方面会降低内存的使用率，另一方面要找到大小合适的内存块的代价会因碎片化而增加，为降低碎片化内存给程序性能造成的不良影响，
-3.1 Tcmalloc # golang采用了类似谷歌的Tcmalloc算法来解决碎片化问题：
-Tcmalloc：
-按照一组预置的大小规格把内存页划分成块，相同的块串联在一个空闲链表中。 程序申请内存时，会先根据要申请的内存大小，找到最匹配的规格，然后从对应空闲链表中分配一个空闲块。 4 golang内存管理 # 4.1 内存结构 # golang把内存大小分为四种级别，分别为:Arena, Page, Span，内存块。
-注：下文讨论的都是在amd64架构的Linux环境下.
-Arena：golang将堆地址空间划分为一个个arena区，arena区域起始地址定义在arenaBaseOffset，每个arena的大小是64MB，起始地址也对齐到64MB
-Page：每个arena包含8192个page，所以每个page大小为8KB。
-Span：包含一个或多个页大小的内存。golang给出了67种预置的大小规格，最小8Byte，最大32KB，所以在划分整整齐齐的arena中，又会按需划分出不同的Span,每个Span包含一组连续的Page，
-类别(class) 内存块对象大小(bytes/obj) Span大小(bytes/span) Span中内存块对象个数(objects) 尾部浪费(tail waste) 最大浪费百分比(max waste) 1 8 8192 1024 0 87.50% 2 16 8192 512 0 43.75% 3 24 8192 341 8 29.</description></item><item><title>类汇编</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</guid><description>golang类汇编指令 # 寻址模式 # (DI)(BX2): The location at address DI plus BX2. 64(DI)(BX2): The location at address DI plus BX2 plus 64. These modes accept only 1, 2, 4, and 8 as scale factors. 结构体+寄存器 # 类似这种:
-# (m_morebuf+gobuf_pc)(REGISTER) MOVQ	8(SP), AX	# f&amp;#39;s caller&amp;#39;s PC MOVQ	AX, (m_morebuf+gobuf_pc)(BX) type m struct { g0 *g // goroutine with scheduling stack morebuf gobuf // gobuf arg to morestack //-----------morebuf-------------// divmod uint32 // div/mod denominator for arm - known to liblink //.</description></item><item><title>map</title><link>https://zput.github.io/go-goroutine/docs/foundation/map/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/map/</guid><description>并发map # 设计一个并发的map,最简单的就是使用锁加普通map来实现。
-type simpleConcurrentMap struct{ mu sync.Mutex m map[interface{}]interface{} } 上面情形，不管是读还是写都需要先加锁，性能太低，假设我们要设计一个高并发的map呢？我们按读写操作来分一下类：
-读多写少 读少写多 读写平衡 可以分为上述三类。 读多写少场景 # 可以让它们读写分离,分成两个map（readMap与writeMap）, 类似mysql的读写分离吗? 那么插入/更新(删除)的时候怎么从writeMap同步到readMap呢？不可能实时同步，否则readMap也转变为了writeMap,也需要加锁!!! 这么看读写分离就没有必要了，徒增复杂度。
-那么可以设计成类似缓存的cacheMap(不加锁，原子锁)与持久化的persistentMap(加锁)？且把真实的value保存在第三方，自己保留的是第三方的句柄(handle), 类似下图的结构:
-cacheMap: nil key---&amp;gt;ValuePtr(第三方句柄) / \ / \ / ---&amp;gt;valuePtr/-----&amp;gt;value(真实的值) / 可理解为第三方的唯一键 persistentMap: / key---&amp;gt;valuePtr(第三方句柄) 当删除的时候，如果在cacheMap中存在，就把对应的ValuePtr设置为nil(代表删除) 当更新的的时候，如果在cacheMap中存在，就把对应的ValuePtr所指向的value改为newValue(这样persistentMap也更新了) 当查询的时候，先去cacheMap查(如果key存在，valuePtr为nil则说明删除了，但是没有同步到persistentMap)，再去persistentMap查 当插入新的key时候，操作persistentMap。但是这也会遇到什么时候同步到cacheMap中去的问题，因为如果一直不同步，会导致查询的时候都会到persistentMap中去，也是要加锁的。
-一个补偿措施是: 加一个计数器misses，在查询的时候，如果只有在persistentMap中才查到则misses++，到了一定条件，我们把persistentMap安全地同步到cacheMap中，并且清空persistentMap。
-cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只能读或者改。
-golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。
-读取 Map.Load
-if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses &amp;gt;= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
-全局数据区 栈区 堆区 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。
-栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
-堆区:主要用于程序运行阶段的动态分配。
-内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。
-2 定义 # 垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：垃圾识别和垃圾清理。
-golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。
-2.1 垃圾识别 # 2.1.1 双色标记法 # 根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。
-双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。
-双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。
-双色标记法只能描述对象节点自身是否扫描，而不能描述子节点是否完成。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。
-由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。
-2.1.2 三色标记法 # 全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
-黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。 灰色：基于当前节点展开的追踪还未完成。 白色：当追踪完成后，代表可回收的对象。 问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。
-原因： 并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。
-当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)
-处理措施：
-有两种方法来避免:
-强三色：黑色对象只能引用灰色对象。 弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态. 引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。
-分为两种，一种是插入写屏障，一种是删除写屏障。
-插入写屏障 writePointer(slot, ptr): // ⚠️:slot现在指向的还是旧对象 shade(ptr) //shade函数尝试改变指针的颜色--&amp;gt;改变ptr的颜色 *slot = ptr 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。 writePointer(slot, ptr) // ⚠️:slot现在指向的还是旧对象 shade(*slot) //shade函数尝试改变指针的颜色--&amp;gt;改变(*slot)的颜色---&amp;gt;注意这个是*slot(旧对象),slot保存着它原先的保存的地址。 *slot = ptr 引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为忽略协程栈上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。</description></item><item><title>sort</title><link>https://zput.github.io/go-goroutine/docs/foundation/sort/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/sort/</guid><description>在实际开发中，我们如何利用sort包，进行快速排序呢。
-首先我们来看一下sort中最重要的一个接口:
-sort # type Interface interface { // Len is the number of elements in the collection. Len() int // Less reports whether the element with // index i should sort before the element with index j. Less(i, j int) bool // Swap swaps the elements with indexes i and j. Swap(i, j int) } // 内部实现的四种排序算法 // 插入排序 func insertionSort(data Interface, a, b int) // 堆排序 func heapSort(data Interface, a, b int) // 快速排序 func quickSort(data Interface, a, b, maxDepth int) // 归并排序 func symMerge(data Interface, a, m, b int) 一般我们利用下面三种方式进行排序:</description></item><item><title>代码执行过久</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</guid><description>执行太久需要抢占 # preemptone设置抢占 # 继续上文看下preemptone函数，它设置了g.preempt(抢占标示)为true和g.stackguard0为很大的数((1&amp;lt;&amp;lt;(8*sys.PtrSize) - 1) &amp;amp; -1314 ---&amp;gt; 0xfffffffffffffade)，使被抢占的goroutine在进行函数调用会去检查栈溢出,然后处理抢占请求
-// Tell the goroutine running on processor P to stop. // This function is purely best-effort. It can incorrectly fail to inform the // goroutine. It can send inform the wrong goroutine. Even if it informs the // correct goroutine, that goroutine might ignore the request if it is // simultaneously executing newstack. // No lock needs to be held.</description></item><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>进入main函数前的初始化 # 我们首先来gdb调试一下这个程序
-// main.go package main import &amp;#34;fmt&amp;#34; // the function&amp;#39;s body is empty func add(x, y int64) int64 func main() { gg:=add(2, 3) fmt.Println(gg) } // add_amd.s TEXT ·add(SB),$0-24 MOVQ x+0(FP), BX MOVQ y+8(FP), BP ADDQ BP, BX MOVQ BX, ret+16(FP) RET 编译一下源代码: go build -gcflags &amp;quot;-N -l&amp;quot; -o test ..
-程序加载到内存入口 # Expand ↕ (gdb) info files Symbols from &amp;#34;/tmp/kubernets/test&amp;#34;. Local exec file: `/tmp/kubernets/test&amp;#39;, file type elf64-x86-64.</description></item><item><title>底层重要结构</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</guid><description>https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html
-g结构 # type g struct { // 栈相关的两个字段 stack stack stackguard0 uintptr stackguard1 uintptr // offset known to liblink // defer 和 panic _panic *_panic // 最内侧的 panic 结构体 _defer *_defer // 最内侧的延迟函数结构体 // m *m sched gobuf atomicstatus uint32 goid int64 // 抢占 preempt bool // 抢占信号 preemptStop bool // 抢占时将状态修改成 `_Gpreempted` preemptShrink bool // 在同步安全点收缩栈 } type gobuf struct { sp uintptr pc uintptr g guintptr ctxt unsafe.</description></item><item><title>退出</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</link><pubDate>Mon, 10 Feb 2020 10:09:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</guid><description>goroutine退出过程 # goroutine退出,即执行完callee代码后，返回到caller中去，前面一节我们看到，编译器自己把goexit()的地址设置为了caller的pc保存到栈上方,所以退出后，会执行goexit()函数,但是main goroutine比较特殊，这个groutine运行的代码 main函数直接调用了操作系统exit()这个API退出,没有机会返回到caller层.
-main goroutine的退出 # 在上节中我们看到程序执行到了 mian函数
-// The main goroutine. func main() { g := getg() //... //main包 init函数，递归的调用import包中定义的init函数 fn := main_init // make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime fn() //... //调用main.main函数(用户定义的main函数):进行间接调用是因为链接器在放置运行时不知道主包的地址 fn = main_main // make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime fn() //.</description></item><item><title>陷入系统调用</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</link><pubDate>Tue, 23 Jun 2020 20:50:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</guid><description>执行系统调用抢占 # handoffp # handoffp函数:判断是否需要启动工作线程来接管_p_，如果不需要则把_p_放入P的全局空闲队列.
-如果当前P的运行队列有任务/全局队列有任务，有gc任务，大概率整个系统有任务待做，或者当前P是最后一个P要用作轮询网络
-其中大概率整个系统有任务待做: 由第24行 atomic.Load(&amp;amp;sched.nmspinning)+atomic.Load(&amp;amp;sched.npidle) == 0 决定:
-如果没有P空闲，而且这些没空闲的P连接的M不是处在自旋状态(没有自旋的M)，证明其他P都在工作(而不是假装工作实际是在伺机从其他队列偷任务那种),是不是说明整个系统除了当前P外都在做事，所以大概率某些P的运行队列上有任务积压，所以我们应该启动M,让它跟当前P连接，去别的P中偷任务)
-1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 // Hands off P from syscall or locked M.</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</guid><description>分配一个对象，mutator -&amp;gt; Allocator -&amp;gt; heap分类，从横向来看，可分为线性与链表形式;其中链表又可以分为：首次适应，循环首次适应，最优适应和预先隔离适应。 从纵向来看，可以分为单级与多级。
-而golang混合纵向的多级,而各级横向结构有线性形式，也有链表的形式。分配某一对象，按照其大小涉及到的层级不同，可分为微小对象，小对象，大对象三类。
-当需要分配这三类对象时，从下面的对应的结构中开始分配
-tiny --&amp;gt; 微小对象 mcache ---&amp;gt; 小对象 mcentralList heapArenasList ---&amp;gt; 大对象 sequential allocation 的实现方式非常简单，只需要把维护的空间直接分配出去就好，每次分配以后挪动指针，指向剩余空闲的位置的首地址，runtime off-heap object allocator一节中介绍的persistent allocator采用的就是sequential allocation这个方式。sequential allocation这种分配方式的缺点是不能直接回收，得配合特定的垃圾回收算法，比如semispace copying collection，这种垃圾回收算法把堆划分成两份，当一份分配完以后，把仍然有用的对象拷贝到另外半个堆中，这样没有用的对象的空间就被回收了，分配空间继续在另外半个堆进行，当满了以后再拷贝有用的对象回到原来的半个堆中。
-free list allocation 这种分配方式相对sequential allocation这种方式没能更好的利用上缓存的空间局部性原理，并且分配的时候速度慢，虽然有first fit 、next fit、best fit三种寻找空闲块的策略 ，但是多少还是会造成外部碎片。但是free list allocation 可以支持立马把释放的空间放到list中用于后续的分配。
-segregated-fix allocation 是属于fee list allocation的一种细分
-func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer { //... if size &amp;lt;= maxSmallSize { if noscan &amp;amp;&amp;amp; size &amp;lt; maxTinySize { // 微对象分配 } else { // 小对象分配 } } else { // 大对象分配 largeAlloc } //.</description></item><item><title>分配大对象</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</guid><description>分配大对象会涉及到的三个部分：栈/块/区</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</guid><description>看下这个调用图
-digraph cacheSpan { rankdir=TB; node[shape=box]; start[label=&amp;#34;开始&amp;#34;]; end[label=&amp;#34;结束&amp;#34;]; sg[label=&amp;#34;获取当前 sweepgen 值&amp;#34;]; nonempty[label=&amp;#34;遍历非空 span 列表&amp;#34;]; sweepgen[label=&amp;#34;如果内存单元的 sweepgen 等于 mheap.sweepgen - 2， 那么意味着当前单元需要清理 \n如果等于 mheap.sweepgen - 1，那么当前管理单元就正在清理&amp;#34;;shape=plain; ] empty[label=&amp;#34;遍历空 span 列表&amp;#34;]; sweep[label=&amp;#34;清理 span 并将其添加到空 span 列表&amp;#34;]; free[label=&amp;#34;释放部分空间&amp;#34;]; grow[label=&amp;#34;创建新的 span 并添加到空 span 列表&amp;#34;]; cache[label=&amp;#34;重新填充 span 的分配缓存&amp;#34;]; have[label=&amp;#34;返回 span 指针&amp;#34;]; // 处理mspan subgraph cluster_span { style = dotted margin = 10 &amp;#34;块(span)&amp;#34; [shape = plaintext;fontsize = 24] &amp;#34;mheap.alloc_m&amp;#34; &amp;#34;notice1&amp;#34; [shape=plain;label=&amp;#34;在这里才设置mspan中的spanclass&amp;#34;] {rank=same; &amp;#34;notice1&amp;#34; -&amp;gt; &amp;#34;mheap.alloc_m&amp;#34;[dir=none]; } } start -&amp;gt; sg; {rank=same; sweepgen -&amp;gt; nonempty[style=invis];} sg -&amp;gt; nonempty -&amp;gt; sweep -&amp;gt; empty -&amp;gt; free -&amp;gt; have; nonempty -&amp;gt; empty; empty -&amp;gt; grow -&amp;gt; cache -&amp;gt; have; have-&amp;gt;end; } mcentral中有六个mspan列表，分别是:</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</guid><description>off是tiny Allocator的偏移指针，根据将要分配的内存大小，需调整off。如果size是8的倍数，则调用round(off,8)函数将off向上舍入到8的倍数。否则，如果size是4的倍数，则调用round(off,4)函数将off向上舍入到4的倍数。最后，如果size是2的倍数，则调用round(off,2)函数将off舍入到2的倍数。
-off := c.tinyoffset // Align tiny pointer for required (conservative) alignment. if size&amp;amp;7 == 0 { off = round(off, 8) } else if size&amp;amp;3 == 0 { off = round(off, 4) } else if size&amp;amp;1 == 0 { off = round(off, 2) } 验证如下，需要调整的都会打印出来
-===&amp;gt;原始: off:1, size:2 | 调整后: off:2, size:2 &amp;lt;===2倍数 // https://go.dev/play/p/1fl_cnJNwD- package main import ( &amp;#34;fmt&amp;#34; ) func main() { for i := 0; i &amp;lt; 16; i++ { for j := 1; j &amp;lt; 16; j++ { tmpOff, tmpSize := Size(i, j) if i !</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</guid><description/></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</guid><description/></item><item><title/><link>https://zput.github.io/go-goroutine/docs/foundation/directory/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/directory/</guid><description>func executeDir() string { ex, err := os.Executable() if err != nil { panic(err) } exPath := filepath.Dir(ex) fmt.Println(exPath) return exPath } func getwd() string { // using the function mydir, err := os.Getwd() if err != nil { fmt.Println(err) } fmt.Println(mydir) return mydir }</description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>go调度源码分析</title><link>https://zput.github.io/go-goroutine/</link><description>Recent content on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Tue, 23 Jun 2020 20:50:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/index.xml" rel="self" type="application/rss+xml"/><item><title>开启系统监控</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/</guid><description>&lt;h1 id="开启系统监控">
+ 开启系统监控
+ &lt;a class="anchor" href="#%e5%bc%80%e5%90%af%e7%b3%bb%e7%bb%9f%e7%9b%91%e6%8e%a7">#&lt;/a>
+&lt;/h1>
+&lt;p>这个是main goroutine执行的主函数，此函数之后会调用用户定义main函数,我们在初始化一章已经提过
+
+
+
+ 
+
+&lt;a href="https://zput.github.io/go-goroutine/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/#%e8%bf%9b%e5%85%a5main%e5%87%bd%e6%95%b0" class="book-btn ...">
+ main goroutine执行的主函数
+&lt;/a>
+&lt;/p>
+&lt;p>它的里面可以看到调用了newm函数生成新M,且新M将执行sysmon函数&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">GOARCH&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#e6db74">&amp;#34;wasm&amp;#34;&lt;/span> { &lt;span style="color:#75715e">// no threads on wasm yet, so no sysmon
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">systemstack&lt;/span>(&lt;span style="color:#66d9ef">func&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#a6e22e">newm&lt;/span>(&lt;span style="color:#a6e22e">sysmon&lt;/span>, &lt;span style="color:#66d9ef">nil&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		})
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>主动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</link><pubDate>Thu, 02 Apr 2020 11:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</guid><description>&lt;h1 id="goroutine主动调度">
+ goroutine主动调度
+ &lt;a class="anchor" href="#goroutine%e4%b8%bb%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="探寻runtimegosched">
+ 探寻runtime.Gosched()
+ &lt;a class="anchor" href="#%e6%8e%a2%e5%af%bbruntimegosched">#&lt;/a>
+&lt;/h2>
+&lt;div class="book-columns flex flex-wrap">
+
+ &lt;div class="flex-even markdown-inner">
+ &lt;!-- begin columns block -->
+&lt;p>goroutine主动调度就是调用&lt;code>runtime.Gosched()&lt;/code>函数, 此函数会主动放弃与M的关联,并把自身(G)放入全局空闲G队列.当前的goroutine并不会退出,它进入全局G队列后可能会再次被调度运行.&lt;/p>
+&lt;blockquote>
+&lt;p>&lt;code>src/runtime/proc.go:267&lt;/code>&lt;/p>
+&lt;/blockquote>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Gosched yields the processor, allowing other goroutines to run. It does not
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// suspend the current goroutine, so execution resumes automatically.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">Gosched&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">checkTimeouts&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">mcall&lt;/span>(&lt;span style="color:#a6e22e">gosched_m&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>从全局/本P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</link><pubDate>Mon, 02 Mar 2020 13:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</guid><description>&lt;h1 id="从本地队列或全局队列获取goroutine">
+ 从本地队列或全局队列获取goroutine
+ &lt;a class="anchor" href="#%e4%bb%8e%e6%9c%ac%e5%9c%b0%e9%98%9f%e5%88%97%e6%88%96%e5%85%a8%e5%b1%80%e9%98%9f%e5%88%97%e8%8e%b7%e5%8f%96goroutine">#&lt;/a>
+&lt;/h1>
+&lt;p>分析schedule函数整个流程:&lt;/p>
+&lt;p>
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624190932.png" alt="schedule()函数" />&lt;/p>
+&lt;p>
+ &lt;a href="https://zput.github.io/go-goroutine/go-goroutine/">src/runtime/proc.go&lt;/a>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// One round of scheduler: find a runnable goroutine and execute it.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Never returns.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">schedule&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">_g_&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">top&lt;/span>:
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">inheritTime&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#75715e">// Check the global runnable queue once in a while to ensure fairness.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#75715e">// Otherwise two goroutines can completely occupy the local runqueue
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#75715e">// by constantly respawning each other.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">p&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>().&lt;span style="color:#a6e22e">schedtick&lt;/span>&lt;span style="color:#f92672">%&lt;/span>&lt;span style="color:#ae81ff">61&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">runqsize&lt;/span> &amp;gt; &lt;span style="color:#ae81ff">0&lt;/span> { &lt;span style="color:#75715e">//schedtick就是调度次数,如果能被61整除且全局的Goroutine队列不为空就尝试获取
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>			&lt;span style="color:#a6e22e">lock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#a6e22e">gp&lt;/span> = &lt;span style="color:#a6e22e">globrunqget&lt;/span>(&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">p&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>(), &lt;span style="color:#ae81ff">1&lt;/span>) &lt;span style="color:#75715e">//全局运行队列中获取goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>			&lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span> = &lt;span style="color:#a6e22e">runqget&lt;/span>(&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">p&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>()) &lt;span style="color:#75715e">//本地运行队列(当前线程)中获取goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#a6e22e">throw&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;schedule: spinning with local work&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">/*
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"> 则调用findrunnable函数从其它工作线程的运行队列中偷取，如果偷取不到，则当前工作线程进入睡眠,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"> 直到获取到需要运行的goroutine之后findrunnable函数才会返回.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"> */&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span> = &lt;span style="color:#a6e22e">findrunnable&lt;/span>() &lt;span style="color:#75715e">// blocks until work is available
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// This thread is going to run a goroutine and is not spinning anymore,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// so if it was marked as spinning we need to reset it now and potentially
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// start a new spinning M.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">resetspinning&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">execute&lt;/span>(&lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>内存大小端</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</guid><description>&lt;h1 id="内存大小端">
+ 内存大小端
+ &lt;a class="anchor" href="#%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f%e7%ab%af">#&lt;/a>
+&lt;/h1>
+&lt;p>对于这两种存储方式，如果联系下我们常用 “异或” 操作，就能得到一个很好的记忆规则。总结来说就是：&lt;/p>
+&lt;ul>
+&lt;li>低地址存储低字节即为小端存储；高地址存储高字节即为小端存储；&lt;/li>
+&lt;li>低地址存储高字节即为大端存储；高地址存储低字节即为大端存储；&lt;/li>
+&lt;/ul>
+&lt;p>我们把 “低” 、“小” 认作 “0”， 把 “高”、“大” 认作 “1”，这样就可以利用 “异或” 的结果来加强记忆了。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">内存&lt;/th>
+ &lt;th style="text-align: left">字节&lt;/th>
+ &lt;th style="text-align: left">大端/小端&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">低地址&lt;/td>
+ &lt;td style="text-align: left">低字节&lt;/td>
+ &lt;td style="text-align: left">小端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">高地址&lt;/td>
+ &lt;td style="text-align: left">高字节&lt;/td>
+ &lt;td style="text-align: left">小端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">低地址&lt;/td>
+ &lt;td style="text-align: left">高字节&lt;/td>
+ &lt;td style="text-align: left">大端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">高地址&lt;/td>
+ &lt;td style="text-align: left">低字节&lt;/td>
+ &lt;td style="text-align: left">大端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;hr>
+&lt;p>intel 存储字节的顺序是小端优先：即低有效字节存储在低内存地址中。写值是从低地址向高地址写入，如SP指向0xf000，往栈中写入一个字（8字节），占用0xf000到0xf007的8个字节。&lt;/p></description></item><item><title>GMP</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;h1 id="golang-gmp概念">
+ golang GMP概念
+ &lt;a class="anchor" href="#golang-gmp%e6%a6%82%e5%bf%b5">#&lt;/a>
+&lt;/h1>
+&lt;ul>
+&lt;li>
+&lt;p>what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P&amp;quot;用来调度goruntine，被称为&amp;quot;GMP模型”。&lt;/p>
+&lt;ul>
+&lt;li>GMP
+&lt;ul>
+&lt;li>G:为了调度方便，保存寄存器，栈地址等-&amp;gt;&lt;code>对应cpu切换[1.cpu寄存器的值；2.stack地址]&lt;/code>&lt;/li>
+&lt;li>M:与系统线程一一对应&lt;/li>
+&lt;li>P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>why:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>单进程时代不需要调度器&lt;/p>
+&lt;ul>
+&lt;li>1.单一的执行流程，计算机只能一个任务一个任务处理。&lt;/li>
+&lt;li>2.进程阻塞所带来的CPU时间浪费。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>多进程/线程时代有了调度器需求&lt;/p>
+&lt;ul>
+&lt;li>1.解决了阻塞的问题&lt;/li>
+&lt;li>2.CPU有很大的一部分都被浪费在进程调度&lt;/li>
+&lt;li>设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;blockquote>
+&lt;ul>
+&lt;li>为什么。
+&lt;ul>
+&lt;li>线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。&lt;/li>
+&lt;li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>如何进行调度。
+&lt;ul>
+&lt;li>一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。&lt;/li>
+&lt;li>另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。&lt;/li>
+&lt;li>M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>摆脱上下文(在这里P就是上下文)？
+&lt;ul>
+&lt;li>&lt;del>不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。&lt;/del>&lt;/li>
+&lt;li>以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;blockquote>
+&lt;ul>
+&lt;li>why:
+&lt;ul>
+&lt;li>threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.&lt;/li>
+&lt;li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>how:
+&lt;ul>
+&lt;li>One is N:1 where several userspace threads are run on one OS thread. This has the advantage of being very quick to context switch but cannot take advantage of multi-core systems.&lt;/li>
+&lt;li>Another is 1:1 where one thread of execution matches one OS thread. It takes advantage of all of the cores on the machine, but context switching is slow because it has to trap through the OS.&lt;/li>
+&lt;li>M:N scheduler. You get quick context switches and you take advantage of all the cores in your system. The main disadvantage of this approach is the complexity it adds to the scheduler.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>get rid of contexts?
+&lt;ul>
+&lt;li>Not really. The reason we have contexts is so that we can hand them off to other threads if the running thread needs to block for some reason.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;hr>
+&lt;blockquote>
+&lt;p>这个也就说明了&lt;code>N-M&lt;/code>的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。&lt;/p></description></item><item><title>基本用法</title><link>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</guid><description>&lt;h2 id="数据结构">
+ 数据结构
+ &lt;a class="anchor" href="#%e6%95%b0%e6%8d%ae%e7%bb%93%e6%9e%84">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>这些数据结构的底层是怎么实现的,比如array,它就是一个指针,指向第一个元素的地址.&lt;/li>
+&lt;li>然后就是一个细节,如果要实现这个数据结构的一些功能,比如chan读写,map的添加删除等,它们是怎么利用数据结构里面底层的field来实现这些功能?&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;h3 id="引用">
+ 引用
+ &lt;a class="anchor" href="#%e5%bc%95%e7%94%a8">#&lt;/a>
+&lt;/h3>
+&lt;p>通常意义上来说，引用就是某块内存的别名, 我们常常拿指针与引用进行比较, 那么看看引用在底层是怎么实现的:&lt;/p>
+&lt;p>一种是c++里的引用实现，它其实是一个语法糖，经过编译器编译后，汇编代码引用就是指针，只不过是const指针，初始化的时候就需要赋值，且以后不能再更改[
+ &lt;a href="https://www.cnblogs.com/hoodlum1980/archive/2012/06/19/2554270.html">c++里的引用实现&lt;/a>;且两者地址相同。
+特别说明由于引用只是指针包装, 也存在风险:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-c++" data-lang="c++">&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">int&lt;/span> &lt;span style="color:#f92672">*&lt;/span>a &lt;span style="color:#f92672">=&lt;/span> &lt;span style="color:#66d9ef">new&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">int&lt;/span> &lt;span style="color:#f92672">&amp;amp;&lt;/span>b &lt;span style="color:#f92672">=&lt;/span> &lt;span style="color:#f92672">*&lt;/span>a;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">delete&lt;/span> a;
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> b &lt;span style="color:#f92672">=&lt;/span> &lt;span style="color:#ae81ff">12&lt;/span>; &lt;span style="color:#75715e">// 对已经释放的内存解引用
+&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>测试相关函数</title><link>https://zput.github.io/go-goroutine/docs/robustness_and_performance/golang_test/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/robustness_and_performance/golang_test/</guid><description>&lt;h1 id="golang测试相关函数">
+ golang测试相关函数
+ &lt;a class="anchor" href="#golang%e6%b5%8b%e8%af%95%e7%9b%b8%e5%85%b3%e5%87%bd%e6%95%b0">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="test函数的种类">
+ test函数的种类
+ &lt;a class="anchor" href="#test%e5%87%bd%e6%95%b0%e7%9a%84%e7%a7%8d%e7%b1%bb">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>func TestXxx(t *testing.T) { ... }&lt;/code>
+&lt;ul>
+&lt;li>注意下这个Xxx需要大写&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>func BenchmarkXxx(b *testing.B) { ... }&lt;/code>
+&lt;ul>
+&lt;li>注意下这个Xxx需要大写&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>ExampleXxx&lt;/code>
+&lt;ul>
+&lt;li>&lt;code>prints output to os.Stdout&lt;/code>&lt;/li>
+&lt;li>&amp;ldquo;Output:&amp;rdquo;&lt;/li>
+&lt;li>&amp;ldquo;Unordered output:&amp;rdquo;&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>&lt;code>go help testfunc&lt;/code>&lt;/p>
+
+&lt;div class="book-expand">
+ &lt;label>
+ &lt;div class="book-expand-head flex justify-between">
+ &lt;span>Expand&lt;/span>
+ &lt;span>↕&lt;/span>
+ &lt;/div>
+ &lt;input type="checkbox" class="hidden" />
+ &lt;div class="book-expand-content markdown-inner">
+ &lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-sh" data-lang="sh">&lt;span style="display:flex;">&lt;span>The &lt;span style="color:#e6db74">&amp;#39;go test&amp;#39;&lt;/span> command expects to find test, benchmark, and example functions
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>in the &lt;span style="color:#e6db74">&amp;#34;*_test.go&amp;#34;&lt;/span> files corresponding to the package under test.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>A test &lt;span style="color:#66d9ef">function&lt;/span> is one named TestXxx &lt;span style="color:#f92672">(&lt;/span>where Xxx does not start with a
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>lower &lt;span style="color:#66d9ef">case&lt;/span> letter&lt;span style="color:#f92672">)&lt;/span> and should have the signature,
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> func TestXxx&lt;span style="color:#f92672">(&lt;/span>t *testing.T&lt;span style="color:#f92672">)&lt;/span> &lt;span style="color:#f92672">{&lt;/span> ... &lt;span style="color:#f92672">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>A benchmark &lt;span style="color:#66d9ef">function&lt;/span> is one named BenchmarkXxx and should have the signature,
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> func BenchmarkXxx&lt;span style="color:#f92672">(&lt;/span>b *testing.B&lt;span style="color:#f92672">)&lt;/span> &lt;span style="color:#f92672">{&lt;/span> ... &lt;span style="color:#f92672">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>An example &lt;span style="color:#66d9ef">function&lt;/span> is similar to a test &lt;span style="color:#66d9ef">function&lt;/span> but, instead of using
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>*testing.T to report success or failure, prints output to os.Stdout.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>If the last comment in the &lt;span style="color:#66d9ef">function&lt;/span> starts with &lt;span style="color:#e6db74">&amp;#34;Output:&amp;#34;&lt;/span> &lt;span style="color:#66d9ef">then&lt;/span> the output
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>is compared exactly against the comment &lt;span style="color:#f92672">(&lt;/span>see examples below&lt;span style="color:#f92672">)&lt;/span>. If the last
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>comment begins with &lt;span style="color:#e6db74">&amp;#34;Unordered output:&amp;#34;&lt;/span> &lt;span style="color:#66d9ef">then&lt;/span> the output is compared to the
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>comment, however the order of the lines is ignored. An example with no such
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>comment is compiled but not executed. An example with no text after
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#e6db74">&amp;#34;Output:&amp;#34;&lt;/span> is compiled, executed, and expected to produce no output.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Godoc displays the body of ExampleXxx to demonstrate the use
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>of the &lt;span style="color:#66d9ef">function&lt;/span>, constant, or variable Xxx. An example of a method M with
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>receiver type T or *T is named ExampleT_M. There may be multiple examples
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">for&lt;/span> a given &lt;span style="color:#66d9ef">function&lt;/span>, constant, or variable, distinguished by a trailing _xxx,
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>where xxx is a suffix not beginning with an upper &lt;span style="color:#66d9ef">case&lt;/span> letter.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Here is an example of an example:
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> func ExamplePrintln&lt;span style="color:#f92672">()&lt;/span> &lt;span style="color:#f92672">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> Println&lt;span style="color:#f92672">(&lt;/span>&lt;span style="color:#e6db74">&amp;#34;The output of\nthis example.&amp;#34;&lt;/span>&lt;span style="color:#f92672">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // Output: The output of
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // this example.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f92672">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>Here is another example where the ordering of the output is ignored:
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> func ExamplePerm&lt;span style="color:#f92672">()&lt;/span> &lt;span style="color:#f92672">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">for&lt;/span> _, value :&lt;span style="color:#f92672">=&lt;/span> range Perm&lt;span style="color:#f92672">(&lt;/span>4&lt;span style="color:#f92672">)&lt;/span> &lt;span style="color:#f92672">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> fmt.Println&lt;span style="color:#f92672">(&lt;/span>value&lt;span style="color:#f92672">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f92672">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // Unordered output: &lt;span style="color:#ae81ff">4&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // &lt;span style="color:#ae81ff">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // &lt;span style="color:#ae81ff">1&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // &lt;span style="color:#ae81ff">3&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> // &lt;span style="color:#ae81ff">0&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f92672">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>The entire test file is presented as the example when it contains a single
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>example &lt;span style="color:#66d9ef">function&lt;/span>, at least one other &lt;span style="color:#66d9ef">function&lt;/span>, type, variable, or constant
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>declaration, and no test or benchmark functions.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>See the documentation of the testing package &lt;span style="color:#66d9ef">for&lt;/span> more information.
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>源码-反码-补码</title><link>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</guid><description>&lt;h2 id="概念">
+ 概念
+ &lt;a class="anchor" href="#%e6%a6%82%e5%bf%b5">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>
+&lt;p>机器数&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>真值&lt;/p>
+&lt;ul>
+&lt;li>真值符号部分&lt;/li>
+&lt;li>真值部分&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>举例：
+-1的真值是:&lt;code>1000 0001&lt;/code>, 其中真值&lt;strong>符号区域&lt;/strong>为最高位的&lt;code>1&lt;/code>,他的&lt;strong>真值区域&lt;/strong>为&lt;code>000 0001&lt;/code>。&lt;/p>
+&lt;hr>
+&lt;ul>
+&lt;li>原码&lt;/li>
+&lt;/ul>
+&lt;pre tabindex="0">&lt;code>[+1] = 0000 0001
+[-1] = 1000 0001
+&lt;/code>&lt;/pre>&lt;ul>
+&lt;li>反码：
+&lt;ul>
+&lt;li>正数的反码是其本身&lt;/li>
+&lt;li>负数的反码是在其原码的基础上, 符号位不变，其余各个位取反.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">十进制数&lt;/th>
+ &lt;th style="text-align: left">带符号位二进制原码&lt;/th>
+ &lt;th style="text-align: left">带符号位二进制补码&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">-8&lt;/td>
+ &lt;td style="text-align: left">N&lt;/td>
+ &lt;td style="text-align: left">1000&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-7&lt;/td>
+ &lt;td style="text-align: left">1111&lt;/td>
+ &lt;td style="text-align: left">1001&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-6&lt;/td>
+ &lt;td style="text-align: left">1110&lt;/td>
+ &lt;td style="text-align: left">1010&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-5&lt;/td>
+ &lt;td style="text-align: left">1101&lt;/td>
+ &lt;td style="text-align: left">1011&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-4&lt;/td>
+ &lt;td style="text-align: left">1100&lt;/td>
+ &lt;td style="text-align: left">1100&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-3&lt;/td>
+ &lt;td style="text-align: left">1011&lt;/td>
+ &lt;td style="text-align: left">1101&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-2&lt;/td>
+ &lt;td style="text-align: left">1010&lt;/td>
+ &lt;td style="text-align: left">1110&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-1&lt;/td>
+ &lt;td style="text-align: left">1001&lt;/td>
+ &lt;td style="text-align: left">1111&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-0&lt;/td>
+ &lt;td style="text-align: left">1000&lt;/td>
+ &lt;td style="text-align: left">0000&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">+0&lt;/td>
+ &lt;td style="text-align: left">0000&lt;/td>
+ &lt;td style="text-align: left">0000&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0001&lt;/td>
+ &lt;td style="text-align: left">0001&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">2&lt;/td>
+ &lt;td style="text-align: left">0010&lt;/td>
+ &lt;td style="text-align: left">0010&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">3&lt;/td>
+ &lt;td style="text-align: left">0011&lt;/td>
+ &lt;td style="text-align: left">0011&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">4&lt;/td>
+ &lt;td style="text-align: left">0100&lt;/td>
+ &lt;td style="text-align: left">0100&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">5&lt;/td>
+ &lt;td style="text-align: left">0101&lt;/td>
+ &lt;td style="text-align: left">0101&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">6&lt;/td>
+ &lt;td style="text-align: left">0110&lt;/td>
+ &lt;td style="text-align: left">0110&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">7&lt;/td>
+ &lt;td style="text-align: left">0111&lt;/td>
+ &lt;td style="text-align: left">0111&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;ul>
+&lt;li>补码：
+&lt;ul>
+&lt;li>正数的补码就是其本身&lt;/li>
+&lt;li>负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1)&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式.
+但为什么需要三种不同的编码方式呢？&lt;/p></description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
+ goroutine被动调度
+ &lt;a class="anchor" href="#goroutine%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
+&lt;/h1>
+&lt;p>什么是被动调度: goroutine执行某个操作因条件不满足需要等待而发生的调度&lt;/p>
+&lt;ul>
+&lt;li>goroutine进入睡眠
+&lt;ul>
+&lt;li>比如是goroutineN发送数据到无缓冲chan上面,当没有其他Goroutine从chan上面读数据的时候,goroutineN阻塞在chan上面. 此刻睡眠含义:进入chan的缓存读取队列(goroutine链表)&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>重新运行schedule()&lt;/li>
+&lt;li>唤醒睡眠中的goroutine;&lt;/li>
+&lt;li>唤醒空闲的P和唤醒/创建工作线程;
+&lt;ul>
+&lt;li>goroutine(&lt;em>被创建出来后/创建运行了一段时间后&lt;/em>)如何放入运行队列P中&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h2 id="被动进入睡眠">
+ 被动进入睡眠
+ &lt;a class="anchor" href="#%e8%a2%ab%e5%8a%a8%e8%bf%9b%e5%85%a5%e7%9d%a1%e7%9c%a0">#&lt;/a>
+&lt;/h2>
+&lt;div class="book-columns flex flex-wrap">
+
+ &lt;div class="flex-even markdown-inner">
+ &lt;!-- begin columns block -->
+&lt;ul>
+&lt;li>goroutine因某个条件而阻塞&lt;/li>
+&lt;li>chan&lt;/li>
+&lt;li>waitGroup
+等这些都会发生阻塞&lt;/li>
+&lt;/ul>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;fmt&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;runtime&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;sync&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#e6db74">&amp;#34;sync/atomic&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">n&lt;/span> &lt;span style="color:#66d9ef">int32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">wg&lt;/span> &lt;span style="color:#a6e22e">sync&lt;/span>.&lt;span style="color:#a6e22e">WaitGroup&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">runtime&lt;/span>.&lt;span style="color:#a6e22e">GOMAXPROCS&lt;/span>(&lt;span style="color:#ae81ff">2&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">wg&lt;/span>.&lt;span style="color:#a6e22e">Add&lt;/span>(&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#66d9ef">func&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">wg&lt;/span>.&lt;span style="color:#a6e22e">Done&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">for&lt;/span>{
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">AddInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">n&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">wg&lt;/span>.&lt;span style="color:#a6e22e">Wait&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">LoadInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">n&lt;/span>)) &lt;span style="color:#75715e">// 1
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>从其他P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</link><pubDate>Sun, 08 Mar 2020 10:05:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</guid><description>&lt;h1 id="从其他队列盗取goroutine">
+ 从其他队列盗取goroutine
+ &lt;a class="anchor" href="#%e4%bb%8e%e5%85%b6%e4%bb%96%e9%98%9f%e5%88%97%e7%9b%97%e5%8f%96goroutine">#&lt;/a>
+&lt;/h1>
+&lt;p>盗取Goroutine的过程就是:如果在所有运行队列找g都找不到,M就进入&lt;strong>睡眠&lt;/strong>状态&lt;/p>
+&lt;h2 id="findrunnable函数">
+ findrunnable函数
+ &lt;a class="anchor" href="#findrunnable%e5%87%bd%e6%95%b0">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Finds a runnable goroutine to execute.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Tries to steal from other P&amp;#39;s, get g from global queue, poll network.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">findrunnable&lt;/span>() (&lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">_g_&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// The conditions here and in handoffp must agree: if
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// findrunnable would return a G to run, handoffp must start
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// an M.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">top&lt;/span>:
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">p&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// local runq
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//再次看一下本地运行队列是否有需要运行的goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">runqget&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>); &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// global runq
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//再看看全局运行队列是否有需要运行的goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">runqsize&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">lock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">globrunqget&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Steal work from other P&amp;#39;s.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// 使用所有P与空闲的P进行比较，如果除了自己，其他的P都是休眠状态。那么整个系统都没有工作需要做了。
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">procs&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> uint32(&lt;span style="color:#a6e22e">gomaxprocs&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Load&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">npidle&lt;/span>) &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#a6e22e">procs&lt;/span>&lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#75715e">// Either GOMAXPROCS=1 or everybody, except for us, is idle already.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#75715e">// New work can appear from returning syscall/cgocall, network or timers.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#75715e">// Neither of that submits to local run queues, so no point in stealing.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">stop&lt;/span> &lt;span style="color:#75715e">//直接退出
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// If number of spinning M&amp;#39;s &amp;gt;= number of busy P&amp;#39;s, block.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// This is necessary to prevent excessive CPU consumption
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// when GOMAXPROCS&amp;gt;&amp;gt;1 but the program parallelism is low.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 	&lt;span style="color:#75715e">// 当这个M不是自旋状态，并且此时的二倍的自旋M大于当前正在工作的P; 说明此时有许多现在在寻找工作做.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> !&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#ae81ff">2&lt;/span>&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Load&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>) &lt;span style="color:#f92672">&amp;gt;=&lt;/span> &lt;span style="color:#a6e22e">procs&lt;/span>&lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Load&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">npidle&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">stop&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> !&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//设置m的状态为spinning
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> = &lt;span style="color:#66d9ef">true&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//处于spinning状态的m数量加一
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Xadd&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//从其它p的本地运行队列盗取goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">for&lt;/span> &lt;span style="color:#a6e22e">i&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span>; &lt;span style="color:#a6e22e">i&lt;/span> &amp;lt; &lt;span style="color:#ae81ff">4&lt;/span>; &lt;span style="color:#a6e22e">i&lt;/span>&lt;span style="color:#f92672">++&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">for&lt;/span> &lt;span style="color:#a6e22e">enum&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">stealOrder&lt;/span>.&lt;span style="color:#a6e22e">start&lt;/span>(&lt;span style="color:#a6e22e">fastrand&lt;/span>()); !&lt;span style="color:#a6e22e">enum&lt;/span>.&lt;span style="color:#a6e22e">done&lt;/span>(); &lt;span style="color:#a6e22e">enum&lt;/span>.&lt;span style="color:#a6e22e">next&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">gcwaiting&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">top&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">stealRunNextG&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">i&lt;/span> &amp;gt; &lt;span style="color:#ae81ff">2&lt;/span> &lt;span style="color:#75715e">// first look for ready queues with more than 1 g
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">runqsteal&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#a6e22e">allp&lt;/span>[&lt;span style="color:#a6e22e">enum&lt;/span>.&lt;span style="color:#a6e22e">position&lt;/span>()], &lt;span style="color:#a6e22e">stealRunNextG&lt;/span>); &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">stop&lt;/span>:
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// Before we drop our P, make a snapshot of the allp slice,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// which can change underfoot once we no longer block
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// safe-points. We don&amp;#39;t need to snapshot the contents because
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// everything up to cap(allp) is immutable.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">allpSnapshot&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">allp&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// return P and block
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">lock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">runqsize&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">globrunqget&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// 当前工作线程解除与p之间的绑定，准备去休眠
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">releasep&lt;/span>() &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#a6e22e">_p_&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">throw&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;findrunnable: wrong p&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//把p放入空闲队列
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">pidleput&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Delicate dance: thread transitions from spinning to non-spinning state,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// potentially concurrently with submission of new goroutines. We must
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// drop nmspinning first and then check all per-P queues again (with
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// #StoreLoad memory barrier in between). If we do it the other way around,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// another thread can submit a goroutine after we&amp;#39;ve checked all run queues
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// but before we drop nmspinning; as the result nobody will unpark a thread
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// to run the goroutine.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// If we discover new work below, we need to restore m.spinning as a signal
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// for resetspinning to unpark a new worker thread (because there can be more
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// than one starving goroutine). However, if after discovering new work
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// we also observe no idle Ps, it is OK to just park the current thread:
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// the system is fully loaded so no spinning threads are required.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Also see &amp;#34;Worker thread parking/unparking&amp;#34; comment at the top of the file.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">wasSpinning&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//m即将睡眠，状态不再是spinning
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> = &lt;span style="color:#66d9ef">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> int32(&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Xadd&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>, &lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span>)) &amp;lt; &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">throw&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;findrunnable: negative nmspinning&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// check all runqueues once again
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// 休眠之前再看一下是否有工作要做
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">for&lt;/span> &lt;span style="color:#a6e22e">_&lt;/span>, &lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#66d9ef">range&lt;/span> &lt;span style="color:#a6e22e">allpSnapshot&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> !&lt;span style="color:#a6e22e">runqempty&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">lock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">_p_&lt;/span> = &lt;span style="color:#a6e22e">pidleget&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">acquirep&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">wasSpinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> = &lt;span style="color:#66d9ef">true&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Xadd&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">top&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">break&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#f92672">......&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//休眠
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">stopm&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">top&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>伪寄存器与函数栈帧</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</guid><description>&lt;h1 id="伪寄存器--函数栈">
+ 伪寄存器 &amp;amp; 函数栈
+ &lt;a class="anchor" href="#%e4%bc%aa%e5%af%84%e5%ad%98%e5%99%a8--%e5%87%bd%e6%95%b0%e6%a0%88">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="伪寄存器">
+ 伪寄存器
+ &lt;a class="anchor" href="#%e4%bc%aa%e5%af%84%e5%ad%98%e5%99%a8">#&lt;/a>
+&lt;/h2>
+&lt;p>伪寄存器常用的一般是下面的四个:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">FP&lt;/span>: &lt;span style="color:#a6e22e">Frame&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">arguments&lt;/span> &lt;span style="color:#a6e22e">and&lt;/span> &lt;span style="color:#a6e22e">locals&lt;/span>.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">PC&lt;/span>: &lt;span style="color:#a6e22e">Program&lt;/span> &lt;span style="color:#a6e22e">counter&lt;/span>: &lt;span style="color:#a6e22e">jumps&lt;/span> &lt;span style="color:#a6e22e">and&lt;/span> &lt;span style="color:#a6e22e">branches&lt;/span>.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">SB&lt;/span>: &lt;span style="color:#a6e22e">Static&lt;/span> &lt;span style="color:#a6e22e">base&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">global&lt;/span> &lt;span style="color:#a6e22e">symbols&lt;/span>.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">SP&lt;/span>: &lt;span style="color:#a6e22e">Stack&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">top&lt;/span> &lt;span style="color:#a6e22e">of&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span>.
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>slice</title><link>https://zput.github.io/go-goroutine/docs/foundation/slice/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/slice/</guid><description>&lt;h2 id="使用slice">
+ 使用slice
+ &lt;a class="anchor" href="#%e4%bd%bf%e7%94%a8slice">#&lt;/a>
+&lt;/h2>
+&lt;p>使用slice的时候，如果能预先确定它的大小，最好先设置好它的容量，避免后期扩容拷贝。预先大小也可能为零，所以总担心初始化能不能先申明容量为零。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">testMakeSlice&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">var&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">a&lt;/span> = make([]&lt;span style="color:#66d9ef">int&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">b&lt;/span> = make([]&lt;span style="color:#66d9ef">int&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Printf&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;a=%+v; b=%+v&amp;#34;&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">b&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Printf&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;a&amp;#39;s Length=%+v; b&amp;#39;s Length=%+v&amp;#34;&lt;/span>, len(&lt;span style="color:#a6e22e">a&lt;/span>), len(&lt;span style="color:#a6e22e">b&lt;/span>))
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Printf&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;a&amp;#39;s Capacity=%+v; b&amp;#39;s Capacity=%+v&amp;#34;&lt;/span>, cap(&lt;span style="color:#a6e22e">a&lt;/span>), cap(&lt;span style="color:#a6e22e">b&lt;/span>))
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">a&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;a is nil&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} &lt;span style="color:#66d9ef">else&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;a is not nil&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">b&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;b is nil&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} &lt;span style="color:#66d9ef">else&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;b is not nil&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">testMakeSlice&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
+ 1 前言
+ &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80">#&lt;/a>
+&lt;/h1>
+&lt;p>从程序的角度来看，
+我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。&lt;/p>
+&lt;p>细化下上述所说的内容，主要包含如下：&lt;/p>
+&lt;ol>
+&lt;li>怎么评估变量所需的内存大小?&lt;/li>
+&lt;li>如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？&lt;/li>
+&lt;li>如果第二点都使用后者的方式，那么如何进行管理？&lt;/li>
+&lt;/ol>
+&lt;h1 id="2-评估内存大小">
+ 2 评估内存大小
+ &lt;a class="anchor" href="#2-%e8%af%84%e4%bc%b0%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="21-内存对齐">
+ 2.1 内存对齐
+ &lt;a class="anchor" href="#21-%e5%86%85%e5%ad%98%e5%af%b9%e9%bd%90">#&lt;/a>
+&lt;/h2>
+&lt;ol>
+&lt;li>what&lt;/li>
+&lt;/ol>
+&lt;p>什么是内存对齐呢？官方解释是：xxxx&lt;/p>
+&lt;blockquote>
+&lt;/blockquote>
+&lt;ol start="2">
+&lt;li>why
+为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。&lt;/li>
+&lt;/ol>
+&lt;h1 id="3-分配内存">
+ 3 分配内存
+ &lt;a class="anchor" href="#3-%e5%88%86%e9%85%8d%e5%86%85%e5%ad%98">#&lt;/a>
+&lt;/h1>
+&lt;ol>
+&lt;li>
+&lt;p>没有内存管理，每次申请都直接向操作系统申请&lt;/p></description></item><item><title>类汇编</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</guid><description>&lt;h2 id="golang类汇编指令">
+ golang类汇编指令
+ &lt;a class="anchor" href="#golang%e7%b1%bb%e6%b1%87%e7%bc%96%e6%8c%87%e4%bb%a4">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="寻址模式">
+ 寻址模式
+ &lt;a class="anchor" href="#%e5%af%bb%e5%9d%80%e6%a8%a1%e5%bc%8f">#&lt;/a>
+&lt;/h3>
+&lt;ul>
+&lt;li>(DI)(BX&lt;em>2): The location at address DI plus BX&lt;/em>2.&lt;/li>
+&lt;li>64(DI)(BX&lt;em>2): The location at address DI plus BX&lt;/em>2 plus 64. These modes accept only 1, 2, 4, and 8 as scale factors.&lt;/li>
+&lt;/ul>
+&lt;h3 id="结构体寄存器">
+ 结构体+寄存器
+ &lt;a class="anchor" href="#%e7%bb%93%e6%9e%84%e4%bd%93%e5%af%84%e5%ad%98%e5%99%a8">#&lt;/a>
+&lt;/h3>
+&lt;p>类似这种:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-asm" data-lang="asm">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># (m_morebuf+gobuf_pc)(REGISTER)
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span>	&lt;span style="color:#ae81ff">8&lt;/span>(&lt;span style="color:#66d9ef">SP&lt;/span>), &lt;span style="color:#66d9ef">AX&lt;/span>	&lt;span style="color:#75715e"># f&amp;#39;s caller&amp;#39;s PC
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span>	&lt;span style="color:#66d9ef">AX&lt;/span>, (&lt;span style="color:#66d9ef">m_morebuf&lt;/span>&lt;span style="color:#960050;background-color:#1e0010">+&lt;/span>&lt;span style="color:#66d9ef">gobuf_pc&lt;/span>)(&lt;span style="color:#66d9ef">BX&lt;/span>)
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>map</title><link>https://zput.github.io/go-goroutine/docs/foundation/map/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/map/</guid><description>&lt;h2 id="并发map">
+ 并发map
+ &lt;a class="anchor" href="#%e5%b9%b6%e5%8f%91map">#&lt;/a>
+&lt;/h2>
+&lt;p>设计一个并发的map,最简单的就是使用锁加普通map来实现。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">simpleConcurrentMap&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span>{
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">mu&lt;/span> &lt;span style="color:#a6e22e">sync&lt;/span>.&lt;span style="color:#a6e22e">Mutex&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">m&lt;/span> &lt;span style="color:#66d9ef">map&lt;/span>[&lt;span style="color:#66d9ef">interface&lt;/span>{}]&lt;span style="color:#66d9ef">interface&lt;/span>{}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>上面情形，不管是读还是写都需要先加锁，性能太低，假设我们要设计一个高并发的map呢？我们按读写操作来分一下类：&lt;/p>
+&lt;ul>
+&lt;li>读多写少&lt;/li>
+&lt;li>读少写多&lt;/li>
+&lt;li>读写平衡
+可以分为上述三类。&lt;/li>
+&lt;/ul>
+&lt;h3 id="读多写少场景">
+ 读多写少场景
+ &lt;a class="anchor" href="#%e8%af%bb%e5%a4%9a%e5%86%99%e5%b0%91%e5%9c%ba%e6%99%af">#&lt;/a>
+&lt;/h3>
+&lt;p>可以让它们读写分离,分成两个map（readMap与writeMap）, 类似mysql的读写分离吗? 那么插入/更新(删除)的时候怎么从writeMap同步到readMap呢？不可能实时同步，否则readMap也转变为了writeMap,也需要加锁!!! 这么看读写分离就没有必要了，徒增复杂度。&lt;/p></description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>&lt;h1 id="1-前言变量的存放区">
+ 1 前言：变量的存放区
+ &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80%e5%8f%98%e9%87%8f%e7%9a%84%e5%ad%98%e6%94%be%e5%8c%ba">#&lt;/a>
+&lt;/h1>
+&lt;p>通常情况下，变量的分配位置一般是下列三个区：&lt;/p>
+&lt;ol>
+&lt;li>全局数据区&lt;/li>
+&lt;li>栈区&lt;/li>
+&lt;li>堆区&lt;/li>
+&lt;/ol>
+&lt;p align="left">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240622185210.png" width = "70%" height="70%" alt="效果图">
+&lt;/p>
+&lt;p>全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。&lt;/p>
+&lt;p>栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。&lt;/p>
+&lt;p>堆区:主要用于程序运行阶段的动态分配。&lt;/p>
+&lt;p>内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。&lt;/p>
+&lt;h1 id="2-定义">
+ 2 定义
+ &lt;a class="anchor" href="#2-%e5%ae%9a%e4%b9%89">#&lt;/a>
+&lt;/h1>
+&lt;p>垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：&lt;strong>垃圾识别&lt;/strong>和&lt;strong>垃圾清理&lt;/strong>。&lt;/p>
+&lt;p>golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。&lt;/p>
+&lt;h2 id="21-垃圾识别">
+ 2.1 垃圾识别
+ &lt;a class="anchor" href="#21-%e5%9e%83%e5%9c%be%e8%af%86%e5%88%ab">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="211-双色标记法">
+ 2.1.1 双色标记法
+ &lt;a class="anchor" href="#211-%e5%8f%8c%e8%89%b2%e6%a0%87%e8%ae%b0%e6%b3%95">#&lt;/a>
+&lt;/h3>
+&lt;p>根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。&lt;/p></description></item><item><title>sort</title><link>https://zput.github.io/go-goroutine/docs/foundation/sort/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/sort/</guid><description>&lt;p>在实际开发中，我们如何利用sort包，进行快速排序呢。&lt;/p>
+&lt;p>首先我们来看一下sort中最重要的一个接口:&lt;/p>
+&lt;h1 id="sort">
+ sort
+ &lt;a class="anchor" href="#sort">#&lt;/a>
+&lt;/h1>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">Interface&lt;/span> &lt;span style="color:#66d9ef">interface&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// Len is the number of elements in the collection.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">Len&lt;/span>() &lt;span style="color:#66d9ef">int&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// Less reports whether the element with
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">// index i should sort before the element with index j.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">Less&lt;/span>(&lt;span style="color:#a6e22e">i&lt;/span>, &lt;span style="color:#a6e22e">j&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>) &lt;span style="color:#66d9ef">bool&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// Swap swaps the elements with indexes i and j.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">Swap&lt;/span>(&lt;span style="color:#a6e22e">i&lt;/span>, &lt;span style="color:#a6e22e">j&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// 内部实现的四种排序算法
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// 插入排序
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">insertionSort&lt;/span>(&lt;span style="color:#a6e22e">data&lt;/span> &lt;span style="color:#a6e22e">Interface&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">b&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// 堆排序
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">heapSort&lt;/span>(&lt;span style="color:#a6e22e">data&lt;/span> &lt;span style="color:#a6e22e">Interface&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">b&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// 快速排序
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">quickSort&lt;/span>(&lt;span style="color:#a6e22e">data&lt;/span> &lt;span style="color:#a6e22e">Interface&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">b&lt;/span>, &lt;span style="color:#a6e22e">maxDepth&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// 归并排序
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">symMerge&lt;/span>(&lt;span style="color:#a6e22e">data&lt;/span> &lt;span style="color:#a6e22e">Interface&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">m&lt;/span>, &lt;span style="color:#a6e22e">b&lt;/span> &lt;span style="color:#66d9ef">int&lt;/span>)
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>代码执行过久</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</guid><description>&lt;h1 id="执行太久需要抢占">
+ 执行太久需要抢占
+ &lt;a class="anchor" href="#%e6%89%a7%e8%a1%8c%e5%a4%aa%e4%b9%85%e9%9c%80%e8%a6%81%e6%8a%a2%e5%8d%a0">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="preemptone设置抢占">
+ preemptone设置抢占
+ &lt;a class="anchor" href="#preemptone%e8%ae%be%e7%bd%ae%e6%8a%a2%e5%8d%a0">#&lt;/a>
+&lt;/h2>
+&lt;p>继续上文看下preemptone函数，它设置了&lt;code>g.preempt&lt;/code>(抢占标示)为true和&lt;code>g.stackguard0&lt;/code>为很大的数(&lt;code>(1&amp;lt;&amp;lt;(8*sys.PtrSize) - 1) &amp;amp; -1314 ---&amp;gt; 0xfffffffffffffade&lt;/code>)，使被抢占的goroutine在进行函数调用会去检查栈溢出,然后处理抢占请求&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Tell the goroutine running on processor P to stop.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// This function is purely best-effort. It can incorrectly fail to inform the
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// goroutine. It can send inform the wrong goroutine. Even if it informs the
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// correct goroutine, that goroutine might ignore the request if it is
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// simultaneously executing newstack.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// No lock needs to be held.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Returns true if preemption request was issued.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// The actual preemption will happen at some point in the future
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// and will be indicated by the gp-&amp;gt;status no longer being
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Grunning
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">preemptone&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">p&lt;/span>) &lt;span style="color:#66d9ef">bool&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">mp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">_p_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">mp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> &lt;span style="color:#f92672">||&lt;/span> &lt;span style="color:#a6e22e">mp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>().&lt;span style="color:#a6e22e">m&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#66d9ef">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">mp&lt;/span>.&lt;span style="color:#a6e22e">curg&lt;/span> &lt;span style="color:#75715e">// gp == 被抢占的goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> &lt;span style="color:#f92672">||&lt;/span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#a6e22e">mp&lt;/span>.&lt;span style="color:#a6e22e">g0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#66d9ef">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">gp&lt;/span>.&lt;span style="color:#a6e22e">preempt&lt;/span> = &lt;span style="color:#66d9ef">true&lt;/span> &lt;span style="color:#75715e">// 设置抢占信号preempt == true
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Every call in a go routine checks for stack overflow by
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// comparing the current stack pointer to gp-&amp;gt;stackguard0.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// Setting gp-&amp;gt;stackguard0 to StackPreempt folds
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// preemption into the normal stack overflow check.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// (1&amp;lt;&amp;lt;(8*sys.PtrSize) - 1) &amp;amp; -1314 ---&amp;gt; 0xfffffffffffffade, 很大的数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">gp&lt;/span>.&lt;span style="color:#a6e22e">stackguard0&lt;/span> = &lt;span style="color:#a6e22e">stackPreempt&lt;/span> &lt;span style="color:#75715e">//stackguard0==很大的数; 使被抢占的goroutine;在进行函数调用会去检查栈溢出;去处理抢占请求
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#66d9ef">true&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>&lt;h1 id="进入main函数前的初始化">
+ 进入main函数前的初始化
+ &lt;a class="anchor" href="#%e8%bf%9b%e5%85%a5main%e5%87%bd%e6%95%b0%e5%89%8d%e7%9a%84%e5%88%9d%e5%a7%8b%e5%8c%96">#&lt;/a>
+&lt;/h1>
+&lt;p>我们首先来gdb调试一下这个程序&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// main.go
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> &lt;span style="color:#e6db74">&amp;#34;fmt&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// the function&amp;#39;s body is empty
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#a6e22e">x&lt;/span>, &lt;span style="color:#a6e22e">y&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>) &lt;span style="color:#66d9ef">int64&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">gg&lt;/span>&lt;span style="color:#f92672">:=&lt;/span>&lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#ae81ff">2&lt;/span>, &lt;span style="color:#ae81ff">3&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">gg&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// add_amd.s
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#a6e22e">TEXT&lt;/span> &lt;span style="color:#960050;background-color:#1e0010">·&lt;/span>&lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#a6e22e">SB&lt;/span>),&lt;span style="color:#960050;background-color:#1e0010">$&lt;/span>&lt;span style="color:#ae81ff">0&lt;/span>&lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">24&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">x&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">0&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>), &lt;span style="color:#a6e22e">BX&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">y&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">8&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>), &lt;span style="color:#a6e22e">BP&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ADDQ&lt;/span> &lt;span style="color:#a6e22e">BP&lt;/span>, &lt;span style="color:#a6e22e">BX&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">BX&lt;/span>, &lt;span style="color:#a6e22e">ret&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">16&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">RET&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>底层重要结构</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</guid><description>&lt;p>
+ &lt;a href="https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html">https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html&lt;/a>&lt;/p>
+&lt;h1 id="g结构">
+ g结构
+ &lt;a class="anchor" href="#g%e7%bb%93%e6%9e%84">#&lt;/a>
+&lt;/h1>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// 栈相关的两个字段
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">stack&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">stackguard0&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">stackguard1&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// offset known to liblink
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// defer 和 panic 
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">_panic&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">_panic&lt;/span> &lt;span style="color:#75715e">// 最内侧的 panic 结构体
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">_defer&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">_defer&lt;/span> &lt;span style="color:#75715e">// 最内侧的延迟函数结构体
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">//
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">m&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">m&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">sched&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">atomicstatus&lt;/span> &lt;span style="color:#66d9ef">uint32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">goid&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// 抢占
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">preempt&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span> &lt;span style="color:#75715e">// 抢占信号
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">preemptStop&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span> &lt;span style="color:#75715e">// 抢占时将状态修改成 `_Gpreempted`
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">preemptShrink&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span> &lt;span style="color:#75715e">// 在同步安全点收缩栈
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">sp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#a6e22e">guintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ctxt&lt;/span> &lt;span style="color:#a6e22e">unsafe&lt;/span>.&lt;span style="color:#a6e22e">Pointer&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ret&lt;/span> &lt;span style="color:#a6e22e">sys&lt;/span>.&lt;span style="color:#a6e22e">Uintreg&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lr&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">bp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// for GOEXPERIMENT=framepointer ------------------------here
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>退出</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</link><pubDate>Mon, 10 Feb 2020 10:09:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</guid><description>&lt;h1 id="goroutine退出过程">
+ goroutine退出过程
+ &lt;a class="anchor" href="#goroutine%e9%80%80%e5%87%ba%e8%bf%87%e7%a8%8b">#&lt;/a>
+&lt;/h1>
+&lt;p>goroutine退出,即执行完callee代码后，返回到caller中去，前面一节我们看到，编译器自己把&lt;code>goexit()&lt;/code>的地址设置为了caller的pc保存到栈上方,所以退出后，会执行&lt;code>goexit()&lt;/code>函数,但是main goroutine比较特殊，这个groutine运行的代码
+ &lt;a href="https://github.com/golang/go/blob/release-branch.go1.15/src/runtime/proc.go#L114">main函数&lt;/a>直接调用了操作系统exit()这个API退出,没有机会返回到caller层.&lt;/p>
+&lt;h2 id="main-goroutine的退出">
+ main goroutine的退出
+ &lt;a class="anchor" href="#main-goroutine%e7%9a%84%e9%80%80%e5%87%ba">#&lt;/a>
+&lt;/h2>
+&lt;p>在上节中我们看到程序执行到了
+ &lt;a href="https://github.com/golang/go/blob/release-branch.go1.15/src/runtime/proc.go#L114">mian函数&lt;/a>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// The main goroutine.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//main包 init函数，递归的调用import包中定义的init函数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">main_init&lt;/span> &lt;span style="color:#75715e">// make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//调用main.main函数(用户定义的main函数):进行间接调用是因为链接器在放置运行时不知道主包的地址
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span> = &lt;span style="color:#a6e22e">main_main&lt;/span> &lt;span style="color:#75715e">// make an indirect call, as the linker doesn&amp;#39;t know the address of the main package when laying down the runtime
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//系统API:exit函数,退出进程
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">exit&lt;/span>(&lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">for&lt;/span> { 
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">x&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#66d9ef">int32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">x&lt;/span> = &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#75715e">// 无效指针代码，会导致程序退出
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>陷入系统调用</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</link><pubDate>Tue, 23 Jun 2020 20:50:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</guid><description>&lt;h1 id="执行系统调用抢占">
+ 执行系统调用抢占
+ &lt;a class="anchor" href="#%e6%89%a7%e8%a1%8c%e7%b3%bb%e7%bb%9f%e8%b0%83%e7%94%a8%e6%8a%a2%e5%8d%a0">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="handoffp">
+ handoffp
+ &lt;a class="anchor" href="#handoffp">#&lt;/a>
+&lt;/h2>
+&lt;blockquote>
+&lt;p>handoffp函数:判断是否需要启动工作线程来接管_p_，如果不需要则把_p_放入P的全局空闲队列.&lt;/p>
+&lt;/blockquote>
+&lt;p>如果&lt;strong>当前P的运行队列有任务/全局队列有任务&lt;/strong>，&lt;strong>有gc任务&lt;/strong>，&lt;strong>大概率整个系统有任务待做&lt;/strong>，或者&lt;strong>当前P是最后一个P要用作轮询网络&lt;/strong>&lt;/p>
+&lt;blockquote>
+&lt;p>其中大概率整个系统有任务待做: 由第24行 &lt;code>atomic.Load(&amp;amp;sched.nmspinning)+atomic.Load(&amp;amp;sched.npidle) == 0&lt;/code> 决定:&lt;/p>
+&lt;blockquote>
+&lt;p>如果没有P空闲，而且这些没空闲的P连接的M不是处在自旋状态(没有自旋的M)，证明其他P都在工作(&lt;strong>而不是假装工作实际是在伺机从其他队列偷任务那种&lt;/strong>),是不是说明整个系统除了当前P外都在做事，所以大概率某些P的运行队列上有任务积压，所以我们应该启动M,让它跟当前P连接，去别的P中偷任务)&lt;/p>
+&lt;/blockquote>
+&lt;/blockquote>
+&lt;div class="highlight">&lt;div style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">
+&lt;table style="border-spacing:0;padding:0;margin:0;border:0;">&lt;tr>&lt;td style="vertical-align:top;padding:0;margin:0;border:0;">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">&lt;code>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 1
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 2
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 3
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 4
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 5
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 6
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 7
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 8
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f"> 9
+&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">10
+&lt;/span>&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">11
+&lt;/span>&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">12
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">13
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">14
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">15
+&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">16
+&lt;/span>&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">17
+&lt;/span>&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">18
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">19
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">20
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">21
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">22
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">23
+&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">24
+&lt;/span>&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">25
+&lt;/span>&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">26
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">27
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">28
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">29
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">30
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">31
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">32
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">33
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">34
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">35
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">36
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">37
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">38
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">39
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">40
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">41
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">42
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">43
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">44
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">45
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">46
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">47
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">48
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">49
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">50
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">51
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">52
+&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">53
+&lt;/span>&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">54
+&lt;/span>&lt;/span>&lt;span style="background-color:#3c3d38">&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">55
+&lt;/span>&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">56
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">57
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">58
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">59
+&lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">60
+&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</guid><description>&lt;p>分配一个对象，mutator -&amp;gt; Allocator -&amp;gt; heap分类，从横向来看，可分为线性与链表形式;其中链表又可以分为：首次适应，循环首次适应，最优适应和预先隔离适应。
+从纵向来看，可以分为单级与多级。&lt;/p>
+&lt;p>而golang混合纵向的多级,而各级横向结构有线性形式，也有链表的形式。分配某一对象，按照其大小涉及到的层级不同，可分为微小对象，小对象，大对象三类。&lt;/p>
+&lt;p>当需要分配这三类对象时，从下面的对应的结构中开始分配&lt;/p>
+&lt;pre tabindex="0">&lt;code>tiny --&amp;gt; 微小对象
+mcache ---&amp;gt; 小对象
+mcentralList 
+heapArenasList ---&amp;gt; 大对象
+&lt;/code>&lt;/pre>&lt;p>sequential allocation 的实现方式非常简单，只需要把维护的空间直接分配出去就好，每次分配以后挪动指针，指向剩余空闲的位置的首地址，runtime off-heap object allocator一节中介绍的persistent allocator采用的就是sequential allocation这个方式。sequential allocation这种分配方式的缺点是不能直接回收，得配合特定的垃圾回收算法，比如semispace copying collection，这种垃圾回收算法把堆划分成两份，当一份分配完以后，把仍然有用的对象拷贝到另外半个堆中，这样没有用的对象的空间就被回收了，分配空间继续在另外半个堆进行，当满了以后再拷贝有用的对象回到原来的半个堆中。&lt;/p>
+&lt;p>free list allocation 这种分配方式相对sequential allocation这种方式没能更好的利用上缓存的空间局部性原理，并且分配的时候速度慢，虽然有first fit 、next fit、best fit三种寻找空闲块的策略 ，但是多少还是会造成外部碎片。但是free list allocation 可以支持立马把释放的空间放到list中用于后续的分配。&lt;/p>
+&lt;p>segregated-fix allocation 是属于fee list allocation的一种细分&lt;/p>
+&lt;pre tabindex="0">&lt;code>func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
+ //...
+	if size &amp;lt;= maxSmallSize {
+		if noscan &amp;amp;&amp;amp; size &amp;lt; maxTinySize {
+			// 微对象分配
+		} else {
+			// 小对象分配
+		}
+	} else {
+		// 大对象分配 largeAlloc
+	}
+ //...
+}
+&lt;/code>&lt;/pr</description></item><item><title>分配大对象</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</guid><description>&lt;p>分配大对象会涉及到的三个部分：栈/块/区&lt;/p>
+
+
+
+&lt;script type="text/javascript" src="https://cdn.bootcss.com/viz.js/1.8.2/viz.js"> &lt;/script>
+
+
+
+
+
+ &lt;p class="graphviz" id="graphviz-pic">
+ &lt;/p>
+
+ &lt;script class="graphviz" type="text/javascript">
+ (function() {
+ srcG = "\n\n\u0060\u0060\u0060graphviz\ndigraph {\n\tcompound=true\n\tfontsize=10\n\tmargin=\u00220,0\u0022\n\tranksep = .15\n\tnodesep = .06\n\n\tnode [shape=ellipse fontname=\u0022Inconsolata, Consolas\u0022, fontsize=12, penwidth=0.5; constraint=false]\n\tedge [fontname=\u0022Inconsolata, Consolas\u0022, fontsize=10, arrowhead=normal]\n\n\n \/\/ 栈区\n\tsubgraph cluster_stack {\n\t\tstyle = dotted\n\t\tmargin = 10\n \t \u0022栈(包括系统栈)\u0022 [shape = plaintext; fontsize = 24;]\n\n \u0022largeAlloc\u0022;\n \u0022mheap.alloc\u0022 [color=red;fontcolor=red];\n\n \u0022notice2\u0022 [shape=plain;label=\u0022系统栈执行;\\n初始化申请的内存\u0022]\n {rank=same; \u0022notice2\u0022 -\u003e \u0022mheap.alloc\u0022[style=invis;]; }\n\t}\n\n \/\/ 处理mspan\n\tsubgraph cluster_span {\n\t\tstyle = dotted\n\t\tmargin = 10\n\t\t\u0022块(span)\u0022 [shape = plaintext;fontsize = 24]\n\n \u0022mheap.alloc_m\u0022\n \u0022notice1\u0022 [shape=plain;label=\u0022在这里才设置\\n mspan中的spanclass\u0022] \n {rank=same; \u0022notice1\u0022 -\u003e \u0022mheap.alloc_m\u0022[style=invis;]; }\n\n \tsubgraph \u0022cluster_mheap.AllocSpanLock\u0022 {\n \t\tstyle = dotted\n \t\tmargin = 10\n label = \u0022mheap.AllocSpanLock\u0022;\n\n DUMMY_1 [shape=point; style=invis;]\n\n {rank=same; DUMMY_1}\n\n k1[label=\u0022先从treap获取至少npage大小mspan\u0022]\n k2[label=\u0022treap没有期望的mspan,调用grow生成\u0022]\n k3[label=\u0022再次从treap获取至少npage大小mspan\u0022]\n k4[label=\u0022如果得到的mspan页数大于我们期望的npage,\\n则拆分出一个新的mspan放入treap中,\\n此mspan大小为两者只差(注意此时没有设置spanclass)\u0022]\n k5[label=\u0022设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)\u0022]\n\n {rank=same; k1-\u003ek2[label=\u0022失败\u0022]}\n k2-\u003ek3;\n k1-\u003ek4;\n k3-\u003ek4-\u003ek5;\n\n }\n\t}\n\n \/\/ 处理heapArena\n\tsubgraph cluster_heap_arena {\n\t\tstyle = dotted\n\t\tmargin = 10\n\n\t\theapArenaTitle[label = \u0022区(堆区\/heap arena)\u0022; shape = plaintext;fontsize = 24]\n\n \tsubgraph cluster_grow {\n \t\tstyle = dotted\n \t\tmargin = 10\n label = \u0022mheap.grow\u0022\n\n DUMMY_grow [shape=point; style=invis;]\n {rank=source; DUMMY_grow; }\n \n\n growS1[label=\u0022先从arena获取(heapArenas中的线性分配器中)\u0022]\n growS2[label=\u0022再从系统中获取mmap\u0022]\n growS3[label=\u0022设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)\u0022]\n growS4[label=\u0022放入treap中(注意此时没有设置spanclass)\u0022]\n\n {rank=same; growS1-\u003egrowS2[label=\u0022失败\u0022]}\n growS1-\u003egrowS3[label=\u0022成功\u0022]\n growS2-\u003egrowS3\n growS3-\u003egrowS4\n }\n\n\t}\n\n \u0022分配大对象过程(largeAlloc)\u0022 [shape = \u0022plaintext\u0022, fontsize = 16]\n\n \u0022largeAlloc\u0022 -\u003e \u0022mheap.alloc\u0022[label=\u0022调用\u0022];\n \u0022mheap.alloc\u0022 -\u003e \u0022mheap.alloc_m\u0022;\n \u0022mheap.alloc_m\u0022 -\u003e \u0022DUMMY_1\u0022[lhead=\u0022cluster_mheap.AllocSpanLock\u0022];\n \u0022k2\u0022 -\u003e \u0022DUMMY_grow\u0022 [lhead=cluster_grow];\n\n}\n\u0060\u0060\u0060\n\n"
+ srcG = srcG.replace(/^\s*```graphviz/, "");
+ srcG = srcG.replace(/```\s*$/, "");
+ 
+
+ image = Viz(srcG, { format: "png-image-element" });
+ 
+ 
+ 
+ document.getElementById("graphviz-pic").appendChild(image);
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ }());
+ &lt;/script></description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</guid><description>&lt;p>看下这个调用图&lt;/p>
+&lt;pre tabindex="0">&lt;code class="language-graphviz" data-lang="graphviz">
+digraph cacheSpan {
+ rankdir=TB;
+ node[shape=box];
+
+ start[label=&amp;#34;开始&amp;#34;];
+ end[label=&amp;#34;结束&amp;#34;];
+
+ sg[label=&amp;#34;获取当前 sweepgen 值&amp;#34;];
+
+ nonempty[label=&amp;#34;遍历非空 span 列表&amp;#34;];
+
+ sweepgen[label=&amp;#34;如果内存单元的 sweepgen 等于 mheap.sweepgen - 2， 那么意味着当前单元需要清理 \n如果等于 mheap.sweepgen - 1，那么当前管理单元就正在清理&amp;#34;;shape=plain; ]
+
+ empty[label=&amp;#34;遍历空 span 列表&amp;#34;];
+
+ sweep[label=&amp;#34;清理 span 并将其添加到空 span 列表&amp;#34;];
+ free[label=&amp;#34;释放部分空间&amp;#34;];
+ grow[label=&amp;#34;创建新的 span 并添加到空 span 列表&amp;#34;];
+ cache[label=&amp;#34;重新填充 span 的分配缓存&amp;#34;];
+
+ have[label=&amp;#34;返回 span 指针&amp;#34;];
+
+
+
+ // 处理mspan
+	subgraph cluster_span {
+		style = dotted
+		margin = 10
+		&amp;#34;块(span)&amp;#34; [shape = plaintext;fontsize = 24]
+
+ &amp;#34;mheap.alloc_m&amp;#34;
+ &amp;#34;notice1&amp;#34; [shape=plain;label=&amp;#34;在这里才设置mspan中的spanclass&amp;#34;] 
+ {rank=same; &amp;#34;notice1&amp;#34; -&amp;gt; &amp;#34;mheap.alloc_m&amp;#34;[dir=none]; }
+	}
+
+ start -&amp;gt; sg;
+
+ {rank=same; sweepgen -&amp;gt; nonempty[style=invis];}
+
+ sg -&amp;gt; nonempty -&amp;gt; sweep -&amp;gt; empty -&amp;gt; free -&amp;gt; have;
+
+
+ nonempty -&amp;gt; empty;
+ empty -&amp;gt; grow -&amp;gt; cache -&amp;gt; have;
+
+ have-&amp;gt;end;
+
+}
+&lt;/code>&lt;/pr</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</guid><description>&lt;p>off是tiny Allocator的偏移指针，根据将要分配的内存大小，需调整&lt;code>off&lt;/code>。如果&lt;code>size&lt;/code>是8的倍数，则调用&lt;code>round(off,8)&lt;/code>函数将&lt;code>off&lt;/code>向上舍入到&lt;strong>8的倍数&lt;/strong>。否则，如果&lt;code>size&lt;/code>是&lt;strong>4的倍数&lt;/strong>，则调用&lt;code>round(off,4)&lt;/code>函数将&lt;code>off&lt;/code>向上舍入到4的倍数。最后，如果&lt;code>size&lt;/code>是&lt;strong>2的倍数&lt;/strong>，则调用&lt;code>round(off,2)&lt;/code>函数将&lt;code>off&lt;/code>舍入到2的倍数。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">off&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">c&lt;/span>.&lt;span style="color:#a6e22e">tinyoffset&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Align tiny pointer for required (conservative) alignment.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">size&lt;/span>&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#ae81ff">7&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">off&lt;/span> = &lt;span style="color:#a6e22e">round&lt;/span>(&lt;span style="color:#a6e22e">off&lt;/span>, &lt;span style="color:#ae81ff">8&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} &lt;span style="color:#66d9ef">else&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">size&lt;/span>&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#ae81ff">3&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">off&lt;/span> = &lt;span style="color:#a6e22e">round&lt;/span>(&lt;span style="color:#a6e22e">off&lt;/span>, &lt;span style="color:#ae81ff">4&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} &lt;span style="color:#66d9ef">else&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">size&lt;/span>&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">off&lt;/span> = &lt;span style="color:#a6e22e">round&lt;/span>(&lt;span style="color:#a6e22e">off&lt;/span>, &lt;span style="color:#ae81ff">2&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} 
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</guid><description/></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</guid><description/></item><item><title/><link>https://zput.github.io/go-goroutine/docs/foundation/directory/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/directory/</guid><description>&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">executeDir&lt;/span>() &lt;span style="color:#66d9ef">string&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ex&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">os&lt;/span>.&lt;span style="color:#a6e22e">Executable&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		panic(&lt;span style="color:#a6e22e">err&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">exPath&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">filepath&lt;/span>.&lt;span style="color:#a6e22e">Dir&lt;/span>(&lt;span style="color:#a6e22e">ex&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">exPath&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">exPath&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">getwd&lt;/span>() &lt;span style="color:#66d9ef">string&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// using the function
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">mydir&lt;/span>, &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">os&lt;/span>.&lt;span style="color:#a6e22e">Getwd&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">err&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#66d9ef">nil&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">err&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">mydir&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">mydir&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>

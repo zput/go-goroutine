@@ -1,10 +1,121 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>堆分配原理 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/</link><description>Recent content in 堆分配原理 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/heap/index.xml" rel="self" type="application/rss+xml"/><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</guid><description>分配一个对象，mutator -&amp;gt; Allocator -&amp;gt; heap分类，从横向来看，可分为线性与链表形式;其中链表又可以分为：首次适应，循环首次适应，最优适应和预先隔离适应。 从纵向来看，可以分为单级与多级。
-而golang混合纵向的多级,而各级横向结构有线性形式，也有链表的形式。分配某一对象，按照其大小涉及到的层级不同，可分为微小对象，小对象，大对象三类。
-当需要分配这三类对象时，从下面的对应的结构中开始分配
-tiny --&amp;gt; 微小对象 mcache ---&amp;gt; 小对象 mcentralList heapArenasList ---&amp;gt; 大对象 sequential allocation 的实现方式非常简单，只需要把维护的空间直接分配出去就好，每次分配以后挪动指针，指向剩余空闲的位置的首地址，runtime off-heap object allocator一节中介绍的persistent allocator采用的就是sequential allocation这个方式。sequential allocation这种分配方式的缺点是不能直接回收，得配合特定的垃圾回收算法，比如semispace copying collection，这种垃圾回收算法把堆划分成两份，当一份分配完以后，把仍然有用的对象拷贝到另外半个堆中，这样没有用的对象的空间就被回收了，分配空间继续在另外半个堆进行，当满了以后再拷贝有用的对象回到原来的半个堆中。
-free list allocation 这种分配方式相对sequential allocation这种方式没能更好的利用上缓存的空间局部性原理，并且分配的时候速度慢，虽然有first fit 、next fit、best fit三种寻找空闲块的策略 ，但是多少还是会造成外部碎片。但是free list allocation 可以支持立马把释放的空间放到list中用于后续的分配。
-segregated-fix allocation 是属于fee list allocation的一种细分
-func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer { //... if size &amp;lt;= maxSmallSize { if noscan &amp;amp;&amp;amp; size &amp;lt; maxTinySize { // 微对象分配 } else { // 小对象分配 } } else { // 大对象分配 largeAlloc } //.</description></item><item><title>分配大对象</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</guid><description>分配大对象会涉及到的三个部分：栈/块/区</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</guid><description>看下这个调用图
-digraph cacheSpan { rankdir=TB; node[shape=box]; start[label=&amp;#34;开始&amp;#34;]; end[label=&amp;#34;结束&amp;#34;]; sg[label=&amp;#34;获取当前 sweepgen 值&amp;#34;]; nonempty[label=&amp;#34;遍历非空 span 列表&amp;#34;]; sweepgen[label=&amp;#34;如果内存单元的 sweepgen 等于 mheap.sweepgen - 2， 那么意味着当前单元需要清理 \n如果等于 mheap.sweepgen - 1，那么当前管理单元就正在清理&amp;#34;;shape=plain; ] empty[label=&amp;#34;遍历空 span 列表&amp;#34;]; sweep[label=&amp;#34;清理 span 并将其添加到空 span 列表&amp;#34;]; free[label=&amp;#34;释放部分空间&amp;#34;]; grow[label=&amp;#34;创建新的 span 并添加到空 span 列表&amp;#34;]; cache[label=&amp;#34;重新填充 span 的分配缓存&amp;#34;]; have[label=&amp;#34;返回 span 指针&amp;#34;]; // 处理mspan subgraph cluster_span { style = dotted margin = 10 &amp;#34;块(span)&amp;#34; [shape = plaintext;fontsize = 24] &amp;#34;mheap.alloc_m&amp;#34; &amp;#34;notice1&amp;#34; [shape=plain;label=&amp;#34;在这里才设置mspan中的spanclass&amp;#34;] {rank=same; &amp;#34;notice1&amp;#34; -&amp;gt; &amp;#34;mheap.alloc_m&amp;#34;[dir=none]; } } start -&amp;gt; sg; {rank=same; sweepgen -&amp;gt; nonempty[style=invis];} sg -&amp;gt; nonempty -&amp;gt; sweep -&amp;gt; empty -&amp;gt; free -&amp;gt; have; nonempty -&amp;gt; empty; empty -&amp;gt; grow -&amp;gt; cache -&amp;gt; have; have-&amp;gt;end; } mcentral中有六个mspan列表，分别是:</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</guid><description>off是tiny Allocator的偏移指针，根据将要分配的内存大小，需调整off。如果size是8的倍数，则调用round(off,8)函数将off向上舍入到8的倍数。否则，如果size是4的倍数，则调用round(off,4)函数将off向上舍入到4的倍数。最后，如果size是2的倍数，则调用round(off,2)函数将off舍入到2的倍数。
-off := c.tinyoffset // Align tiny pointer for required (conservative) alignment. if size&amp;amp;7 == 0 { off = round(off, 8) } else if size&amp;amp;3 == 0 { off = round(off, 4) } else if size&amp;amp;1 == 0 { off = round(off, 2) } 验证如下，需要调整的都会打印出来
-===&amp;gt;原始: off:1, size:2 | 调整后: off:2, size:2 &amp;lt;===2倍数 // https://go.dev/play/p/1fl_cnJNwD- package main import ( &amp;#34;fmt&amp;#34; ) func main() { for i := 0; i &amp;lt; 16; i++ { for j := 1; j &amp;lt; 16; j++ { tmpOff, tmpSize := Size(i, j) if i !</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</guid><description/></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</guid><description/></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>堆分配原理 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/</link><description>Recent content in 堆分配原理 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/heap/index.xml" rel="self" type="application/rss+xml"/><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/</guid><description>&lt;p>分配一个对象，mutator -&amp;gt; Allocator -&amp;gt; heap分类，从横向来看，可分为线性与链表形式;其中链表又可以分为：首次适应，循环首次适应，最优适应和预先隔离适应。
+从纵向来看，可以分为单级与多级。&lt;/p>
+&lt;p>而golang混合纵向的多级,而各级横向结构有线性形式，也有链表的形式。分配某一对象，按照其大小涉及到的层级不同，可分为微小对象，小对象，大对象三类。&lt;/p>
+&lt;p>当需要分配这三类对象时，从下面的对应的结构中开始分配&lt;/p>
+&lt;pre tabindex="0">&lt;code>tiny --&amp;gt; 微小对象
+mcache ---&amp;gt; 小对象
+mcentralList 
+heapArenasList ---&amp;gt; 大对象
+&lt;/code>&lt;/pre>&lt;p>sequential allocation 的实现方式非常简单，只需要把维护的空间直接分配出去就好，每次分配以后挪动指针，指向剩余空闲的位置的首地址，runtime off-heap object allocator一节中介绍的persistent allocator采用的就是sequential allocation这个方式。sequential allocation这种分配方式的缺点是不能直接回收，得配合特定的垃圾回收算法，比如semispace copying collection，这种垃圾回收算法把堆划分成两份，当一份分配完以后，把仍然有用的对象拷贝到另外半个堆中，这样没有用的对象的空间就被回收了，分配空间继续在另外半个堆进行，当满了以后再拷贝有用的对象回到原来的半个堆中。&lt;/p>
+&lt;p>free list allocation 这种分配方式相对sequential allocation这种方式没能更好的利用上缓存的空间局部性原理，并且分配的时候速度慢，虽然有first fit 、next fit、best fit三种寻找空闲块的策略 ，但是多少还是会造成外部碎片。但是free list allocation 可以支持立马把释放的空间放到list中用于后续的分配。&lt;/p>
+&lt;p>segregated-fix allocation 是属于fee list allocation的一种细分&lt;/p>
+&lt;pre tabindex="0">&lt;code>func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
+ //...
+	if size &amp;lt;= maxSmallSize {
+		if noscan &amp;amp;&amp;amp; size &amp;lt; maxTinySize {
+			// 微对象分配
+		} else {
+			// 小对象分配
+		}
+	} else {
+		// 大对象分配 largeAlloc
+	}
+ //...
+}
+&lt;/code>&lt;/pr</description></item><item><title>分配大对象</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/</guid><description>&lt;p>分配大对象会涉及到的三个部分：栈/块/区&lt;/p>
+
+
+
+&lt;script type="text/javascript" src="https://cdn.bootcss.com/viz.js/1.8.2/viz.js"> &lt;/script>
+
+
+
+
+
+ &lt;p class="graphviz" id="graphviz-pic">
+ &lt;/p>
+
+ &lt;script class="graphviz" type="text/javascript">
+ (function() {
+ srcG = "\n\n\u0060\u0060\u0060graphviz\ndigraph {\n\tcompound=true\n\tfontsize=10\n\tmargin=\u00220,0\u0022\n\tranksep = .15\n\tnodesep = .06\n\n\tnode [shape=ellipse fontname=\u0022Inconsolata, Consolas\u0022, fontsize=12, penwidth=0.5; constraint=false]\n\tedge [fontname=\u0022Inconsolata, Consolas\u0022, fontsize=10, arrowhead=normal]\n\n\n \/\/ 栈区\n\tsubgraph cluster_stack {\n\t\tstyle = dotted\n\t\tmargin = 10\n \t \u0022栈(包括系统栈)\u0022 [shape = plaintext; fontsize = 24;]\n\n \u0022largeAlloc\u0022;\n \u0022mheap.alloc\u0022 [color=red;fontcolor=red];\n\n \u0022notice2\u0022 [shape=plain;label=\u0022系统栈执行;\\n初始化申请的内存\u0022]\n {rank=same; \u0022notice2\u0022 -\u003e \u0022mheap.alloc\u0022[style=invis;]; }\n\t}\n\n \/\/ 处理mspan\n\tsubgraph cluster_span {\n\t\tstyle = dotted\n\t\tmargin = 10\n\t\t\u0022块(span)\u0022 [shape = plaintext;fontsize = 24]\n\n \u0022mheap.alloc_m\u0022\n \u0022notice1\u0022 [shape=plain;label=\u0022在这里才设置\\n mspan中的spanclass\u0022] \n {rank=same; \u0022notice1\u0022 -\u003e \u0022mheap.alloc_m\u0022[style=invis;]; }\n\n \tsubgraph \u0022cluster_mheap.AllocSpanLock\u0022 {\n \t\tstyle = dotted\n \t\tmargin = 10\n label = \u0022mheap.AllocSpanLock\u0022;\n\n DUMMY_1 [shape=point; style=invis;]\n\n {rank=same; DUMMY_1}\n\n k1[label=\u0022先从treap获取至少npage大小mspan\u0022]\n k2[label=\u0022treap没有期望的mspan,调用grow生成\u0022]\n k3[label=\u0022再次从treap获取至少npage大小mspan\u0022]\n k4[label=\u0022如果得到的mspan页数大于我们期望的npage,\\n则拆分出一个新的mspan放入treap中,\\n此mspan大小为两者只差(注意此时没有设置spanclass)\u0022]\n k5[label=\u0022设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)\u0022]\n\n {rank=same; k1-\u003ek2[label=\u0022失败\u0022]}\n k2-\u003ek3;\n k1-\u003ek4;\n k3-\u003ek4-\u003ek5;\n\n }\n\t}\n\n \/\/ 处理heapArena\n\tsubgraph cluster_heap_arena {\n\t\tstyle = dotted\n\t\tmargin = 10\n\n\t\theapArenaTitle[label = \u0022区(堆区\/heap arena)\u0022; shape = plaintext;fontsize = 24]\n\n \tsubgraph cluster_grow {\n \t\tstyle = dotted\n \t\tmargin = 10\n label = \u0022mheap.grow\u0022\n\n DUMMY_grow [shape=point; style=invis;]\n {rank=source; DUMMY_grow; }\n \n\n growS1[label=\u0022先从arena获取(heapArenas中的线性分配器中)\u0022]\n growS2[label=\u0022再从系统中获取mmap\u0022]\n growS3[label=\u0022设置此mspan中每个页对应的*mspan为它自己(heapArenas.Arean)\u0022]\n growS4[label=\u0022放入treap中(注意此时没有设置spanclass)\u0022]\n\n {rank=same; growS1-\u003egrowS2[label=\u0022失败\u0022]}\n growS1-\u003egrowS3[label=\u0022成功\u0022]\n growS2-\u003egrowS3\n growS3-\u003egrowS4\n }\n\n\t}\n\n \u0022分配大对象过程(largeAlloc)\u0022 [shape = \u0022plaintext\u0022, fontsize = 16]\n\n \u0022largeAlloc\u0022 -\u003e \u0022mheap.alloc\u0022[label=\u0022调用\u0022];\n \u0022mheap.alloc\u0022 -\u003e \u0022mheap.alloc_m\u0022;\n \u0022mheap.alloc_m\u0022 -\u003e \u0022DUMMY_1\u0022[lhead=\u0022cluster_mheap.AllocSpanLock\u0022];\n \u0022k2\u0022 -\u003e \u0022DUMMY_grow\u0022 [lhead=cluster_grow];\n\n}\n\u0060\u0060\u0060\n\n"
+ srcG = srcG.replace(/^\s*```graphviz/, "");
+ srcG = srcG.replace(/```\s*$/, "");
+ 
+
+ image = Viz(srcG, { format: "png-image-element" });
+ 
+ 
+ 
+ document.getElementById("graphviz-pic").appendChild(image);
+
+
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ }());
+ &lt;/script></description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/</guid><description>&lt;p>看下这个调用图&lt;/p>
+&lt;pre tabindex="0">&lt;code class="language-graphviz" data-lang="graphviz">
+digraph cacheSpan {
+ rankdir=TB;
+ node[shape=box];
+
+ start[label=&amp;#34;开始&amp;#34;];
+ end[label=&amp;#34;结束&amp;#34;];
+
+ sg[label=&amp;#34;获取当前 sweepgen 值&amp;#34;];
+
+ nonempty[label=&amp;#34;遍历非空 span 列表&amp;#34;];
+
+ sweepgen[label=&amp;#34;如果内存单元的 sweepgen 等于 mheap.sweepgen - 2， 那么意味着当前单元需要清理 \n如果等于 mheap.sweepgen - 1，那么当前管理单元就正在清理&amp;#34;;shape=plain; ]
+
+ empty[label=&amp;#34;遍历空 span 列表&amp;#34;];
+
+ sweep[label=&amp;#34;清理 span 并将其添加到空 span 列表&amp;#34;];
+ free[label=&amp;#34;释放部分空间&amp;#34;];
+ grow[label=&amp;#34;创建新的 span 并添加到空 span 列表&amp;#34;];
+ cache[label=&amp;#34;重新填充 span 的分配缓存&amp;#34;];
+
+ have[label=&amp;#34;返回 span 指针&amp;#34;];
+
+
+
+ // 处理mspan
+	subgraph cluster_span {
+		style = dotted
+		margin = 10
+		&amp;#34;块(span)&amp;#34; [shape = plaintext;fontsize = 24]
+
+ &amp;#34;mheap.alloc_m&amp;#34;
+ &amp;#34;notice1&amp;#34; [shape=plain;label=&amp;#34;在这里才设置mspan中的spanclass&amp;#34;] 
+ {rank=same; &amp;#34;notice1&amp;#34; -&amp;gt; &amp;#34;mheap.alloc_m&amp;#34;[dir=none]; }
+	}
+
+ start -&amp;gt; sg;
+
+ {rank=same; sweepgen -&amp;gt; nonempty[style=invis];}
+
+ sg -&amp;gt; nonempty -&amp;gt; sweep -&amp;gt; empty -&amp;gt; free -&amp;gt; have;
+
+
+ nonempty -&amp;gt; empty;
+ empty -&amp;gt; grow -&amp;gt; cache -&amp;gt; have;
+
+ have-&amp;gt;end;
+
+}
+&lt;/code>&lt;/pr</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/</guid><description>&lt;p>off是tiny Allocator的偏移指针，根据将要分配的内存大小，需调整&lt;code>off&lt;/code>。如果&lt;code>size&lt;/code>是8的倍数，则调用&lt;code>round(off,8)&lt;/code>函数将&lt;code>off&lt;/code>向上舍入到&lt;strong>8的倍数&lt;/strong>。否则，如果&lt;code>size&lt;/code>是&lt;strong>4的倍数&lt;/strong>，则调用&lt;code>round(off,4)&lt;/code>函数将&lt;code>off&lt;/code>向上舍入到4的倍数。最后，如果&lt;code>size&lt;/code>是&lt;strong>2的倍数&lt;/strong>，则调用&lt;code>round(off,2)&lt;/code>函数将&lt;code>off&lt;/code>舍入到2的倍数。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">off&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">c&lt;/span>.&lt;span style="color:#a6e22e">tinyoffset&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Align tiny pointer for required (conservative) alignment.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">size&lt;/span>&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#ae81ff">7&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">off&lt;/span> = &lt;span style="color:#a6e22e">round&lt;/span>(&lt;span style="color:#a6e22e">off&lt;/span>, &lt;span style="color:#ae81ff">8&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} &lt;span style="color:#66d9ef">else&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">size&lt;/span>&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#ae81ff">3&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">off&lt;/span> = &lt;span style="color:#a6e22e">round&lt;/span>(&lt;span style="color:#a6e22e">off&lt;/span>, &lt;span style="color:#ae81ff">4&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} &lt;span style="color:#66d9ef">else&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">size&lt;/span>&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">off&lt;/span> = &lt;span style="color:#a6e22e">round&lt;/span>(&lt;span style="color:#a6e22e">off&lt;/span>, &lt;span style="color:#ae81ff">2&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	} 
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/off_heap/</guid><description/></item><item><title>概述</title><link>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/heap/ch1_prespective_of_system_buttom/on_heap/</guid><description/></item></channel></rss>

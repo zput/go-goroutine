@@ -1,10 +1,144 @@
-<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="概念 # 机器数
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
+  概念
+  #
+
+
+
+机器数
+
+
+真值
+
+真值符号部分
+真值部分
+
+
+
+举例：
+-1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
+
+
+原码
+
+[+1] = 0000 0001
+[-1] = 1000 0001
+
+反码：
+
+正数的反码是其本身
+负数的反码是在其原码的基础上, 符号位不变，其余各个位取反.
+
+
+
+
+  
+      
+          十进制数
+          带符号位二进制原码
+          带符号位二进制补码
+      
+  
+  
+      
+          -8
+          N
+          1000
+      
+      
+          -7
+          1111
+          1001
+      
+      
+          -6
+          1110
+          1010
+      
+      
+          -5
+          1101
+          1011
+      
+      
+          -4
+          1100
+          1100
+      
+      
+          -3
+          1011
+          1101
+      
+      
+          -2
+          1010
+          1110
+      
+      
+          -1
+          1001
+          1111
+      
+      
+          -0
+          1000
+          0000
+      
+      
+          +0
+          0000
+          0000
+      
+      
+          1
+          0001
+          0001
+      
+      
+          2
+          0010
+          0010
+      
+      
+          3
+          0011
+          0011
+      
+      
+          4
+          0100
+          0100
+      
+      
+          5
+          0101
+          0101
+      
+      
+          6
+          0110
+          0110
+      
+      
+          7
+          0111
+          0111
+      
+  
+
+
+补码：
+
+正数的补码就是其本身
+负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1)
+
+
+
+计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式.
+但为什么需要三种不同的编码方式呢？"><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="源码-反码-补码"><meta property="og:description" content=" 概念 # 机器数
 真值
 真值符号部分 真值部分 举例： -1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
-原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 十进制数 带符号位二进制原码 带符号位二进制补码 -8 N 1000 -7 1111 1001 -6 1110 1010 -5 1101 1011 -4 1100 1100 -3 1011 1101 -2 1010 1110 -1 1001 1111 -0 1000 0000 +0 0000 0000 1 0001 0001 2 0010 0010 3 0011 0011 4 0100 0100 5 0101 0101 6 0110 0110 7 0111 0111 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1."><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="源码-反码-补码"><meta property="og:description" content="概念 # 机器数
-真值
-真值符号部分 真值部分 举例： -1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
-原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 十进制数 带符号位二进制原码 带符号位二进制补码 -8 N 1000 -7 1111 1001 -6 1110 1010 -5 1101 1011 -4 1100 1100 -3 1011 1101 -2 1010 1110 -1 1001 1111 -0 1000 0000 +0 0000 0000 1 0001 0001 2 0010 0010 3 0011 0011 4 0100 0100 5 0101 0101 6 0110 0110 7 0111 0111 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1."><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>源码-反码-补码 | go调度源码分析</title>
+原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 十进制数 带符号位二进制原码 带符号位二进制补码 -8 N 1000 -7 1111 1001 -6 1110 1010 -5 1101 1011 -4 1100 1100 -3 1011 1101 -2 1010 1110 -1 1001 1111 -0 1000 0000 +0 0000 0000 1 0001 0001 2 0010 0010 3 0011 0011 4 0100 0100 5 0101 0101 6 0110 0110 7 0111 0111 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1) 计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式. 但为什么需要三种不同的编码方式呢？"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>源码-反码-补码 | go调度源码分析</title>
 <link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.4af95582c2d89e848e6592890d92006aee754b8d4472c5ed71a0c6e01fa4ac97.js integrity="sha256-SvlVgsLYnoSOZZKJDZIAau51S41EcsXtcaDG4B+krJc=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
 <span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/complement-source-reverse/ class=active>源码-反码-补码</a></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/>内存大小端</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-740657f38f0c4de9a986bda642ff0388 class=toggle>
@@ -14,7 +148,7 @@
 <a class=anchor href=#%e6%a6%82%e5%bf%b5>#</a></h2><ul><li><p>机器数</p></li><li><p>真值</p><ul><li>真值符号部分</li><li>真值部分</li></ul></li></ul><p>举例：
 -1的真值是:<code>1000 0001</code>, 其中真值<strong>符号区域</strong>为最高位的<code>1</code>,他的<strong>真值区域</strong>为<code>000 0001</code>。</p><hr><ul><li>原码</li></ul><pre tabindex=0><code>[+1] = 0000 0001
 [-1] = 1000 0001
-</code></pre><ul><li>反码：<ul><li>正数的反码是其本身</li><li>负数的反码是在其原码的基础上, 符号位不变，其余各个位取反.</li></ul></li></ul><table><thead><tr><th>十进制数</th><th>带符号位二进制原码</th><th>带符号位二进制补码</th></tr></thead><tbody><tr><td>-8</td><td>N</td><td>1000</td></tr><tr><td>-7</td><td>1111</td><td>1001</td></tr><tr><td>-6</td><td>1110</td><td>1010</td></tr><tr><td>-5</td><td>1101</td><td>1011</td></tr><tr><td>-4</td><td>1100</td><td>1100</td></tr><tr><td>-3</td><td>1011</td><td>1101</td></tr><tr><td>-2</td><td>1010</td><td>1110</td></tr><tr><td>-1</td><td>1001</td><td>1111</td></tr><tr><td>-0</td><td>1000</td><td>0000</td></tr><tr><td>+0</td><td>0000</td><td>0000</td></tr><tr><td>1</td><td>0001</td><td>0001</td></tr><tr><td>2</td><td>0010</td><td>0010</td></tr><tr><td>3</td><td>0011</td><td>0011</td></tr><tr><td>4</td><td>0100</td><td>0100</td></tr><tr><td>5</td><td>0101</td><td>0101</td></tr><tr><td>6</td><td>0110</td><td>0110</td></tr><tr><td>7</td><td>0111</td><td>0111</td></tr></tbody></table><ul><li>补码：<ul><li>正数的补码就是其本身</li><li>负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1)</li></ul></li></ul><p>计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式.
+</code></pre><ul><li>反码：<ul><li>正数的反码是其本身</li><li>负数的反码是在其原码的基础上, 符号位不变，其余各个位取反.</li></ul></li></ul><table><thead><tr><th style=text-align:left>十进制数</th><th style=text-align:left>带符号位二进制原码</th><th style=text-align:left>带符号位二进制补码</th></tr></thead><tbody><tr><td style=text-align:left>-8</td><td style=text-align:left>N</td><td style=text-align:left>1000</td></tr><tr><td style=text-align:left>-7</td><td style=text-align:left>1111</td><td style=text-align:left>1001</td></tr><tr><td style=text-align:left>-6</td><td style=text-align:left>1110</td><td style=text-align:left>1010</td></tr><tr><td style=text-align:left>-5</td><td style=text-align:left>1101</td><td style=text-align:left>1011</td></tr><tr><td style=text-align:left>-4</td><td style=text-align:left>1100</td><td style=text-align:left>1100</td></tr><tr><td style=text-align:left>-3</td><td style=text-align:left>1011</td><td style=text-align:left>1101</td></tr><tr><td style=text-align:left>-2</td><td style=text-align:left>1010</td><td style=text-align:left>1110</td></tr><tr><td style=text-align:left>-1</td><td style=text-align:left>1001</td><td style=text-align:left>1111</td></tr><tr><td style=text-align:left>-0</td><td style=text-align:left>1000</td><td style=text-align:left>0000</td></tr><tr><td style=text-align:left>+0</td><td style=text-align:left>0000</td><td style=text-align:left>0000</td></tr><tr><td style=text-align:left>1</td><td style=text-align:left>0001</td><td style=text-align:left>0001</td></tr><tr><td style=text-align:left>2</td><td style=text-align:left>0010</td><td style=text-align:left>0010</td></tr><tr><td style=text-align:left>3</td><td style=text-align:left>0011</td><td style=text-align:left>0011</td></tr><tr><td style=text-align:left>4</td><td style=text-align:left>0100</td><td style=text-align:left>0100</td></tr><tr><td style=text-align:left>5</td><td style=text-align:left>0101</td><td style=text-align:left>0101</td></tr><tr><td style=text-align:left>6</td><td style=text-align:left>0110</td><td style=text-align:left>0110</td></tr><tr><td style=text-align:left>7</td><td style=text-align:left>0111</td><td style=text-align:left>0111</td></tr></tbody></table><ul><li>补码：<ul><li>正数的补码就是其本身</li><li>负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1)</li></ul></li></ul><p>计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式.
 但为什么需要三种不同的编码方式呢？</p><h2 id=使用原码反码和补码的原因>使用原码，反码和补码的原因
 <a class=anchor href=#%e4%bd%bf%e7%94%a8%e5%8e%9f%e7%a0%81%e5%8f%8d%e7%a0%81%e5%92%8c%e8%a1%a5%e7%a0%81%e7%9a%84%e5%8e%9f%e5%9b%a0>#</a></h2><h3 id=人脑与机器计算的差异>人脑与机器计算的差异
 <a class=anchor href=#%e4%ba%ba%e8%84%91%e4%b8%8e%e6%9c%ba%e5%99%a8%e8%ae%a1%e7%ae%97%e7%9a%84%e5%b7%ae%e5%bc%82>#</a></h3><p>人脑可以知道第一位是符号位, 在计算的时候我们会根据符号位, 选择对真值区域的加减。但是对于计算机, 加减乘数已经是最基础的运算, 要设计的尽量简单. 计算机辨别"符号位"显然会让<strong>计算机的基础电路设计</strong>变得十分复杂! 于是人们转而设计出将<strong>符号位也参与运算</strong>的方法。</p><h3 id=反码诞生原因>反码诞生原因

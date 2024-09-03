@@ -1,42 +1,291 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>golang GMP概念 # what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P&amp;quot;用来调度goruntine，被称为&amp;quot;GMP模型”。
-GMP G:为了调度方便，保存寄存器，栈地址等-&amp;gt;对应cpu切换[1.cpu寄存器的值；2.stack地址] M:与系统线程一一对应 P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。 why:
-单进程时代不需要调度器
-1.单一的执行流程，计算机只能一个任务一个任务处理。 2.进程阻塞所带来的CPU时间浪费。 多进程/线程时代有了调度器需求
-1.解决了阻塞的问题 2.CPU有很大的一部分都被浪费在进程调度 设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。 协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)
-为什么。 线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。 Go调度器可以做出只在它知道内存是一致的点进行调度的决定。 如何进行调度。 一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。 另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。 M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。 摆脱上下文(在这里P就是上下文)？ 不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。 以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？ why: threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.</description></item><item><title>源码-反码-补码</title><link>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</guid><description>概念 # 机器数
-真值
-真值符号部分 真值部分 举例： -1的真值是:1000 0001, 其中真值符号区域为最高位的1,他的真值区域为000 0001。
-原码 [+1] = 0000 0001 [-1] = 1000 0001 反码： 正数的反码是其本身 负数的反码是在其原码的基础上, 符号位不变，其余各个位取反. 十进制数 带符号位二进制原码 带符号位二进制补码 -8 N 1000 -7 1111 1001 -6 1110 1010 -5 1101 1011 -4 1100 1100 -3 1011 1101 -2 1010 1110 -1 1001 1111 -0 1000 0000 +0 0000 0000 1 0001 0001 2 0010 0010 3 0011 0011 4 0100 0100 5 0101 0101 6 0110 0110 7 0111 0111 补码： 正数的补码就是其本身 负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1.</description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>1 前言 # 从程序的角度来看， 我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。
-细化下上述所说的内容，主要包含如下：
-怎么评估变量所需的内存大小? 如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？ 如果第二点都使用后者的方式，那么如何进行管理？ 2 评估内存大小 # 2.1 内存对齐 # what 什么是内存对齐呢？官方解释是：xxxx
-why 为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。 3 分配内存 # 没有内存管理，每次申请都直接向操作系统申请
-通过程序级别的内存管理
-因程序运行起来所需要分配的内存块有大有小，而分散的、大小不一的碎片化内存，一方面会降低内存的使用率，另一方面要找到大小合适的内存块的代价会因碎片化而增加，为降低碎片化内存给程序性能造成的不良影响，
-3.1 Tcmalloc # golang采用了类似谷歌的Tcmalloc算法来解决碎片化问题：
-Tcmalloc：
-按照一组预置的大小规格把内存页划分成块，相同的块串联在一个空闲链表中。 程序申请内存时，会先根据要申请的内存大小，找到最匹配的规格，然后从对应空闲链表中分配一个空闲块。 4 golang内存管理 # 4.1 内存结构 # golang把内存大小分为四种级别，分别为:Arena, Page, Span，内存块。
-注：下文讨论的都是在amd64架构的Linux环境下.
-Arena：golang将堆地址空间划分为一个个arena区，arena区域起始地址定义在arenaBaseOffset，每个arena的大小是64MB，起始地址也对齐到64MB
-Page：每个arena包含8192个page，所以每个page大小为8KB。
-Span：包含一个或多个页大小的内存。golang给出了67种预置的大小规格，最小8Byte，最大32KB，所以在划分整整齐齐的arena中，又会按需划分出不同的Span,每个Span包含一组连续的Page，
-类别(class) 内存块对象大小(bytes/obj) Span大小(bytes/span) Span中内存块对象个数(objects) 尾部浪费(tail waste) 最大浪费百分比(max waste) 1 8 8192 1024 0 87.50% 2 16 8192 512 0 43.75% 3 24 8192 341 8 29.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
-全局数据区 栈区 堆区 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。
-栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
-堆区:主要用于程序运行阶段的动态分配。
-内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。
-2 定义 # 垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：垃圾识别和垃圾清理。
-golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。
-2.1 垃圾识别 # 2.1.1 双色标记法 # 根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。
-双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。
-双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。
-双色标记法只能描述对象节点自身是否扫描，而不能描述子节点是否完成。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。
-由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。
-2.1.2 三色标记法 # 全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
-黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。 灰色：基于当前节点展开的追踪还未完成。 白色：当追踪完成后，代表可回收的对象。 问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。
-原因： 并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。
-当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)
-处理措施：
-有两种方法来避免:
-强三色：黑色对象只能引用灰色对象。 弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态. 引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。
-分为两种，一种是插入写屏障，一种是删除写屏障。
-插入写屏障 writePointer(slot, ptr): // ⚠️:slot现在指向的还是旧对象 shade(ptr) //shade函数尝试改变指针的颜色--&amp;gt;改变ptr的颜色 *slot = ptr 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。 writePointer(slot, ptr) // ⚠️:slot现在指向的还是旧对象 shade(*slot) //shade函数尝试改变指针的颜色--&amp;gt;改变(*slot)的颜色---&amp;gt;注意这个是*slot(旧对象),slot保存着它原先的保存的地址。 *slot = ptr 引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为忽略协程栈上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。</description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;h1 id="golang-gmp概念">
+ golang GMP概念
+ &lt;a class="anchor" href="#golang-gmp%e6%a6%82%e5%bf%b5">#&lt;/a>
+&lt;/h1>
+&lt;ul>
+&lt;li>
+&lt;p>what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P&amp;quot;用来调度goruntine，被称为&amp;quot;GMP模型”。&lt;/p>
+&lt;ul>
+&lt;li>GMP
+&lt;ul>
+&lt;li>G:为了调度方便，保存寄存器，栈地址等-&amp;gt;&lt;code>对应cpu切换[1.cpu寄存器的值；2.stack地址]&lt;/code>&lt;/li>
+&lt;li>M:与系统线程一一对应&lt;/li>
+&lt;li>P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>why:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;p>单进程时代不需要调度器&lt;/p>
+&lt;ul>
+&lt;li>1.单一的执行流程，计算机只能一个任务一个任务处理。&lt;/li>
+&lt;li>2.进程阻塞所带来的CPU时间浪费。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>多进程/线程时代有了调度器需求&lt;/p>
+&lt;ul>
+&lt;li>1.解决了阻塞的问题&lt;/li>
+&lt;li>2.CPU有很大的一部分都被浪费在进程调度&lt;/li>
+&lt;li>设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;blockquote>
+&lt;ul>
+&lt;li>为什么。
+&lt;ul>
+&lt;li>线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。&lt;/li>
+&lt;li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>如何进行调度。
+&lt;ul>
+&lt;li>一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。&lt;/li>
+&lt;li>另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。&lt;/li>
+&lt;li>M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>摆脱上下文(在这里P就是上下文)？
+&lt;ul>
+&lt;li>&lt;del>不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。&lt;/del>&lt;/li>
+&lt;li>以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;blockquote>
+&lt;ul>
+&lt;li>why:
+&lt;ul>
+&lt;li>threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.&lt;/li>
+&lt;li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>how:
+&lt;ul>
+&lt;li>One is N:1 where several userspace threads are run on one OS thread. This has the advantage of being very quick to context switch but cannot take advantage of multi-core systems.&lt;/li>
+&lt;li>Another is 1:1 where one thread of execution matches one OS thread. It takes advantage of all of the cores on the machine, but context switching is slow because it has to trap through the OS.&lt;/li>
+&lt;li>M:N scheduler. You get quick context switches and you take advantage of all the cores in your system. The main disadvantage of this approach is the complexity it adds to the scheduler.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>get rid of contexts?
+&lt;ul>
+&lt;li>Not really. The reason we have contexts is so that we can hand them off to other threads if the running thread needs to block for some reason.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;hr>
+&lt;blockquote>
+&lt;p>这个也就说明了&lt;code>N-M&lt;/code>的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。&lt;/p></description></item><item><title>源码-反码-补码</title><link>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/complement-source-reverse/</guid><description>&lt;h2 id="概念">
+ 概念
+ &lt;a class="anchor" href="#%e6%a6%82%e5%bf%b5">#&lt;/a>
+&lt;/h2>
+&lt;ul>
+&lt;li>
+&lt;p>机器数&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>真值&lt;/p>
+&lt;ul>
+&lt;li>真值符号部分&lt;/li>
+&lt;li>真值部分&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>举例：
+-1的真值是:&lt;code>1000 0001&lt;/code>, 其中真值&lt;strong>符号区域&lt;/strong>为最高位的&lt;code>1&lt;/code>,他的&lt;strong>真值区域&lt;/strong>为&lt;code>000 0001&lt;/code>。&lt;/p>
+&lt;hr>
+&lt;ul>
+&lt;li>原码&lt;/li>
+&lt;/ul>
+&lt;pre tabindex="0">&lt;code>[+1] = 0000 0001
+[-1] = 1000 0001
+&lt;/code>&lt;/pre>&lt;ul>
+&lt;li>反码：
+&lt;ul>
+&lt;li>正数的反码是其本身&lt;/li>
+&lt;li>负数的反码是在其原码的基础上, 符号位不变，其余各个位取反.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">十进制数&lt;/th>
+ &lt;th style="text-align: left">带符号位二进制原码&lt;/th>
+ &lt;th style="text-align: left">带符号位二进制补码&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">-8&lt;/td>
+ &lt;td style="text-align: left">N&lt;/td>
+ &lt;td style="text-align: left">1000&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-7&lt;/td>
+ &lt;td style="text-align: left">1111&lt;/td>
+ &lt;td style="text-align: left">1001&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-6&lt;/td>
+ &lt;td style="text-align: left">1110&lt;/td>
+ &lt;td style="text-align: left">1010&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-5&lt;/td>
+ &lt;td style="text-align: left">1101&lt;/td>
+ &lt;td style="text-align: left">1011&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-4&lt;/td>
+ &lt;td style="text-align: left">1100&lt;/td>
+ &lt;td style="text-align: left">1100&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-3&lt;/td>
+ &lt;td style="text-align: left">1011&lt;/td>
+ &lt;td style="text-align: left">1101&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-2&lt;/td>
+ &lt;td style="text-align: left">1010&lt;/td>
+ &lt;td style="text-align: left">1110&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-1&lt;/td>
+ &lt;td style="text-align: left">1001&lt;/td>
+ &lt;td style="text-align: left">1111&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">-0&lt;/td>
+ &lt;td style="text-align: left">1000&lt;/td>
+ &lt;td style="text-align: left">0000&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">+0&lt;/td>
+ &lt;td style="text-align: left">0000&lt;/td>
+ &lt;td style="text-align: left">0000&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0001&lt;/td>
+ &lt;td style="text-align: left">0001&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">2&lt;/td>
+ &lt;td style="text-align: left">0010&lt;/td>
+ &lt;td style="text-align: left">0010&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">3&lt;/td>
+ &lt;td style="text-align: left">0011&lt;/td>
+ &lt;td style="text-align: left">0011&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">4&lt;/td>
+ &lt;td style="text-align: left">0100&lt;/td>
+ &lt;td style="text-align: left">0100&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">5&lt;/td>
+ &lt;td style="text-align: left">0101&lt;/td>
+ &lt;td style="text-align: left">0101&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">6&lt;/td>
+ &lt;td style="text-align: left">0110&lt;/td>
+ &lt;td style="text-align: left">0110&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">7&lt;/td>
+ &lt;td style="text-align: left">0111&lt;/td>
+ &lt;td style="text-align: left">0111&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;ul>
+&lt;li>补码：
+&lt;ul>
+&lt;li>正数的补码就是其本身&lt;/li>
+&lt;li>负数的补码是在其原码的基础上, 符号位不变, 其余各位取反, 最后+1. (即在反码基础上+1)&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>计算机要使用一定的编码方式进行存储. 原码, 反码, 补码是机器存储一个具体数字的编码方式.
+但为什么需要三种不同的编码方式呢？&lt;/p></description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
+ 1 前言
+ &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80">#&lt;/a>
+&lt;/h1>
+&lt;p>从程序的角度来看，
+我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。&lt;/p>
+&lt;p>细化下上述所说的内容，主要包含如下：&lt;/p>
+&lt;ol>
+&lt;li>怎么评估变量所需的内存大小?&lt;/li>
+&lt;li>如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？&lt;/li>
+&lt;li>如果第二点都使用后者的方式，那么如何进行管理？&lt;/li>
+&lt;/ol>
+&lt;h1 id="2-评估内存大小">
+ 2 评估内存大小
+ &lt;a class="anchor" href="#2-%e8%af%84%e4%bc%b0%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="21-内存对齐">
+ 2.1 内存对齐
+ &lt;a class="anchor" href="#21-%e5%86%85%e5%ad%98%e5%af%b9%e9%bd%90">#&lt;/a>
+&lt;/h2>
+&lt;ol>
+&lt;li>what&lt;/li>
+&lt;/ol>
+&lt;p>什么是内存对齐呢？官方解释是：xxxx&lt;/p>
+&lt;blockquote>
+&lt;/blockquote>
+&lt;ol start="2">
+&lt;li>why
+为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。&lt;/li>
+&lt;/ol>
+&lt;h1 id="3-分配内存">
+ 3 分配内存
+ &lt;a class="anchor" href="#3-%e5%88%86%e9%85%8d%e5%86%85%e5%ad%98">#&lt;/a>
+&lt;/h1>
+&lt;ol>
+&lt;li>
+&lt;p>没有内存管理，每次申请都直接向操作系统申请&lt;/p></description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>&lt;h1 id="1-前言变量的存放区">
+ 1 前言：变量的存放区
+ &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80%e5%8f%98%e9%87%8f%e7%9a%84%e5%ad%98%e6%94%be%e5%8c%ba">#&lt;/a>
+&lt;/h1>
+&lt;p>通常情况下，变量的分配位置一般是下列三个区：&lt;/p>
+&lt;ol>
+&lt;li>全局数据区&lt;/li>
+&lt;li>栈区&lt;/li>
+&lt;li>堆区&lt;/li>
+&lt;/ol>
+&lt;p align="left">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240622185210.png" width = "70%" height="70%" alt="效果图">
+&lt;/p>
+&lt;p>全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。&lt;/p>
+&lt;p>栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。&lt;/p>
+&lt;p>堆区:主要用于程序运行阶段的动态分配。&lt;/p>
+&lt;p>内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。&lt;/p>
+&lt;h1 id="2-定义">
+ 2 定义
+ &lt;a class="anchor" href="#2-%e5%ae%9a%e4%b9%89">#&lt;/a>
+&lt;/h1>
+&lt;p>垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：&lt;strong>垃圾识别&lt;/strong>和&lt;strong>垃圾清理&lt;/strong>。&lt;/p>
+&lt;p>golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。&lt;/p>
+&lt;h2 id="21-垃圾识别">
+ 2.1 垃圾识别
+ &lt;a class="anchor" href="#21-%e5%9e%83%e5%9c%be%e8%af%86%e5%88%ab">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="211-双色标记法">
+ 2.1.1 双色标记法
+ &lt;a class="anchor" href="#211-%e5%8f%8c%e8%89%b2%e6%a0%87%e8%ae%b0%e6%b3%95">#&lt;/a>
+&lt;/h3>
+&lt;p>根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。&lt;/p></description></item></channel></rss>

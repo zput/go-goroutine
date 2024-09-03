@@ -1,8 +1,135 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>前置知识 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/</link><description>Recent content in 前置知识 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Thu, 28 Feb 2019 15:03:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/index.xml" rel="self" type="application/rss+xml"/><item><title>内存大小端</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</guid><description>内存大小端 # 对于这两种存储方式，如果联系下我们常用 “异或” 操作，就能得到一个很好的记忆规则。总结来说就是：
-低地址存储低字节即为小端存储；高地址存储高字节即为小端存储； 低地址存储高字节即为大端存储；高地址存储低字节即为大端存储； 我们把 “低” 、“小” 认作 “0”， 把 “高”、“大” 认作 “1”，这样就可以利用 “异或” 的结果来加强记忆了。
-内存 字节 大端/小端 低地址 低字节 小端存储 0 0 0 高地址 高字节 小端存储 1 1 0 低地址 高字节 大端存储 0 1 1 高地址 低字节 大端存储 1 0 1 intel 存储字节的顺序是小端优先：即低有效字节存储在低内存地址中。写值是从低地址向高地址写入，如SP指向0xf000，往栈中写入一个字（8字节），占用0xf000到0xf007的8个字节。</description></item><item><title>伪寄存器与函数栈帧</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</guid><description>伪寄存器 &amp;amp; 函数栈 # 伪寄存器 # 伪寄存器常用的一般是下面的四个:
-FP: Frame pointer: arguments and locals. PC: Program counter: jumps and branches. SB: Static base pointer: global symbols. SP: Stack pointer: top of stack. 下面我们来翻译一下 官网1的对他们的解释，然后做一个总结,方便理解。
-FP # FP伪寄存器是一个用于引用函数参数的虚拟帧指针。编译器维护一个虚拟帧指针，并将堆栈上的参数引用为该伪寄存器的偏移量。因此0(FP)是函数的第一个参数，8(FP)是第二个参数(在64位机器上)，以此类推。但是，当以这种方式引用一个函数参数时，有必要将名称放在开头，如first_arg+0(FP)和second_arg+8(FP)。(偏移量的含义(从帧指针出发的偏移量)与它在SB中的使用不同，在SB中，它是从符号出发的偏移量。) 汇编器强制执行这个约定，拒绝普通的0(FP)和8(FP)。实际的名称在语义上是不相关的，但应该用来记录参数的名称。值得强调的是，FP始终是一个伪寄存器，而不是硬件寄存器，即使在具有硬件帧指针的架构上也是如此。
-The FP pseudo-register is a virtual frame pointer used to refer to function arguments. The compilers maintain a virtual frame pointer and refer to the arguments on the stack as offsets from that pseudo-register.</description></item><item><title>类汇编</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</guid><description>golang类汇编指令 # 寻址模式 # (DI)(BX2): The location at address DI plus BX2. 64(DI)(BX2): The location at address DI plus BX2 plus 64. These modes accept only 1, 2, 4, and 8 as scale factors. 结构体+寄存器 # 类似这种:
-# (m_morebuf+gobuf_pc)(REGISTER) MOVQ	8(SP), AX	# f&amp;#39;s caller&amp;#39;s PC MOVQ	AX, (m_morebuf+gobuf_pc)(BX) type m struct { g0 *g // goroutine with scheduling stack morebuf gobuf // gobuf arg to morestack //-----------morebuf-------------// divmod uint32 // div/mod denominator for arm - known to liblink //.</description></item><item><title>底层重要结构</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</guid><description>https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html
-g结构 # type g struct { // 栈相关的两个字段 stack stack stackguard0 uintptr stackguard1 uintptr // offset known to liblink // defer 和 panic _panic *_panic // 最内侧的 panic 结构体 _defer *_defer // 最内侧的延迟函数结构体 // m *m sched gobuf atomicstatus uint32 goid int64 // 抢占 preempt bool // 抢占信号 preemptStop bool // 抢占时将状态修改成 `_Gpreempted` preemptShrink bool // 在同步安全点收缩栈 } type gobuf struct { sp uintptr pc uintptr g guintptr ctxt unsafe.</description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>前置知识 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/</link><description>Recent content in 前置知识 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Thu, 28 Feb 2019 15:03:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/index.xml" rel="self" type="application/rss+xml"/><item><title>内存大小端</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/memory/</guid><description>&lt;h1 id="内存大小端">
+ 内存大小端
+ &lt;a class="anchor" href="#%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f%e7%ab%af">#&lt;/a>
+&lt;/h1>
+&lt;p>对于这两种存储方式，如果联系下我们常用 “异或” 操作，就能得到一个很好的记忆规则。总结来说就是：&lt;/p>
+&lt;ul>
+&lt;li>低地址存储低字节即为小端存储；高地址存储高字节即为小端存储；&lt;/li>
+&lt;li>低地址存储高字节即为大端存储；高地址存储低字节即为大端存储；&lt;/li>
+&lt;/ul>
+&lt;p>我们把 “低” 、“小” 认作 “0”， 把 “高”、“大” 认作 “1”，这样就可以利用 “异或” 的结果来加强记忆了。&lt;/p>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">内存&lt;/th>
+ &lt;th style="text-align: left">字节&lt;/th>
+ &lt;th style="text-align: left">大端/小端&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">低地址&lt;/td>
+ &lt;td style="text-align: left">低字节&lt;/td>
+ &lt;td style="text-align: left">小端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">高地址&lt;/td>
+ &lt;td style="text-align: left">高字节&lt;/td>
+ &lt;td style="text-align: left">小端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">低地址&lt;/td>
+ &lt;td style="text-align: left">高字节&lt;/td>
+ &lt;td style="text-align: left">大端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">高地址&lt;/td>
+ &lt;td style="text-align: left">低字节&lt;/td>
+ &lt;td style="text-align: left">大端存储&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;hr>
+&lt;p>intel 存储字节的顺序是小端优先：即低有效字节存储在低内存地址中。写值是从低地址向高地址写入，如SP指向0xf000，往栈中写入一个字（8字节），占用0xf000到0xf007的8个字节。&lt;/p></description></item><item><title>伪寄存器与函数栈帧</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</guid><description>&lt;h1 id="伪寄存器--函数栈">
+ 伪寄存器 &amp;amp; 函数栈
+ &lt;a class="anchor" href="#%e4%bc%aa%e5%af%84%e5%ad%98%e5%99%a8--%e5%87%bd%e6%95%b0%e6%a0%88">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="伪寄存器">
+ 伪寄存器
+ &lt;a class="anchor" href="#%e4%bc%aa%e5%af%84%e5%ad%98%e5%99%a8">#&lt;/a>
+&lt;/h2>
+&lt;p>伪寄存器常用的一般是下面的四个:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">FP&lt;/span>: &lt;span style="color:#a6e22e">Frame&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">arguments&lt;/span> &lt;span style="color:#a6e22e">and&lt;/span> &lt;span style="color:#a6e22e">locals&lt;/span>.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">PC&lt;/span>: &lt;span style="color:#a6e22e">Program&lt;/span> &lt;span style="color:#a6e22e">counter&lt;/span>: &lt;span style="color:#a6e22e">jumps&lt;/span> &lt;span style="color:#a6e22e">and&lt;/span> &lt;span style="color:#a6e22e">branches&lt;/span>.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">SB&lt;/span>: &lt;span style="color:#a6e22e">Static&lt;/span> &lt;span style="color:#a6e22e">base&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">global&lt;/span> &lt;span style="color:#a6e22e">symbols&lt;/span>.
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">SP&lt;/span>: &lt;span style="color:#a6e22e">Stack&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">top&lt;/span> &lt;span style="color:#a6e22e">of&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span>.
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>类汇编</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</guid><description>&lt;h2 id="golang类汇编指令">
+ golang类汇编指令
+ &lt;a class="anchor" href="#golang%e7%b1%bb%e6%b1%87%e7%bc%96%e6%8c%87%e4%bb%a4">#&lt;/a>
+&lt;/h2>
+&lt;h3 id="寻址模式">
+ 寻址模式
+ &lt;a class="anchor" href="#%e5%af%bb%e5%9d%80%e6%a8%a1%e5%bc%8f">#&lt;/a>
+&lt;/h3>
+&lt;ul>
+&lt;li>(DI)(BX&lt;em>2): The location at address DI plus BX&lt;/em>2.&lt;/li>
+&lt;li>64(DI)(BX&lt;em>2): The location at address DI plus BX&lt;/em>2 plus 64. These modes accept only 1, 2, 4, and 8 as scale factors.&lt;/li>
+&lt;/ul>
+&lt;h3 id="结构体寄存器">
+ 结构体+寄存器
+ &lt;a class="anchor" href="#%e7%bb%93%e6%9e%84%e4%bd%93%e5%af%84%e5%ad%98%e5%99%a8">#&lt;/a>
+&lt;/h3>
+&lt;p>类似这种:&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-asm" data-lang="asm">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e"># (m_morebuf+gobuf_pc)(REGISTER)
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span>	&lt;span style="color:#ae81ff">8&lt;/span>(&lt;span style="color:#66d9ef">SP&lt;/span>), &lt;span style="color:#66d9ef">AX&lt;/span>	&lt;span style="color:#75715e"># f&amp;#39;s caller&amp;#39;s PC
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span>	&lt;span style="color:#66d9ef">AX&lt;/span>, (&lt;span style="color:#66d9ef">m_morebuf&lt;/span>&lt;span style="color:#960050;background-color:#1e0010">+&lt;/span>&lt;span style="color:#66d9ef">gobuf_pc&lt;/span>)(&lt;span style="color:#66d9ef">BX&lt;/span>)
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>底层重要结构</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</guid><description>&lt;p>
+ &lt;a href="https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html">https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html&lt;/a>&lt;/p>
+&lt;h1 id="g结构">
+ g结构
+ &lt;a class="anchor" href="#g%e7%bb%93%e6%9e%84">#&lt;/a>
+&lt;/h1>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// 栈相关的两个字段
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">stack&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">stackguard0&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">stackguard1&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// offset known to liblink
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// defer 和 panic 
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">_panic&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">_panic&lt;/span> &lt;span style="color:#75715e">// 最内侧的 panic 结构体
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">_defer&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">_defer&lt;/span> &lt;span style="color:#75715e">// 最内侧的延迟函数结构体
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">//
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">m&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">m&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">sched&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">atomicstatus&lt;/span> &lt;span style="color:#66d9ef">uint32&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">goid&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// 抢占
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">preempt&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span> &lt;span style="color:#75715e">// 抢占信号
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">preemptStop&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span> &lt;span style="color:#75715e">// 抢占时将状态修改成 `_Gpreempted`
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">preemptShrink&lt;/span> &lt;span style="color:#66d9ef">bool&lt;/span> &lt;span style="color:#75715e">// 在同步安全点收缩栈
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">sp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#a6e22e">guintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ctxt&lt;/span> &lt;span style="color:#a6e22e">unsafe&lt;/span>.&lt;span style="color:#a6e22e">Pointer&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ret&lt;/span> &lt;span style="color:#a6e22e">sys&lt;/span>.&lt;span style="color:#a6e22e">Uintreg&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lr&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">bp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// for GOEXPERIMENT=framepointer ------------------------here
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>
