@@ -20,7 +20,58 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">checkTimeouts&lt;/span>()
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">mcall&lt;/span>(&lt;span style="color:#a6e22e">gosched_m&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>在go1.14前,编译器不会插入抢占点,用户代码可能会陷入CPU计算循环(即使代码中有函数调用),它可能会一直霸占CPU,这时候可能需要runtime.Gosched, 在go1.14,编译器会在函数前加入自动抢占点.所以对于go1.14+，无需手动调用它。&lt;/p>
+
+ &lt;/div>
+
+ &lt;div class="flex-even markdown-inner">
+ &lt;!-- magic separator, between columns -->
+&lt;p align="middle">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624193034.png" width = "35%" height="35%" alt="gosched">
+&lt;/p>
+
+ &lt;/div>
+
+&lt;/div>
+
+&lt;h2 id="gdb主动调度">
+ gdb主动调度
+ &lt;a class="anchor" href="#gdb%e4%b8%bb%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
+&lt;/h2>
+&lt;blockquote>
+&lt;p>main.go&lt;/p>
+&lt;/blockquote>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#e6db74">&amp;#34;runtime&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#e6db74">&amp;#34;sync/atomic&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">existFlag&lt;/span> &lt;span style="color:#66d9ef">int32&lt;/span> = &lt;span style="color:#ae81ff">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// the function&amp;#39;s body is empty
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">addAssemble&lt;/span>(&lt;span style="color:#a6e22e">x&lt;/span>, &lt;span style="color:#a6e22e">y&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>) &lt;span style="color:#66d9ef">int64&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#a6e22e">a&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>){
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">addAssemble&lt;/span>(&lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">AddInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">existFlag&lt;/span>, &lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">runtime&lt;/span>.&lt;span style="color:#a6e22e">GOMAXPROCS&lt;/span>(&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#ae81ff">2&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">for&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">LoadInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">existFlag&lt;/span>) &lt;span style="color:#f92672">&amp;lt;=&lt;/span>&lt;span style="color:#ae81ff">0&lt;/span>{
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">break&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">runtime&lt;/span>.&lt;span style="color:#a6e22e">Gosched&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;blockquote>
+&lt;p>add_amd.s&lt;/p></description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
  goroutine被动调度
  &lt;a class="anchor" href="#goroutine%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
 &lt;/h1>
@@ -77,4 +128,25 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">wg&lt;/span>.&lt;span style="color:#a6e22e">Wait&lt;/span>()
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">LoadInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">n&lt;/span>)) &lt;span style="color:#75715e">// 1
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+ &lt;/div>
+
+ &lt;div class="flex-even markdown-inner">
+ &lt;!-- magic separator, between columns -->
+&lt;p align="middle">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624235343.png" width = "40%" height="30%" alt="进入睡眠">
+&lt;/p>
+
+ &lt;/div>
+
+&lt;/div>
+
+&lt;h3 id="gdb调试前准备">
+ gdb调试前准备
+ &lt;a class="anchor" href="#gdb%e8%b0%83%e8%af%95%e5%89%8d%e5%87%86%e5%a4%87">#&lt;/a>
+&lt;/h3>
+&lt;h4 id="编译程序">
+ 编译程序
+ &lt;a class="anchor" href="#%e7%bc%96%e8%af%91%e7%a8%8b%e5%ba%8f">#&lt;/a>
+&lt;/h4>
+&lt;p>编译一下源代码: &lt;code>go build -gcflags &amp;quot;-N -l&amp;quot; -o test .&lt;/code>.&lt;/p></description></item></channel></rss>

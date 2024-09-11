@@ -57,7 +57,12 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">execute&lt;/span>(&lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>从其他P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</link><pubDate>Sun, 08 Mar 2020 10:05:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</guid><description>&lt;h1 id="从其他队列盗取goroutine">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>schedule函数按顺序分三步来分别来获取可运行的Goroutine: 全局G队列，本地G队列和其他P上面的G队列
+&lt;ul>
+&lt;li>
+&lt;blockquote>
+&lt;p>从全局运行G队列中寻找Goroutine: 因为全局上面拿Goroutine是需要加锁的,需尽量少操作全局队列,所以当一个P调度次数是61的倍数之后且全局的Goroutine队列不为空，才尝试在全局上寻找&lt;/p></description></item><item><title>从其他P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</link><pubDate>Sun, 08 Mar 2020 10:05:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</guid><description>&lt;h1 id="从其他队列盗取goroutine">
  从其他队列盗取goroutine
  &lt;a class="anchor" href="#%e4%bb%8e%e5%85%b6%e4%bb%96%e9%98%9f%e5%88%97%e7%9b%97%e5%8f%96goroutine">#&lt;/a>
 &lt;/h1>
@@ -210,4 +215,23 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">stopm&lt;/span>()
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">top&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h3 id="随机遍历从其他的工作线程对应p上盗取g">
+ 随机遍历从其他的工作线程对应P上盗取G
+ &lt;a class="anchor" href="#%e9%9a%8f%e6%9c%ba%e9%81%8d%e5%8e%86%e4%bb%8e%e5%85%b6%e4%bb%96%e7%9a%84%e5%b7%a5%e4%bd%9c%e7%ba%bf%e7%a8%8b%e5%af%b9%e5%ba%94p%e4%b8%8a%e7%9b%97%e5%8f%96g">#&lt;/a>
+&lt;/h3>
+&lt;ol>
+&lt;li>尽量减少M的自旋状态时间,只有在盗取的时候才把spinning标志位设为true,盗取退出后把spinning标志位重新设置为false,&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> !&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> = &lt;span style="color:#66d9ef">true&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Xadd&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ol start="2">
+&lt;li>随机遍历全局P中的P,如果有goroutines,就偷盗一半来运行.&lt;/li>
+&lt;/ol>
+&lt;h3 id="工作线程进入睡眠">
+ 工作线程进入睡眠
+ &lt;a class="anchor" href="#%e5%b7%a5%e4%bd%9c%e7%ba%bf%e7%a8%8b%e8%bf%9b%e5%85%a5%e7%9d%a1%e7%9c%a0">#&lt;/a>
+&lt;/h3>
+&lt;blockquote>
+&lt;p>src/runtime/proc.go:1910&lt;/p></description></item></channel></rss>

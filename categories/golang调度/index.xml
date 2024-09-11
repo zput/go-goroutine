@@ -24,7 +24,54 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>主动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</link><pubDate>Thu, 02 Apr 2020 11:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</guid><description>&lt;h1 id="goroutine主动调度">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="sysmon">
+ sysmon
+ &lt;a class="anchor" href="#sysmon">#&lt;/a>
+&lt;/h2>
+&lt;p>可以看到sysmon里面是一个for循环,它会一直运行,因为这个M没有关联P，所以不允许写屏障
+逻辑比较简单，延时睡眠，调用retake&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Always runs without a P, so write barriers are not allowed.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">//
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">//go:nowritebarrierrec
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">sysmon&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmsys&lt;/span>&lt;span style="color:#f92672">++&lt;/span> &lt;span style="color:#75715e">//增加记录系统线程的值的个数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">checkdead&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lasttrace&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> int64(&lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">idle&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#75715e">// how many cycles in succession we had not wokeup somebody
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">delay&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> uint32(&lt;span style="color:#ae81ff">0&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>	&lt;span style="color:#66d9ef">for&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">idle&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> { &lt;span style="color:#75715e">// start with 20us sleep...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>			&lt;span style="color:#a6e22e">delay&lt;/span> = &lt;span style="color:#ae81ff">20&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		} &lt;span style="color:#66d9ef">else&lt;/span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">idle&lt;/span> &amp;gt; &lt;span style="color:#ae81ff">50&lt;/span> { &lt;span style="color:#75715e">// start doubling the sleep after 1ms...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>			&lt;span style="color:#a6e22e">delay&lt;/span> &lt;span style="color:#f92672">*=&lt;/span> &lt;span style="color:#ae81ff">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">delay&lt;/span> &amp;gt; &lt;span style="color:#ae81ff">10&lt;/span>&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#ae81ff">1000&lt;/span> { &lt;span style="color:#75715e">// up to 10ms
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>			&lt;span style="color:#a6e22e">delay&lt;/span> = &lt;span style="color:#ae81ff">10&lt;/span> &lt;span style="color:#f92672">*&lt;/span> &lt;span style="color:#ae81ff">1000&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span> &lt;span style="color:#a6e22e">usleep&lt;/span>(&lt;span style="color:#a6e22e">delay&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span> 
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#75715e">// retake P&amp;#39;s blocked in syscalls
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#75715e">// and preempt long running G&amp;#39;s
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#75715e">// 抢占被系统调用阻塞的P和抢占长期运行的G
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">retake&lt;/span>(&lt;span style="color:#a6e22e">now&lt;/span>) &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>			&lt;span style="color:#a6e22e">idle&lt;/span> = &lt;span style="color:#ae81ff">0&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		} &lt;span style="color:#66d9ef">else&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>			&lt;span style="color:#a6e22e">idle&lt;/span>&lt;span style="color:#f92672">++&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span> &lt;span style="color:#75715e">// check if we need to force a GC
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;h3 id="retake">
+ retake
+ &lt;a class="anchor" href="#retake">#&lt;/a>
+&lt;/h3>
+&lt;p>retake是怎么区分是否是本次调度一直在运行?&lt;/p></description></item><item><title>主动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</link><pubDate>Thu, 02 Apr 2020 11:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/</guid><description>&lt;h1 id="goroutine主动调度">
  goroutine主动调度
  &lt;a class="anchor" href="#goroutine%e4%b8%bb%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
 &lt;/h1>
@@ -46,7 +93,58 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">checkTimeouts&lt;/span>()
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">mcall&lt;/span>(&lt;span style="color:#a6e22e">gosched_m&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>从全局/本P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</link><pubDate>Mon, 02 Mar 2020 13:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</guid><description>&lt;h1 id="从本地队列或全局队列获取goroutine">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>在go1.14前,编译器不会插入抢占点,用户代码可能会陷入CPU计算循环(即使代码中有函数调用),它可能会一直霸占CPU,这时候可能需要runtime.Gosched, 在go1.14,编译器会在函数前加入自动抢占点.所以对于go1.14+，无需手动调用它。&lt;/p>
+
+ &lt;/div>
+
+ &lt;div class="flex-even markdown-inner">
+ &lt;!-- magic separator, between columns -->
+&lt;p align="middle">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624193034.png" width = "35%" height="35%" alt="gosched">
+&lt;/p>
+
+ &lt;/div>
+
+&lt;/div>
+
+&lt;h2 id="gdb主动调度">
+ gdb主动调度
+ &lt;a class="anchor" href="#gdb%e4%b8%bb%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
+&lt;/h2>
+&lt;blockquote>
+&lt;p>main.go&lt;/p>
+&lt;/blockquote>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">package&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#f92672">import&lt;/span> (
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#e6db74">&amp;#34;runtime&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#e6db74">&amp;#34;sync/atomic&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">var&lt;/span> &lt;span style="color:#a6e22e">existFlag&lt;/span> &lt;span style="color:#66d9ef">int32&lt;/span> = &lt;span style="color:#ae81ff">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// the function&amp;#39;s body is empty
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">addAssemble&lt;/span>(&lt;span style="color:#a6e22e">x&lt;/span>, &lt;span style="color:#a6e22e">y&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>) &lt;span style="color:#66d9ef">int64&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#a6e22e">a&lt;/span> &lt;span style="color:#66d9ef">int64&lt;/span>){
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">addAssemble&lt;/span>(&lt;span style="color:#a6e22e">a&lt;/span>, &lt;span style="color:#a6e22e">a&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">AddInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">existFlag&lt;/span>, &lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">runtime&lt;/span>.&lt;span style="color:#a6e22e">GOMAXPROCS&lt;/span>(&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#a6e22e">add&lt;/span>(&lt;span style="color:#ae81ff">2&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">for&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">LoadInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">existFlag&lt;/span>) &lt;span style="color:#f92672">&amp;lt;=&lt;/span>&lt;span style="color:#ae81ff">0&lt;/span>{
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">break&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">runtime&lt;/span>.&lt;span style="color:#a6e22e">Gosched&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;blockquote>
+&lt;p>add_amd.s&lt;/p></description></item><item><title>从全局/本P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</link><pubDate>Mon, 02 Mar 2020 13:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/</guid><description>&lt;h1 id="从本地队列或全局队列获取goroutine">
  从本地队列或全局队列获取goroutine
  &lt;a class="anchor" href="#%e4%bb%8e%e6%9c%ac%e5%9c%b0%e9%98%9f%e5%88%97%e6%88%96%e5%85%a8%e5%b1%80%e9%98%9f%e5%88%97%e8%8e%b7%e5%8f%96goroutine">#&lt;/a>
 &lt;/h1>
@@ -105,7 +203,12 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">execute&lt;/span>(&lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">inheritTime&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>schedule函数按顺序分三步来分别来获取可运行的Goroutine: 全局G队列，本地G队列和其他P上面的G队列
+&lt;ul>
+&lt;li>
+&lt;blockquote>
+&lt;p>从全局运行G队列中寻找Goroutine: 因为全局上面拿Goroutine是需要加锁的,需尽量少操作全局队列,所以当一个P调度次数是61的倍数之后且全局的Goroutine队列不为空，才尝试在全局上寻找&lt;/p></description></item><item><title>被动调度</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</link><pubDate>Wed, 15 Apr 2020 11:33:07 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/</guid><description>&lt;h1 id="goroutine被动调度">
  goroutine被动调度
  &lt;a class="anchor" href="#goroutine%e8%a2%ab%e5%8a%a8%e8%b0%83%e5%ba%a6">#&lt;/a>
 &lt;/h1>
@@ -162,7 +265,28 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">wg&lt;/span>.&lt;span style="color:#a6e22e">Wait&lt;/span>()
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">LoadInt32&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">n&lt;/span>)) &lt;span style="color:#75715e">// 1
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>从其他P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</link><pubDate>Sun, 08 Mar 2020 10:05:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</guid><description>&lt;h1 id="从其他队列盗取goroutine">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+ &lt;/div>
+
+ &lt;div class="flex-even markdown-inner">
+ &lt;!-- magic separator, between columns -->
+&lt;p align="middle">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220624235343.png" width = "40%" height="30%" alt="进入睡眠">
+&lt;/p>
+
+ &lt;/div>
+
+&lt;/div>
+
+&lt;h3 id="gdb调试前准备">
+ gdb调试前准备
+ &lt;a class="anchor" href="#gdb%e8%b0%83%e8%af%95%e5%89%8d%e5%87%86%e5%a4%87">#&lt;/a>
+&lt;/h3>
+&lt;h4 id="编译程序">
+ 编译程序
+ &lt;a class="anchor" href="#%e7%bc%96%e8%af%91%e7%a8%8b%e5%ba%8f">#&lt;/a>
+&lt;/h4>
+&lt;p>编译一下源代码: &lt;code>go build -gcflags &amp;quot;-N -l&amp;quot; -o test .&lt;/code>.&lt;/p></description></item><item><title>从其他P队列</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</link><pubDate>Sun, 08 Mar 2020 10:05:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/</guid><description>&lt;h1 id="从其他队列盗取goroutine">
  从其他队列盗取goroutine
  &lt;a class="anchor" href="#%e4%bb%8e%e5%85%b6%e4%bb%96%e9%98%9f%e5%88%97%e7%9b%97%e5%8f%96goroutine">#&lt;/a>
 &lt;/h1>
@@ -315,7 +439,26 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">stopm&lt;/span>()
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">goto&lt;/span> &lt;span style="color:#a6e22e">top&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>伪寄存器与函数栈帧</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</guid><description>&lt;h1 id="伪寄存器--函数栈">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h3 id="随机遍历从其他的工作线程对应p上盗取g">
+ 随机遍历从其他的工作线程对应P上盗取G
+ &lt;a class="anchor" href="#%e9%9a%8f%e6%9c%ba%e9%81%8d%e5%8e%86%e4%bb%8e%e5%85%b6%e4%bb%96%e7%9a%84%e5%b7%a5%e4%bd%9c%e7%ba%bf%e7%a8%8b%e5%af%b9%e5%ba%94p%e4%b8%8a%e7%9b%97%e5%8f%96g">#&lt;/a>
+&lt;/h3>
+&lt;ol>
+&lt;li>尽量减少M的自旋状态时间,只有在盗取的时候才把spinning标志位设为true,盗取退出后把spinning标志位重新设置为false,&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> !&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">_g_&lt;/span>.&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">spinning&lt;/span> = &lt;span style="color:#66d9ef">true&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Xadd&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ol start="2">
+&lt;li>随机遍历全局P中的P,如果有goroutines,就偷盗一半来运行.&lt;/li>
+&lt;/ol>
+&lt;h3 id="工作线程进入睡眠">
+ 工作线程进入睡眠
+ &lt;a class="anchor" href="#%e5%b7%a5%e4%bd%9c%e7%ba%bf%e7%a8%8b%e8%bf%9b%e5%85%a5%e7%9d%a1%e7%9c%a0">#&lt;/a>
+&lt;/h3>
+&lt;blockquote>
+&lt;p>src/runtime/proc.go:1910&lt;/p></description></item><item><title>伪寄存器与函数栈帧</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/</guid><description>&lt;h1 id="伪寄存器--函数栈">
  伪寄存器 &amp;amp; 函数栈
  &lt;a class="anchor" href="#%e4%bc%aa%e5%af%84%e5%ad%98%e5%99%a8--%e5%87%bd%e6%95%b0%e6%a0%88">#&lt;/a>
 &lt;/h1>
@@ -328,7 +471,17 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">PC&lt;/span>: &lt;span style="color:#a6e22e">Program&lt;/span> &lt;span style="color:#a6e22e">counter&lt;/span>: &lt;span style="color:#a6e22e">jumps&lt;/span> &lt;span style="color:#a6e22e">and&lt;/span> &lt;span style="color:#a6e22e">branches&lt;/span>.
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">SB&lt;/span>: &lt;span style="color:#a6e22e">Static&lt;/span> &lt;span style="color:#a6e22e">base&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">global&lt;/span> &lt;span style="color:#a6e22e">symbols&lt;/span>.
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">SP&lt;/span>: &lt;span style="color:#a6e22e">Stack&lt;/span> &lt;span style="color:#a6e22e">pointer&lt;/span>: &lt;span style="color:#a6e22e">top&lt;/span> &lt;span style="color:#a6e22e">of&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span>.
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>类汇编</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</guid><description>&lt;h2 id="golang类汇编指令">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>下面我们来翻译一下
+ &lt;a href="https://golang.org/doc/asm#symbols">官网&lt;sup>1&lt;/sup>&lt;/a>的对他们的解释，然后做一个总结,方便理解。&lt;/p>
+&lt;h3 id="fp">
+ FP
+ &lt;a class="anchor" href="#fp">#&lt;/a>
+&lt;/h3>
+&lt;blockquote>
+&lt;p>FP伪寄存器是一个用于引用&lt;strong>函数参数&lt;/strong>的虚拟帧指针。编译器维护一个虚拟帧指针，并将堆栈上的参数引用为该伪寄存器的偏移量。因此0(FP)是函数的第一个参数，8(FP)是第二个参数(在64位机器上)，以此类推。但是，当以这种方式引用一个函数参数时，有必要将名称放在开头，如first_arg+0(FP)和second_arg+8(FP)。(偏移量的含义(从帧指针出发的偏移量)与它在SB中的使用不同，在SB中，它是从符号出发的偏移量。) 汇编器强制执行这个约定，拒绝普通的0(FP)和8(FP)。实际的名称在语义上是不相关的，但应该用来记录参数的名称。值得强调的是，FP始终是一个伪寄存器，而不是硬件寄存器，即使在具有硬件帧指针的架构上也是如此。&lt;/p>
+&lt;/blockquote>
+&lt;blockquote>
+&lt;p>The FP pseudo-register is a virtual frame pointer used to refer to function arguments. The compilers maintain a virtual frame pointer and refer to the arguments on the stack as offsets from that pseudo-register. Thus 0(FP) is the first argument to the function, 8(FP) is the second (on a 64-bit machine), and so on. However, when referring to a function argument this way, it is necessary to place a name at the beginning, as in first_arg+0(FP) and second_arg+8(FP). (The meaning of the offset—offset from the frame pointer—distinct from its use with SB, where it is an offset from the symbol.) The assembler enforces this convention, rejecting plain 0(FP) and 8(FP). The actual name is semantically irrelevant but should be used to document the argument&amp;rsquo;s name. It is worth stressing that FP is always a pseudo-register, not a hardware register, even on architectures with a hardware frame pointer.&lt;/p></description></item><item><title>类汇编</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</link><pubDate>Thu, 28 Feb 2019 15:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/</guid><description>&lt;h2 id="golang类汇编指令">
  golang类汇编指令
  &lt;a class="anchor" href="#golang%e7%b1%bb%e6%b1%87%e7%bc%96%e6%8c%87%e4%bb%a4">#&lt;/a>
 &lt;/h2>
@@ -349,7 +502,35 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span>	&lt;span style="color:#ae81ff">8&lt;/span>(&lt;span style="color:#66d9ef">SP&lt;/span>), &lt;span style="color:#66d9ef">AX&lt;/span>	&lt;span style="color:#75715e"># f&amp;#39;s caller&amp;#39;s PC
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span>	&lt;span style="color:#66d9ef">AX&lt;/span>, (&lt;span style="color:#66d9ef">m_morebuf&lt;/span>&lt;span style="color:#960050;background-color:#1e0010">+&lt;/span>&lt;span style="color:#66d9ef">gobuf_pc&lt;/span>)(&lt;span style="color:#66d9ef">BX&lt;/span>)
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>代码执行过久</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</guid><description>&lt;h1 id="执行太久需要抢占">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">&lt;code class="language-golang" data-lang="golang">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">m&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">g0&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#75715e">// goroutine with scheduling stack
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">morebuf&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span> &lt;span style="color:#75715e">// gobuf arg to morestack //-----------morebuf-------------//
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">divmod&lt;/span> &lt;span style="color:#66d9ef">uint32&lt;/span> &lt;span style="color:#75715e">// div/mod denominator for arm - known to liblink
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// The offsets of sp, pc, and g are known to (hard-coded in) libmach.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">//
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// ctxt is unusual with respect to GC: it may be a
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// heap-allocated funcval, so GC needs to track it, but it
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// needs to be set and cleared from assembly, where it&amp;#39;s
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// difficult to have write barriers. However, ctxt is really a
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// saved, live register, and we only ever exchange it between
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// the real register and the gobuf. Hence, we treat it as a
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// root during stack scanning, which means assembly that saves
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// and restores it doesn&amp;#39;t need write barriers. It&amp;#39;s still
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// typed as a pointer so that any other writes from Go get
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// write barriers.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">sp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>	&lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// &amp;lt;&amp;lt;&amp;lt;--- 
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#a6e22e">guintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ctxt&lt;/span> &lt;span style="color:#a6e22e">unsafe&lt;/span>.&lt;span style="color:#a6e22e">Pointer&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ret&lt;/span> &lt;span style="color:#a6e22e">sys&lt;/span>.&lt;span style="color:#a6e22e">Uintreg&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lr&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">bp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// for GOEXPERIMENT=framepointer
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+&lt;p>我们从这个&lt;code>m_morebuf+gobuf_pc&lt;/code>就知道指的是这个m结构体中的morebuf结构体字段中的pc值。&lt;/p></description></item><item><title>代码执行过久</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</link><pubDate>Mon, 04 May 2020 12:35:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/</guid><description>&lt;h1 id="执行太久需要抢占">
  执行太久需要抢占
  &lt;a class="anchor" href="#%e6%89%a7%e8%a1%8c%e5%a4%aa%e4%b9%85%e9%9c%80%e8%a6%81%e6%8a%a2%e5%8d%a0">#&lt;/a>
 &lt;/h1>
@@ -389,7 +570,20 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">gp&lt;/span>.&lt;span style="color:#a6e22e">stackguard0&lt;/span> = &lt;span style="color:#a6e22e">stackPreempt&lt;/span> &lt;span style="color:#75715e">//stackguard0==很大的数; 使被抢占的goroutine;在进行函数调用会去检查栈溢出;去处理抢占请求
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#66d9ef">true&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>&lt;h1 id="进入main函数前的初始化">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="触发抢占">
+ 触发抢占
+ &lt;a class="anchor" href="#%e8%a7%a6%e5%8f%91%e6%8a%a2%e5%8d%a0">#&lt;/a>
+&lt;/h2>
+&lt;p>通过preemptone函数设置抢占后，我们继续来看实际触发抢占的，在前文我们讲述了编译器会在函数的头尾部分添加额外的汇编：
+
+
+
+ 
+
+&lt;a href="https://zput.github.io/go-goroutine/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/#%e6%b7%bb%e5%8a%a0%e6%b1%87%e7%bc%96" class="book-btn">
+ 编译器加的函数头的部分
+&lt;/a>
+&lt;/p></description></item><item><title>初始化</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</link><pubDate>Mon, 20 Jan 2020 10:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/</guid><description>&lt;h1 id="进入main函数前的初始化">
  进入main函数前的初始化
  &lt;a class="anchor" href="#%e8%bf%9b%e5%85%a5main%e5%87%bd%e6%95%b0%e5%89%8d%e7%9a%84%e5%88%9d%e5%a7%8b%e5%8c%96">#&lt;/a>
 &lt;/h1>
@@ -414,7 +608,82 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">ADDQ&lt;/span> &lt;span style="color:#a6e22e">BP&lt;/span>, &lt;span style="color:#a6e22e">BX&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">MOVQ&lt;/span> &lt;span style="color:#a6e22e">BX&lt;/span>, &lt;span style="color:#a6e22e">ret&lt;/span>&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#ae81ff">16&lt;/span>(&lt;span style="color:#a6e22e">FP&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">RET&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>底层重要结构</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</guid><description>&lt;p>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>编译一下源代码: &lt;code>go build -gcflags &amp;quot;-N -l&amp;quot; -o test .&lt;/code>.&lt;/p>
+&lt;h2 id="程序加载到内存入口">
+ 程序加载到内存入口
+ &lt;a class="anchor" href="#%e7%a8%8b%e5%ba%8f%e5%8a%a0%e8%bd%bd%e5%88%b0%e5%86%85%e5%ad%98%e5%85%a5%e5%8f%a3">#&lt;/a>
+&lt;/h2>
+&lt;p>
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20220622230646.png" alt="20220622230646" />&lt;/p>
+
+&lt;div class="book-expand">
+ &lt;label>
+ &lt;div class="book-expand-head flex justify-between">
+ &lt;span>Expand&lt;/span>
+ &lt;span>↕&lt;/span>
+ &lt;/div>
+ &lt;input type="checkbox" class="hidden" />
+ &lt;div class="book-expand-content markdown-inner">
+ &lt;pre tabindex="0">&lt;code>(gdb) info files
+Symbols from &amp;#34;/tmp/kubernets/test&amp;#34;.
+Local exec file:
+	`/tmp/kubernets/test&amp;#39;, file type elf64-x86-64.
+	Entry point: 0x454e00
+	0x0000000000401000 - 0x000000000048cfd3 is .text
+	0x000000000048d000 - 0x00000000004dc550 is .rodata
+	0x00000000004dc720 - 0x00000000004dd38c is .typelink
+	0x00000000004dd390 - 0x00000000004dd3e0 is .itablink
+	0x00000000004dd3e0 - 0x00000000004dd3e0 is .gosymtab
+	0x00000000004dd3e0 - 0x0000000000548adf is .gopclntab
+	0x0000000000549000 - 0x0000000000549020 is .go.buildinfo
+	0x0000000000549020 - 0x0000000000556118 is .noptrdata
+	0x0000000000556120 - 0x000000000055d110 is .data
+	0x000000000055d120 - 0x0000000000578990 is .bss
+	0x00000000005789a0 - 0x000000000057b108 is .noptrbss
+	0x0000000000400f9c - 0x0000000000401000 is .note.go.buildid
+(gdb) b *0x454e00
+Breakpoint 1 at 0x454e00: file /usr/lib/golang/src/runtime/rt0_linux_amd64.s, line 8. //跳到这个文件来了
+(gdb) run
+Starting program: /tmp/kubernets/test
+
+Breakpoint 1, _rt0_amd64_linux () at /usr/lib/golang/src/runtime/rt0_linux_amd64.s:8 //跳到这个文件来了
+8		JMP	_rt0_amd64(SB)
+
+(gdb) info registers bp sp
+bp 0x0	0
+sp 0x7fffffffe4d0	0x7fffffffe4d0
+
+(gdb) next
+16		LEAQ	8(SP), SI	// argv
+(gdb) list
+11	// internal linking. This is the entry point for the program from the
+12	// kernel for an ordinary -buildmode=exe program. The stack holds the
+13	// number of arguments and the C-style argv.
+14	TEXT _rt0_amd64(SB),NOSPLIT,$-8
+15		MOVQ	0(SP), DI	// argc
+16		LEAQ	8(SP), SI	// argv
+17		JMP	runtime·rt0_go(SB)
+(gdb) next
+runtime.rt0_go () at /usr/lib/golang/src/runtime/asm_amd64.s:89 //跳到这个文件来了
+89		MOVQ	DI, AX		// argc
+(gdb) list
+84	DATA _rt0_amd64_lib_argv&amp;lt;&amp;gt;(SB)/8, $0
+85	GLOBL _rt0_amd64_lib_argv&amp;lt;&amp;gt;(SB),NOPTR, $8
+86
+87	TEXT runtime·rt0_go(SB),NOSPLIT,$0
+88		// copy arguments forward on an even stack
+89		MOVQ	DI, AX		// argc
+90		MOVQ	SI, BX		// argv
+91		SUBQ	$(4*8+7), SP		// 2args 2auto
+92		ANDQ	$~15, SP
+93		MOVQ	AX, 16(SP)
+&lt;/code>&lt;/pre>
+ &lt;/div>
+ &lt;/label>
+&lt;/div>
+
+&lt;p>从上面的调试来看,最终到到达了&lt;code>src/runtime/asm_amd64.s:89&lt;/code>的
+ &lt;a href="https://github.com/golang/go/blob/93810ac1f4574e1e2a79ea156781bafaf8b8ebe0/src/runtime/asm_amd64.s#L87">runtime.rt0_go&lt;/a>函数.&lt;/p></description></item><item><title>底层重要结构</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</link><pubDate>Sun, 20 Jan 2019 09:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/</guid><description>&lt;p>
  &lt;a href="https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html">https://blog.tianfeiyu.com/source-code-reading-notes/go/golang_gpm.html&lt;/a>&lt;/p>
 &lt;h1 id="g结构">
  g结构
@@ -452,7 +721,33 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lr&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">bp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// for GOEXPERIMENT=framepointer ------------------------here
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>退出</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</link><pubDate>Mon, 10 Feb 2020 10:09:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</guid><description>&lt;h1 id="goroutine退出过程">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h1 id="m结构">
+ m结构
+ &lt;a class="anchor" href="#m%e7%bb%93%e6%9e%84">#&lt;/a>
+&lt;/h1>
+&lt;p>
+ &lt;a href="https://github.com/golang/go/blob/release-branch.go1.18/src/runtime/runtime2.go#L513">m&lt;/a>&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">m&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">g0&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#75715e">// goroutine with scheduling stack
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">morebuf&lt;/span> &lt;span style="color:#a6e22e">gobuf&lt;/span> &lt;span style="color:#75715e">// gobuf arg to morestack
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">divmod&lt;/span> &lt;span style="color:#66d9ef">uint32&lt;/span> &lt;span style="color:#75715e">// div/mod denominator for arm - known to liblink
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// Fields not known to debuggers.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">procid&lt;/span> &lt;span style="color:#66d9ef">uint64&lt;/span> &lt;span style="color:#75715e">// for debuggers, but offset not hard-coded
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">gsignal&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#75715e">// signal-handling g
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">goSigStack&lt;/span> &lt;span style="color:#a6e22e">gsignalStack&lt;/span> &lt;span style="color:#75715e">// Go-allocated signal handling stack
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">sigmask&lt;/span> &lt;span style="color:#a6e22e">sigset&lt;/span> &lt;span style="color:#75715e">// storage for saved signal mask
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">tls&lt;/span> [&lt;span style="color:#ae81ff">6&lt;/span>]&lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// thread-local storage (for x86 extern register)
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">mstartfn&lt;/span> &lt;span style="color:#66d9ef">func&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">curg&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#75715e">// current running goroutine
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="m的创建与销毁">
+ M的创建与销毁
+ &lt;a class="anchor" href="#m%e7%9a%84%e5%88%9b%e5%bb%ba%e4%b8%8e%e9%94%80%e6%af%81">#&lt;/a>
+&lt;/h2>
+&lt;p>M 是 runtime 中的一个对象，代表线程，每创建一个 M 对象同时会创建一个线程与 M 进行绑定，线程的新建是通过执行 clone() 系统调用创建出来的。runtime 中定义 M 的最大数量为 10000 个，用户可以通过debug.SetMaxThreads(n) 进行调整。&lt;/p></description></item><item><title>退出</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</link><pubDate>Mon, 10 Feb 2020 10:09:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/3_exit_goroutine/</guid><description>&lt;h1 id="goroutine退出过程">
  goroutine退出过程
  &lt;a class="anchor" href="#goroutine%e9%80%80%e5%87%ba%e8%bf%87%e7%a8%8b">#&lt;/a>
 &lt;/h1>
@@ -489,7 +784,14 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">x&lt;/span> = &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#75715e">// 无效指针代码，会导致程序退出
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	}
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>陷入系统调用</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</link><pubDate>Tue, 23 Jun 2020 20:50:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</guid><description>&lt;h1 id="执行系统调用抢占">
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>&lt;code>exit(0)&lt;/code>函数与最底部的&lt;code>for&lt;/code>循环会让程序不可能回到caller层&lt;/li>
+&lt;/ul>
+&lt;h2 id="非main-goroutine退出">
+ 非main goroutine退出
+ &lt;a class="anchor" href="#%e9%9d%9emain-goroutine%e9%80%80%e5%87%ba">#&lt;/a>
+&lt;/h2>
+&lt;p>我们首先来gdb调试一下这个程序&lt;/p></description></item><item><title>陷入系统调用</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</link><pubDate>Tue, 23 Jun 2020 20:50:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/</guid><description>&lt;h1 id="执行系统调用抢占">
  执行系统调用抢占
  &lt;a class="anchor" href="#%e6%89%a7%e8%a1%8c%e7%b3%bb%e7%bb%9f%e8%b0%83%e7%94%a8%e6%8a%a2%e5%8d%a0">#&lt;/a>
 &lt;/h1>
@@ -569,7 +871,80 @@
 &lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">58
 &lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">59
 &lt;/span>&lt;span style="white-space:pre;-webkit-user-select:none;user-select:none;margin-right:0.4em;padding:0 0.4em 0 0.4em;color:#7f7f7f">60
-&lt;/span>&lt;/code>&lt;/pr</description></item><item><title>调度到达时机</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/</link><pubDate>Thu, 02 Apr 2020 11:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/</guid><description>&lt;h1 id="程序到达调度的时机">
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td style="vertical-align:top;padding:0;margin:0;border:0;;width:100%">
+&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;display:grid;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Hands off P from syscall or locked M.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">// Always runs without a P, so write barriers are not allowed.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">//go:nowritebarrierrec
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">handoffp&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">p&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// handoffp must start an M in any situation where
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// findrunnable would return a G to run on _p_.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// if it has local work, start it straight away
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// 如果本地P中运行队列不为空/全局运行队列不为空就调用startm函数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> !&lt;span style="color:#a6e22e">runqempty&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>) &lt;span style="color:#f92672">||&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">runqsize&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#a6e22e">startm&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>) &lt;span style="color:#75715e">// 这个我们前面讨论过,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#66d9ef">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// if it has GC work, start it straight away 
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// 如果有GC任务，就调用startm函数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">gcBlackenEnabled&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#a6e22e">gcMarkWorkAvailable&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#a6e22e">startm&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// no local work, check that there are no spinning/idle M&amp;#39;s,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// otherwise our help is not required
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// 没有自旋状态的M,且没有空闲的P(所有其它p都在运行goroutine,所有的M都在运行/睡眠)
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// 只能说明系统比较忙， ??? 需要启动m ???
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Load&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>)&lt;span style="color:#f92672">+&lt;/span>&lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Load&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">npidle&lt;/span>) &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Cas&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">nmspinning&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>) { &lt;span style="color:#75715e">// TODO: fast atomic
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">startm&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#66d9ef">true&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">lock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">gcwaiting&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">_p_&lt;/span>.&lt;span style="color:#a6e22e">status&lt;/span> = &lt;span style="color:#a6e22e">_Pgcstop&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">stopwait&lt;/span>&lt;span style="color:#f92672">--&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">stopwait&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#a6e22e">notewakeup&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">stopnote&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">_p_&lt;/span>.&lt;span style="color:#a6e22e">runSafePointFn&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Cas&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">_p_&lt;/span>.&lt;span style="color:#a6e22e">runSafePointFn&lt;/span>, &lt;span style="color:#ae81ff">1&lt;/span>, &lt;span style="color:#ae81ff">0&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">safePointFn&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">safePointWait&lt;/span>&lt;span style="color:#f92672">--&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">safePointWait&lt;/span> &lt;span style="color:#f92672">==&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>			&lt;span style="color:#a6e22e">notewakeup&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">safePointNote&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">runqsize&lt;/span> &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> { &lt;span style="color:#75715e">// 全局运行队列大小不是0; 说明Goroutine需要运行,有工作要做.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>		&lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#a6e22e">startm&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#75715e">// If this is the last running P and nobody is polling network,
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// need to wakeup another M to poll network.
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#75715e">// 如果只有当前P还在运行;需要唤醒别的M来轮询网络
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#66d9ef">if&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">npidle&lt;/span> &lt;span style="color:#f92672">==&lt;/span> uint32(&lt;span style="color:#a6e22e">gomaxprocs&lt;/span>&lt;span style="color:#f92672">-&lt;/span>&lt;span style="color:#ae81ff">1&lt;/span>) &lt;span style="color:#f92672">&amp;amp;&amp;amp;&lt;/span> &lt;span style="color:#a6e22e">atomic&lt;/span>.&lt;span style="color:#a6e22e">Load64&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lastpoll&lt;/span>) &lt;span style="color:#f92672">!=&lt;/span> &lt;span style="color:#ae81ff">0&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex; background-color:#3c3d38">&lt;span>		&lt;span style="color:#a6e22e">startm&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#66d9ef">false&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>		&lt;span style="color:#66d9ef">return&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>	&lt;span style="color:#a6e22e">pidleput&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>) &lt;span style="color:#75715e">// 无事可做，把p放入全局空闲队列
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>	&lt;span style="color:#a6e22e">unlock&lt;/span>(&lt;span style="color:#f92672">&amp;amp;&lt;/span>&lt;span style="color:#a6e22e">sched&lt;/span>.&lt;span style="color:#a6e22e">lock&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>
+&lt;p>其中startm函数我们前面介绍过 
+
+
+
+ 
+
+&lt;a href="https://zput.github.io/go-goroutine/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/#startm" class="book-btn ...">
+ startm
+&lt;/a>
+ ：&lt;/p></description></item><item><title>调度到达时机</title><link>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/</link><pubDate>Thu, 02 Apr 2020 11:03:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/</guid><description>&lt;h1 id="程序到达调度的时机">
  程序到达调度的时机
  &lt;a class="anchor" href="#%e7%a8%8b%e5%ba%8f%e5%88%b0%e8%be%be%e8%b0%83%e5%ba%a6%e7%9a%84%e6%97%b6%e6%9c%ba">#&lt;/a>
 &lt;/h1>
@@ -593,4 +968,23 @@
 &lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;main is scheduled!&amp;#34;&lt;/span>)
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ul>
+&lt;li>将不会打印[&amp;ldquo;main is scheduled!&amp;rdquo;]&lt;/li>
+&lt;/ul>
+&lt;h2 id="调度时机">
+ 调度时机
+ &lt;a class="anchor" href="#%e8%b0%83%e5%ba%a6%e6%97%b6%e6%9c%ba">#&lt;/a>
+&lt;/h2>
+&lt;p>调度时机: 主要是什么时候发生调度:&lt;/p>
+&lt;ul>
+&lt;li>主动调度&lt;/li>
+&lt;li>被动调度&lt;/li>
+&lt;li>剥夺调度
+&lt;ul>
+&lt;li>运行时间过长&lt;/li>
+&lt;li>系统调用被剥夺P&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/goroutine%E8%B0%83%E5%BA%A6.png" alt="goroutine调度时机总结" />&lt;/p></description></item></channel></rss>

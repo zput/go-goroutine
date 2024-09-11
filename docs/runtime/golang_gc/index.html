@@ -29,14 +29,74 @@ golang支持垃圾自动回收，主要是降低人的心智负担，从堆（he
   2.1.1 双色标记法
   #
 
-根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。"><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/golang_gc/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="垃圾回收"><meta property="og:description" content=" 1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
+根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。
+双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。
+双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。
+双色标记法只能描述对象节点自身是否扫描，而不能描述子节点是否完成。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。
+
+由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。
+
+
+  2.1.2 三色标记法
+  #
+
+全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
+
+黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。
+灰色：基于当前节点展开的追踪还未完成。
+白色：当追踪完成后，代表可回收的对象。
+
+问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。
+
+  
+
+原因：
+并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。
+
+当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)
+
+处理措施：
+有两种方法来避免:
+
+强三色：黑色对象只能引用灰色对象。
+弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态.
+
+引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。
+分为两种，一种是插入写屏障，一种是删除写屏障。
+
+插入写屏障
+
+writePointer(slot, ptr): // ⚠️:slot现在指向的还是旧对象
+    shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色
+    *slot = ptr
+
+删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。
+
+writePointer(slot, ptr) // ⚠️:slot现在指向的还是旧对象
+  shade(*slot) //shade函数尝试改变指针的颜色-->改变(*slot)的颜色--->注意这个是*slot(旧对象),slot保存着它原先的保存的地址。
+  *slot = ptr
+
+引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为忽略协程栈上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。"><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/golang_gc/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="垃圾回收"><meta property="og:description" content=" 1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
 全局数据区 栈区 堆区 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。
 栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
 堆区:主要用于程序运行阶段的动态分配。
 内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。
 2 定义 # 垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：垃圾识别和垃圾清理。
 golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。
-2.1 垃圾识别 # 2.1.1 双色标记法 # 根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>垃圾回收 | go调度源码分析</title>
+2.1 垃圾识别 # 2.1.1 双色标记法 # 根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。
+双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。
+双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。
+双色标记法只能描述对象节点自身是否扫描，而不能描述子节点是否完成。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。
+由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。
+2.1.2 三色标记法 # 全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
+黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。 灰色：基于当前节点展开的追踪还未完成。 白色：当追踪完成后，代表可回收的对象。 问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。
+原因： 并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。
+当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)
+处理措施：
+有两种方法来避免:
+强三色：黑色对象只能引用灰色对象。 弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态. 引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。
+分为两种，一种是插入写屏障，一种是删除写屏障。
+插入写屏障 writePointer(slot, ptr): // ⚠️:slot现在指向的还是旧对象 shade(ptr) //shade函数尝试改变指针的颜色-->改变ptr的颜色 *slot = ptr 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。 writePointer(slot, ptr) // ⚠️:slot现在指向的还是旧对象 shade(*slot) //shade函数尝试改变指针的颜色-->改变(*slot)的颜色--->注意这个是*slot(旧对象),slot保存着它原先的保存的地址。 *slot = ptr 引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为忽略协程栈上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>垃圾回收 | go调度源码分析</title>
 <link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.c6f146e119ed38047ecf17ab29f9ae84e568069696e6d4c10599847f2476b14a.js integrity="sha256-xvFG4RntOAR+zxerKfmuhOVoBpaW5tTBBZmEfyR2sUo=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
 <span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/ class=active>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-740657f38f0c4de9a986bda642ff0388 class=toggle>

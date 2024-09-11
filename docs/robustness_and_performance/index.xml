@@ -89,4 +89,14 @@
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>declaration, and no test or benchmark functions.
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>
 &lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>See the documentation of the testing package &lt;span style="color:#66d9ef">for&lt;/span> more information.
-&lt;/span>&lt;/span>&lt;/code>&lt;/pr</description></item></channel></rss>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>
+ &lt;/div>
+ &lt;/label>
+&lt;/div>
+
+&lt;h2 id="go-test命令">
+ go test命令
+ &lt;a class="anchor" href="#go-test%e5%91%bd%e4%bb%a4">#&lt;/a>
+&lt;/h2>
+&lt;blockquote>
+&lt;p>测试结果输出结果：&lt;code>test status ('ok' or 'FAIL')&lt;/code> &lt;code>package name&lt;/code> &lt;code>elapsed time&lt;/code>&lt;/p></description></item></channel></rss>

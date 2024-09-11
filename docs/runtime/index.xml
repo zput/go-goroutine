@@ -120,7 +120,124 @@
 &lt;/h1>
 &lt;ol>
 &lt;li>
-&lt;p>没有内存管理，每次申请都直接向操作系统申请&lt;/p></description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>&lt;h1 id="1-前言变量的存放区">
+&lt;p>没有内存管理，每次申请都直接向操作系统申请&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>通过程序级别的内存管理&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;p>因程序运行起来所需要分配的内存块有大有小，而分散的、大小不一的碎片化内存，一方面会降低内存的使用率，另一方面要找到大小合适的内存块的代价会因碎片化而增加，为降低碎片化内存给程序性能造成的不良影响，&lt;/p>
+&lt;h2 id="31-tcmalloc">
+ 3.1 Tcmalloc
+ &lt;a class="anchor" href="#31-tcmalloc">#&lt;/a>
+&lt;/h2>
+&lt;p>golang采用了类似谷歌的Tcmalloc算法来解决碎片化问题：&lt;/p>
+&lt;blockquote>
+&lt;p>Tcmalloc：&lt;/p>
+&lt;ol>
+&lt;li>按照一组预置的大小规格把内存页划分成块，相同的块串联在一个空闲链表中。&lt;/li>
+&lt;li>程序申请内存时，会先根据要申请的内存大小，找到最匹配的规格，然后从对应空闲链表中分配一个空闲块。&lt;/li>
+&lt;/ol>
+&lt;/blockquote>
+&lt;h1 id="4-golang内存管理">
+ 4 golang内存管理
+ &lt;a class="anchor" href="#4-golang%e5%86%85%e5%ad%98%e7%ae%a1%e7%90%86">#&lt;/a>
+&lt;/h1>
+&lt;h2 id="41-内存结构">
+ 4.1 内存结构
+ &lt;a class="anchor" href="#41-%e5%86%85%e5%ad%98%e7%bb%93%e6%9e%84">#&lt;/a>
+&lt;/h2>
+&lt;p>golang把内存大小分为四种级别，分别为:Arena, Page, Span，内存块。&lt;/p>
+&lt;blockquote>
+&lt;p>注：下文讨论的都是在amd64架构的Linux环境下.&lt;/p>
+&lt;/blockquote>
+&lt;ol>
+&lt;li>
+&lt;p>Arena：golang将堆地址空间划分为一个个arena区，arena区域起始地址定义在arenaBaseOffset，每个arena的大小是64MB，起始地址也对齐到64MB&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Page：每个arena包含8192个page，所以每个page大小为8KB。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Span：包含一个或多个页大小的内存。golang给出了67种预置的大小规格，最小8Byte，最大32KB，所以在划分整整齐齐的arena中，又会按需划分出不同的Span,每个Span包含一组连续的Page，&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;table>
+ &lt;thead>
+ &lt;tr>
+ &lt;th style="text-align: left">类别(class)&lt;/th>
+ &lt;th style="text-align: left">内存块对象大小(bytes/obj)&lt;/th>
+ &lt;th style="text-align: left">Span大小(bytes/span)&lt;/th>
+ &lt;th style="text-align: left">Span中内存块对象个数(objects)&lt;/th>
+ &lt;th style="text-align: left">尾部浪费(tail waste)&lt;/th>
+ &lt;th style="text-align: left">最大浪费百分比(max waste)&lt;/th>
+ &lt;/tr>
+ &lt;/thead>
+ &lt;tbody>
+ &lt;tr>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">8&lt;/td>
+ &lt;td style="text-align: left">8192&lt;/td>
+ &lt;td style="text-align: left">1024&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">87.50%&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">2&lt;/td>
+ &lt;td style="text-align: left">16&lt;/td>
+ &lt;td style="text-align: left">8192&lt;/td>
+ &lt;td style="text-align: left">512&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">43.75%&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">3&lt;/td>
+ &lt;td style="text-align: left">24&lt;/td>
+ &lt;td style="text-align: left">8192&lt;/td>
+ &lt;td style="text-align: left">341&lt;/td>
+ &lt;td style="text-align: left">8&lt;/td>
+ &lt;td style="text-align: left">29.24%&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">4&lt;/td>
+ &lt;td style="text-align: left">32&lt;/td>
+ &lt;td style="text-align: left">8192&lt;/td>
+ &lt;td style="text-align: left">256&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">21.88%&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">&amp;hellip;&lt;/td>
+ &lt;td style="text-align: left">&lt;/td>
+ &lt;td style="text-align: left">&lt;/td>
+ &lt;td style="text-align: left">&lt;/td>
+ &lt;td style="text-align: left">&lt;/td>
+ &lt;td style="text-align: left">&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">66&lt;/td>
+ &lt;td style="text-align: left">28672&lt;/td>
+ &lt;td style="text-align: left">57344&lt;/td>
+ &lt;td style="text-align: left">2&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">4.91%&lt;/td>
+ &lt;/tr>
+ &lt;tr>
+ &lt;td style="text-align: left">67&lt;/td>
+ &lt;td style="text-align: left">32768&lt;/td>
+ &lt;td style="text-align: left">32768&lt;/td>
+ &lt;td style="text-align: left">1&lt;/td>
+ &lt;td style="text-align: left">0&lt;/td>
+ &lt;td style="text-align: left">12.50%&lt;/td>
+ &lt;/tr>
+ &lt;/tbody>
+&lt;/table>
+&lt;ol start="4">
+&lt;li>内存块：并且按照特定规格划，在Span中分成了等大的内存块。&lt;/li>
+&lt;/ol>
+&lt;p align="left">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240601173403.png" width = "50%" height="50%" alt="效果图">
+&lt;/p></description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>&lt;h1 id="1-前言变量的存放区">
  1 前言：变量的存放区
  &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80%e5%8f%98%e9%87%8f%e7%9a%84%e5%ad%98%e6%94%be%e5%8c%ba">#&lt;/a>
 &lt;/h1>
@@ -151,4 +268,51 @@
  2.1.1 双色标记法
  &lt;a class="anchor" href="#211-%e5%8f%8c%e8%89%b2%e6%a0%87%e8%ae%b0%e6%b3%95">#&lt;/a>
 &lt;/h3>
-&lt;p>根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。&lt;/p></description></item></channel></rss>
+&lt;p>根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。&lt;/p>
+&lt;p>双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。&lt;/p>
+&lt;p>双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。&lt;/p>
+&lt;p>双色标记法只能描述对象节点自身是否扫描，&lt;strong>而不能描述子节点是否完成&lt;/strong>。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。&lt;/p>
+&lt;blockquote>
+&lt;p>由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。&lt;/p>
+&lt;/blockquote>
+&lt;h3 id="212-三色标记法">
+ 2.1.2 三色标记法
+ &lt;a class="anchor" href="#212-%e4%b8%89%e8%89%b2%e6%a0%87%e8%ae%b0%e6%b3%95">#&lt;/a>
+&lt;/h3>
+&lt;p>全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。&lt;/p>
+&lt;ul>
+&lt;li>黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。&lt;/li>
+&lt;li>灰色：基于当前节点展开的追踪还未完成。&lt;/li>
+&lt;li>白色：当追踪完成后，代表可回收的对象。&lt;/li>
+&lt;/ul>
+&lt;p>问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。&lt;/p>
+&lt;p align="left">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240622204628.png" width = "50%" height="50%" alt="效果图">
+&lt;/p>
+&lt;p>原因：
+并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。&lt;/p>
+&lt;blockquote>
+&lt;p>当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)&lt;/p>
+&lt;/blockquote>
+&lt;p>处理措施：&lt;/p>
+&lt;p>有两种方法来避免:&lt;/p>
+&lt;ul>
+&lt;li>强三色：黑色对象只能引用灰色对象。&lt;/li>
+&lt;li>弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态.&lt;/li>
+&lt;/ul>
+&lt;p>引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。&lt;/p>
+&lt;p>分为两种，一种是插入写屏障，一种是删除写屏障。&lt;/p>
+&lt;ol>
+&lt;li>插入写屏障&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">writePointer&lt;/span>(&lt;span style="color:#a6e22e">slot&lt;/span>, &lt;span style="color:#a6e22e">ptr&lt;/span>): &lt;span style="color:#75715e">// ⚠️:slot现在指向的还是旧对象
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">shade&lt;/span>(&lt;span style="color:#a6e22e">ptr&lt;/span>) &lt;span style="color:#75715e">//shade函数尝试改变指针的颜色--&amp;gt;改变ptr的颜色
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">slot&lt;/span> = &lt;span style="color:#a6e22e">ptr&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ol start="2">
+&lt;li>删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">writePointer&lt;/span>(&lt;span style="color:#a6e22e">slot&lt;/span>, &lt;span style="color:#a6e22e">ptr&lt;/span>) &lt;span style="color:#75715e">// ⚠️:slot现在指向的还是旧对象
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">shade&lt;/span>(&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">slot&lt;/span>) &lt;span style="color:#75715e">//shade函数尝试改变指针的颜色--&amp;gt;改变(*slot)的颜色---&amp;gt;注意这个是*slot(旧对象),slot保存着它原先的保存的地址。
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">slot&lt;/span> = &lt;span style="color:#a6e22e">ptr&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;blockquote>
+&lt;p>引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为&lt;strong>忽略协程栈&lt;/strong>上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。&lt;/p></description></item></channel></rss>
