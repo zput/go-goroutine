@@ -1,90 +1,61 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;h1 id="golang-gmp概念">
- golang GMP概念
- &lt;a class="anchor" href="#golang-gmp%e6%a6%82%e5%bf%b5">#&lt;/a>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;h1 id="gmp模型结构体">
+ GMP模型结构体
+ &lt;a class="anchor" href="#gmp%e6%a8%a1%e5%9e%8b%e7%bb%93%e6%9e%84%e4%bd%93">#&lt;/a>
 &lt;/h1>
-&lt;ul>
-&lt;li>
-&lt;p>what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P&amp;quot;用来调度goruntine，被称为&amp;quot;GMP模型”。&lt;/p>
-&lt;ul>
-&lt;li>GMP
-&lt;ul>
-&lt;li>G:为了调度方便，保存寄存器，栈地址等-&amp;gt;&lt;code>对应cpu切换[1.cpu寄存器的值；2.stack地址]&lt;/code>&lt;/li>
-&lt;li>M:与系统线程一一对应&lt;/li>
-&lt;li>P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>
-&lt;p>why:&lt;/p>
-&lt;ul>
-&lt;li>
-&lt;p>单进程时代不需要调度器&lt;/p>
-&lt;ul>
-&lt;li>1.单一的执行流程，计算机只能一个任务一个任务处理。&lt;/li>
-&lt;li>2.进程阻塞所带来的CPU时间浪费。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>
-&lt;p>多进程/线程时代有了调度器需求&lt;/p>
-&lt;ul>
-&lt;li>1.解决了阻塞的问题&lt;/li>
-&lt;li>2.CPU有很大的一部分都被浪费在进程调度&lt;/li>
-&lt;li>设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>
-&lt;p>协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)&lt;/p>
-&lt;/li>
-&lt;/ul>
-&lt;blockquote>
-&lt;ul>
-&lt;li>为什么。
-&lt;ul>
-&lt;li>线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。&lt;/li>
-&lt;li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>如何进行调度。
-&lt;ul>
-&lt;li>一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。&lt;/li>
-&lt;li>另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。&lt;/li>
-&lt;li>M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>摆脱上下文(在这里P就是上下文)？
-&lt;ul>
-&lt;li>&lt;del>不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。&lt;/del>&lt;/li>
-&lt;li>以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;/blockquote>
-&lt;blockquote>
-&lt;ul>
-&lt;li>why:
-&lt;ul>
-&lt;li>threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.&lt;/li>
-&lt;li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>how:
-&lt;ul>
-&lt;li>One is N:1 where several userspace threads are run on one OS thread. This has the advantage of being very quick to context switch but cannot take advantage of multi-core systems.&lt;/li>
-&lt;li>Another is 1:1 where one thread of execution matches one OS thread. It takes advantage of all of the cores on the machine, but context switching is slow because it has to trap through the OS.&lt;/li>
-&lt;li>M:N scheduler. You get quick context switches and you take advantage of all the cores in your system. The main disadvantage of this approach is the complexity it adds to the scheduler.&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>get rid of contexts?
-&lt;ul>
-&lt;li>Not really. The reason we have contexts is so that we can hand them off to other threads if the running thread needs to block for some reason.&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;/blockquote>
-&lt;hr>
-&lt;blockquote>
-&lt;p>这个也就说明了&lt;code>N-M&lt;/code>的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。&lt;/p></description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
+&lt;p>在Go语言的运行时系统中，GMP模型（Goroutine, Machine, Processor）是用于调度和管理goroutine的核心概念。尽管它们各自只是普通的结构体，但它们协同工作构成了Go语言高效并发模型的基础。&lt;/p>
+&lt;h2 id="g结构体">
+ G结构体
+ &lt;a class="anchor" href="#g%e7%bb%93%e6%9e%84%e4%bd%93">#&lt;/a>
+&lt;/h2>
+&lt;p>g结构体代表一个goroutine，包含了栈、上下文信息以及其他状态信息。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">gopc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// 保存创建这个goroutine的代码位置。
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">startpc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// 保存goroutine绑定的函数的代码地址。
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> { &lt;span style="color:#75715e">// 保存goroutine在切换时的上下文信息，包括栈指针（sp）、程序计数器（pc）、基址指针（bp）。
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">sp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">bp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> }
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span> &lt;span style="color:#75715e">// 保存goroutine的栈信息。
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="go关键字绑定gopcstartpc">
+ go关键字绑定(gopc、startpc)
+ &lt;a class="anchor" href="#go%e5%85%b3%e9%94%ae%e5%ad%97%e7%bb%91%e5%ae%9agopcstartpc">#&lt;/a>
+&lt;/h2>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// 使用go 关键并发执行一个函数
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>()
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>(){
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;hello world&amp;#34;&lt;/span>)
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>先来看下上述简单例子，当你用go关键字执行一个函数(&lt;code>fn()&lt;/code>函数)，在底层会调用&lt;code>newproc&lt;/code>函数自动获取一个goroutine，并与待执行的函数(&lt;code>fn()&lt;/code>)进行绑定G。&lt;/p>
+&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">newproc&lt;/span>(&lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">funcval&lt;/span>) {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>() &lt;span style="color:#75715e">// 调用者的G
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getcallerpc&lt;/span>() &lt;span style="color:#75715e">// go关键字的代码位置(pc)
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">systemstack&lt;/span>(&lt;span style="color:#66d9ef">func&lt;/span>() {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">newg&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">newproc1&lt;/span>(&lt;span style="color:#a6e22e">fn&lt;/span>, &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">pc&lt;/span>) &lt;span style="color:#75715e">// 真正的绑定过程在这个函数中，绑定完后获得新G
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>().&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">p&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>() &lt;span style="color:#75715e">// 调用者的P
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">runqput&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#a6e22e">newg&lt;/span>, &lt;span style="color:#66d9ef">true&lt;/span>) &lt;span style="color:#75715e">// 新G放入本地队列，等待调度
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> })
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">newproc1&lt;/span>(&lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">funcval&lt;/span>, &lt;span style="color:#a6e22e">callergp&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span>, &lt;span style="color:#a6e22e">callerpc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>) &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span> {
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">gfget&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>) &lt;span style="color:#75715e">// 从G的闲置队列获取一个G
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span>.&lt;span style="color:#a6e22e">gopc&lt;/span> = &lt;span style="color:#a6e22e">callerpc&lt;/span> &lt;span style="color:#75715e">// **设置go关键字的位置**
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span>.&lt;span style="color:#a6e22e">startpc&lt;/span> = &lt;span style="color:#a6e22e">fn&lt;/span>.&lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#75715e">// **绑定待被执行的函数fn**
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
+&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span>
+&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p align="left">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240929131617.png" width = "50%" height="50%" alt="效果图">
+&lt;/p></description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
  1 前言
  &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80">#&lt;/a>
 &lt;/h1>
