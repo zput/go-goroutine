@@ -208,60 +208,51 @@
 &lt;ul>
 &lt;li>
 &lt;blockquote>
-&lt;p>从全局运行G队列中寻找Goroutine: 因为全局上面拿Goroutine是需要加锁的,需尽量少操作全局队列,所以当一个P调度次数是61的倍数之后且全局的Goroutine队列不为空，才尝试在全局上寻找&lt;/p></description></item><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;p>在Go语言的运行时系统中，GMP模型（Goroutine, Machine, Processor）是用于调度和管理goroutine的核心概念。尽管它们各自只是普通的结构体，但它们协同工作构成了Go语言高效并发模型的基础。&lt;/p>
-&lt;h2 id="1g结构体">
- 1.G结构体
- &lt;a class="anchor" href="#1g%e7%bb%93%e6%9e%84%e4%bd%93">#&lt;/a>
-&lt;/h2>
-&lt;p>g结构体代表一个goroutine，包含了栈、上下文信息以及其他状态信息。&lt;/p>
-&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">type&lt;/span> &lt;span style="color:#a6e22e">g&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> {
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">gopc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// 保存创建这个goroutine的代码位置。
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">startpc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span> &lt;span style="color:#75715e">// 保存goroutine绑定的函数的代码地址。
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">sched&lt;/span> &lt;span style="color:#66d9ef">struct&lt;/span> { &lt;span style="color:#75715e">// 保存goroutine在切换时的上下文信息，包括栈指针（sp）、程序计数器（pc）、基址指针（bp）。
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">sp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">bp&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> }
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span> &lt;span style="color:#a6e22e">stack&lt;/span> &lt;span style="color:#75715e">// 保存goroutine的栈信息。
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;h2 id="11-go关键字绑定gopcstartpc">
- 1.1 go关键字绑定(gopc、startpc)
- &lt;a class="anchor" href="#11-go%e5%85%b3%e9%94%ae%e5%ad%97%e7%bb%91%e5%ae%9agopcstartpc">#&lt;/a>
-&lt;/h2>
-&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">main&lt;/span>() {
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">// 使用go 关键并发执行一个函数
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">go&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>()
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">fn&lt;/span>(){
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">fmt&lt;/span>.&lt;span style="color:#a6e22e">Println&lt;/span>(&lt;span style="color:#e6db74">&amp;#34;hello world&amp;#34;&lt;/span>)
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p>先来看下上述简单例子，当你用go关键字执行一个函数(&lt;code>fn()&lt;/code>函数)，在底层会调用&lt;code>newproc&lt;/code>函数自动获取一个goroutine，并与待执行的函数(&lt;code>fn()&lt;/code>)进行绑定G。&lt;/p>
-&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">newproc&lt;/span>(&lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">funcval&lt;/span>) {
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">gp&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>() &lt;span style="color:#75715e">// 调用者的G
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">pc&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getcallerpc&lt;/span>() &lt;span style="color:#75715e">// go关键字的代码位置(pc)
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">systemstack&lt;/span>(&lt;span style="color:#66d9ef">func&lt;/span>() {
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#a6e22e">newg&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">newproc1&lt;/span>(&lt;span style="color:#a6e22e">fn&lt;/span>, &lt;span style="color:#a6e22e">gp&lt;/span>, &lt;span style="color:#a6e22e">pc&lt;/span>) &lt;span style="color:#75715e">// 真正的绑定过程在这个函数中，绑定完后获得新G
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">_p_&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">getg&lt;/span>().&lt;span style="color:#a6e22e">m&lt;/span>.&lt;span style="color:#a6e22e">p&lt;/span>.&lt;span style="color:#a6e22e">ptr&lt;/span>() &lt;span style="color:#75715e">// 调用者的P
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">runqput&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>, &lt;span style="color:#a6e22e">newg&lt;/span>, &lt;span style="color:#66d9ef">true&lt;/span>) &lt;span style="color:#75715e">// 新G放入本地队列，等待调度
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> })
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>}
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#66d9ef">func&lt;/span> &lt;span style="color:#a6e22e">newproc1&lt;/span>(&lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">funcval&lt;/span>, &lt;span style="color:#a6e22e">callergp&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span>, &lt;span style="color:#a6e22e">callerpc&lt;/span> &lt;span style="color:#66d9ef">uintptr&lt;/span>) &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">g&lt;/span> {
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span> &lt;span style="color:#f92672">:=&lt;/span> &lt;span style="color:#a6e22e">gfget&lt;/span>(&lt;span style="color:#a6e22e">_p_&lt;/span>) &lt;span style="color:#75715e">// 从G的闲置队列获取一个G
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span>.&lt;span style="color:#a6e22e">gopc&lt;/span> = &lt;span style="color:#a6e22e">callerpc&lt;/span> &lt;span style="color:#75715e">// **设置go关键字的位置**
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span>.&lt;span style="color:#a6e22e">startpc&lt;/span> = &lt;span style="color:#a6e22e">fn&lt;/span>.&lt;span style="color:#a6e22e">fn&lt;/span> &lt;span style="color:#75715e">// **绑定待被执行的函数fn**
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#75715e">//...
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#66d9ef">return&lt;/span> &lt;span style="color:#a6e22e">newg&lt;/span>
-&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span> }
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;p align="left">
- &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240929131617.png" width = "50%" height="50%" alt="效果图">
-&lt;/p></description></item><item><title>基本用法</title><link>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</guid><description>&lt;h2 id="数据结构">
+&lt;p>从全局运行G队列中寻找Goroutine: 因为全局上面拿Goroutine是需要加锁的,需尽量少操作全局队列,所以当一个P调度次数是61的倍数之后且全局的Goroutine队列不为空，才尝试在全局上寻找&lt;/p></description></item><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;pre tabindex="0">&lt;code class="language-plantuml" data-lang="plantuml">@startuml
+package &amp;#34;Concurrency vs Parallelism&amp;#34; {
+ class Concurrency {
+ + Task1
+ + Task2
+ + Task3
+ note right: Tasks are managed\nand switched by the CPU
+ }
+ 
+ class Parallelism {
+ + Task1
+ + Task2
+ + Task3
+ note right: Tasks are executed\nsimultaneously on different cores
+ }
+ 
+ Concurrency -- Parallelism : Difference
+}
+@enduml
+&lt;/code>&lt;/pre>&lt;p>我觉得“同步/异步”、“阻塞/非阻塞”可以从字面上理解。所谓“同步”，是指“相同的步调”，既然是相同，必然涉及比较，那么就是关于两者（调用方与被调用方）的。也即是说，“同步/异步”描述的是两个模块之间的关系。所谓“阻塞”，是指“无法前进”了，“卡住了”，等待在那里而不能做其他事情了。也即是说，“阻塞/非阻塞”描述的是一个模块自身的运行状态。“同步/异步”、“阻塞/非阻塞”一个是描述两者的关系，另一个是描述一者的状态，所以其实是讲的不同的事情。&lt;/p>
+&lt;p>阻塞IO就是那种recv, read，一直等，等到有了数据才返回；&lt;/p>
+&lt;p>非阻塞IO就是立即返回，设置描述符为非阻塞，但是要进程自己一直检查是否可读；&lt;/p>
+&lt;p>IO复用其实也是阻塞的，不过可以用来等很多描述符，比起阻塞有了进步，可以算有点异步了，但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。&lt;/p>
+&lt;p>信号驱动采用信号机制等待，有了更多的进步，不用监视描述符了，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。&lt;/p>
+&lt;p>异步IO，发送IO请求后，不用等了，也不再需要发送IO请求获取结果了。等到通知后，其实是系统帮你把数据读取好了的，你等到的通知也不再是要求你去读写IO了，而是告诉你IO请求过程已经结束了。你要做的就是可以处理数据了。且同一个描述符上可能同时存在很多请求。(对应上面那个买书例子中，就是送书到我家，我直接看书就行了，不需要再去跑一趟了)。&lt;/p>
+&lt;p>一个操作可以是非阻塞的但仍然是同步的，也就是说调用者仍然需要等待操作完成后才能继续执行。&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>同步异步是一种涉及两方的关系。&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>调用方与被调用方的关系。&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;p>同步http请求，异步http请求:
+同步：提交请求(调用方)-&amp;gt;等待服务器处理(被调用方)-&amp;gt;处理完毕返回 这个期间客户端浏览器不能干任何事(调用方)
+异步: 请求通过事件触发(调用方)-&amp;gt;服务器处理（这是浏览器仍然可以作其他事情）-&amp;gt;处理完毕&lt;/p>
+&lt;p>同步io，异步io&lt;/p>
+&lt;p>2.同步、异步&lt;/p>
+&lt;p>定义&lt;/p>
+&lt;p>同步：在发出一个同步调用后，只有得到结果后，该调用才会。
+异步：在发出一个异步调用后，调用者不会立刻得到结果，该调用就返回了.&lt;/p></description></item><item><title>基本用法</title><link>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/foundation/golang_basic/</guid><description>&lt;h2 id="数据结构">
  数据结构
  &lt;a class="anchor" href="#%e6%95%b0%e6%8d%ae%e7%bb%93%e6%9e%84">#&lt;/a>
 &lt;/h2>
