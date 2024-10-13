@@ -1,106 +1,129 @@
-<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='@startuml
-package "Concurrency vs Parallelism" {
-    class Concurrency {
-        + Task1
-        + Task2
-        + Task3
-        note right: Tasks are managed\nand switched by the CPU
-    }
-    
-    class Parallelism {
-        + Task1
-        + Task2
-        + Task3
-        note right: Tasks are executed\nsimultaneously on different cores
-    }
-    
-    Concurrency -- Parallelism : Difference
-}
-@enduml
-我觉得“同步/异步”、“阻塞/非阻塞”可以从字面上理解。所谓“同步”，是指“相同的步调”，既然是相同，必然涉及比较，那么就是关于两者（调用方与被调用方）的。也即是说，“同步/异步”描述的是两个模块之间的关系。所谓“阻塞”，是指“无法前进”了，“卡住了”，等待在那里而不能做其他事情了。也即是说，“阻塞/非阻塞”描述的是一个模块自身的运行状态。“同步/异步”、“阻塞/非阻塞”一个是描述两者的关系，另一个是描述一者的状态，所以其实是讲的不同的事情。
-阻塞IO就是那种recv, read，一直等，等到有了数据才返回；
-非阻塞IO就是立即返回，设置描述符为非阻塞，但是要进程自己一直检查是否可读；
-IO复用其实也是阻塞的，不过可以用来等很多描述符，比起阻塞有了进步，可以算有点异步了，但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。
-信号驱动采用信号机制等待，有了更多的进步，不用监视描述符了，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。
-异步IO，发送IO请求后，不用等了，也不再需要发送IO请求获取结果了。等到通知后，其实是系统帮你把数据读取好了的，你等到的通知也不再是要求你去读写IO了，而是告诉你IO请求过程已经结束了。你要做的就是可以处理数据了。且同一个描述符上可能同时存在很多请求。(对应上面那个买书例子中，就是送书到我家，我直接看书就行了，不需要再去跑一趟了)。
-一个操作可以是非阻塞的但仍然是同步的，也就是说调用者仍然需要等待操作完成后才能继续执行。
+<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content='
+  同步&异步/阻塞&非阻塞
+  #
+
+同步/异步、阻塞/非阻塞可从字面上理解。
+同步，同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的"关系"。（最常见的比如：调用方、被调用方）。
+阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。
+综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。
+
+  同步异步
+  #
 
 
-同步异步是一种涉及两方的关系。
+同步异步是一种涉及两着的关系。
+
+
+  程序处理多任务
+  #
 
 
 并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B
 
+并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应
+能力。
+并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。
+
+  
+
+
+并行∈并发，并发=并行+交错
+
+这里并发包括同步（synchronous）和异步（asynchronous）两种方式:
+同步是指任务按照一定的顺序依次执行，每个任务需要等待前一个任务完成后才能执行，任务之间有明显的先后顺序。同步执行的任务需要占用CPU资源，但是其执行结果是可预测的。
+异步是指任务在不等待其他任务执行结果的情况下，直接进行下一步操作，任务之间不受顺序限制。异步执行的任务不会占用CPU资源，因为它们不会一直等待其他任务的完成，但是其执行结果不一定是可预测的。
+
+  程序与外部交互(可以是外部系统，也可能是操作系统)
+  #
 
 调用方与被调用方的关系。
 
+web开发最多的HTTP接口同步异步。
 
-同步http请求，异步http请求:
-同步：提交请求(调用方)->等待服务器处理(被调用方)->处理完毕返回 这个期间客户端浏览器不能干任何事(调用方)
-异步: 请求通过事件触发(调用方)->服务器处理（这是浏览器仍然可以作其他事情）->处理完毕
-同步io，异步io
-2.同步、异步
-定义
-同步：在发出一个同步调用后，只有得到结果后，该调用才会。
-异步：在发出一个异步调用后，调用者不会立刻得到结果，该调用就返回了.'><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="GMP模型结构体"><meta property="og:description" content='@startuml package "Concurrency vs Parallelism" { class Concurrency { + Task1 + Task2 + Task3 note right: Tasks are managed\nand switched by the CPU } class Parallelism { + Task1 + Task2 + Task3 note right: Tasks are executed\nsimultaneously on different cores } Concurrency -- Parallelism : Difference } @enduml 我觉得“同步/异步”、“阻塞/非阻塞”可以从字面上理解。所谓“同步”，是指“相同的步调”，既然是相同，必然涉及比较，那么就是关于两者（调用方与被调用方）的。也即是说，“同步/异步”描述的是两个模块之间的关系。所谓“阻塞”，是指“无法前进”了，“卡住了”，等待在那里而不能做其他事情了。也即是说，“阻塞/非阻塞”描述的是一个模块自身的运行状态。“同步/异步”、“阻塞/非阻塞”一个是描述两者的关系，另一个是描述一者的状态，所以其实是讲的不同的事情。
-阻塞IO就是那种recv, read，一直等，等到有了数据才返回；
-非阻塞IO就是立即返回，设置描述符为非阻塞，但是要进程自己一直检查是否可读；
-IO复用其实也是阻塞的，不过可以用来等很多描述符，比起阻塞有了进步，可以算有点异步了，但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。
-信号驱动采用信号机制等待，有了更多的进步，不用监视描述符了，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。
-异步IO，发送IO请求后，不用等了，也不再需要发送IO请求获取结果了。等到通知后，其实是系统帮你把数据读取好了的，你等到的通知也不再是要求你去读写IO了，而是告诉你IO请求过程已经结束了。你要做的就是可以处理数据了。且同一个描述符上可能同时存在很多请求。(对应上面那个买书例子中，就是送书到我家，我直接看书就行了，不需要再去跑一趟了)。
-一个操作可以是非阻塞的但仍然是同步的，也就是说调用者仍然需要等待操作完成后才能继续执行。
-同步异步是一种涉及两方的关系。
-并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B
-调用方与被调用方的关系。
-同步http请求，异步http请求: 同步：提交请求(调用方)->等待服务器处理(被调用方)->处理完毕返回 这个期间客户端浏览器不能干任何事(调用方) 异步: 请求通过事件触发(调用方)->服务器处理（这是浏览器仍然可以作其他事情）->处理完毕
-同步io，异步io
-2.同步、异步
-定义
-同步：在发出一个同步调用后，只有得到结果后，该调用才会。 异步：在发出一个异步调用后，调用者不会立刻得到结果，该调用就返回了.'><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>GMP模型结构体 | go调度源码分析</title>
-<link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.0a907edcf1858abebae3465206908c8c1cfdf1c255d9e58bd8fa7e30f44f1548.js integrity="sha256-CpB+3PGFir6640ZSBpCMjBz98cJV2eWL2Pp+MPRPFUg=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+
+需要说明的是接口本身不区分同步和异步。这种区分更在于客户端(调用方)如何与接口进行交互，以及服务端(被调用方)如何处理请求。
+
+服务端接口
+
+服务端实现：服务端处理请求的方式可以是同步的，也可以是异步的。同步实现可能在处理请求时会阻塞直到完成，而异步实现可能会利用事件驱动或多线程来提高并发性和响应速度。
+对客户端的透明性：从客户端的角度来看，服务端的实现细节是透明的。客户端并不知道服务端是同步还是异步地处理请求。
+提供额外的机制来支持异步操作，例如：
+
+Webhooks/mq：服务端在处理完成后主动通知客户端。
+回调URL：客户端提供一个回调URL，服务端在处理完成后向该URL发送通知。
+轮询（Polling）：客户端定期检查服务端的状态以获取结果。
+
+
+
+
+客户端调用
+
+同步调用：客户端发起请求并等待响应完成后再继续执行其他操作。这种方式在编写代码时表现为阻塞调用。
+异步调用：客户端发起请求后可以立即继续执行其他任务，并在响应返回时通过回调、Promise或其他机制处理结果。
+
+
+
+
+
+操作系统的io操作, 同步io，异步io。
+
+《UNIX Network Programming》（简称UNP）中，通常总结了五种I/O模型，这些模型描述了在UNIX系统中进行网络编程时处理I/O操作的不同方式。
+
+阻塞 I/O 模型（Blocking I/O）
+
+描述：这是最简单的I/O模型。在发起I/O操作（如read或recv）时，调用方会阻塞，直到数据准备好并完成操作。
+优点：实现简单，因为所有操作都是顺序进行的。
+缺点：在等待数据时，调用方无法执行其他任务，这可能导致资源低效利用。
+
+非阻塞 I/O 模型（Non-blocking I/O）
+
+描述：调用方在发起I/O操作时立即返回，即使数据尚未准备好。调用方需要不断地重试操作以检查数据是否可用。
+优点：调用方在等待数据时可以执行其他任务。
+缺点：需要实现轮询机制（polling），这可能导致CPU资源浪费。
+
+I/O 复用模型（I/O Multiplexing）
+
+描述：使用select、poll或epoll等系统调用来监视多个文件描述符。当一个或多个文件描述符准备好进行I/O操作时，系统调用返回。(可以用来等很多描述符, 但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。)
+优点：允许一个线程同时处理多个I/O操作，提高资源利用率。
+缺点：在监视大量文件描述符时可能存在性能瓶颈。
+
+信号驱动 I/O 模型（Signal-driven I/O）'><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="GMP模型结构体"><meta property="og:description" content=' 同步&异步/阻塞&非阻塞 # 同步/异步、阻塞/非阻塞可从字面上理解。
+同步，同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的"关系"。（最常见的比如：调用方、被调用方）。
+阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。
+综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。
+同步异步 # 同步异步是一种涉及两着的关系。
+程序处理多任务 # 并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B
+并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应 能力。 并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。
+并行∈并发，并发=并行+交错
+这里并发包括同步（synchronous）和异步（asynchronous）两种方式: 同步是指任务按照一定的顺序依次执行，每个任务需要等待前一个任务完成后才能执行，任务之间有明显的先后顺序。同步执行的任务需要占用CPU资源，但是其执行结果是可预测的。
+异步是指任务在不等待其他任务执行结果的情况下，直接进行下一步操作，任务之间不受顺序限制。异步执行的任务不会占用CPU资源，因为它们不会一直等待其他任务的完成，但是其执行结果不一定是可预测的。
+程序与外部交互(可以是外部系统，也可能是操作系统) # 调用方与被调用方的关系。
+web开发最多的HTTP接口同步异步。 需要说明的是接口本身不区分同步和异步。这种区分更在于客户端(调用方)如何与接口进行交互，以及服务端(被调用方)如何处理请求。
+服务端接口 服务端实现：服务端处理请求的方式可以是同步的，也可以是异步的。同步实现可能在处理请求时会阻塞直到完成，而异步实现可能会利用事件驱动或多线程来提高并发性和响应速度。 对客户端的透明性：从客户端的角度来看，服务端的实现细节是透明的。客户端并不知道服务端是同步还是异步地处理请求。 提供额外的机制来支持异步操作，例如： Webhooks/mq：服务端在处理完成后主动通知客户端。 回调URL：客户端提供一个回调URL，服务端在处理完成后向该URL发送通知。 轮询（Polling）：客户端定期检查服务端的状态以获取结果。 客户端调用 同步调用：客户端发起请求并等待响应完成后再继续执行其他操作。这种方式在编写代码时表现为阻塞调用。 异步调用：客户端发起请求后可以立即继续执行其他任务，并在响应返回时通过回调、Promise或其他机制处理结果。 操作系统的io操作, 同步io，异步io。 《UNIX Network Programming》（简称UNP）中，通常总结了五种I/O模型，这些模型描述了在UNIX系统中进行网络编程时处理I/O操作的不同方式。
+阻塞 I/O 模型（Blocking I/O）
+描述：这是最简单的I/O模型。在发起I/O操作（如read或recv）时，调用方会阻塞，直到数据准备好并完成操作。 优点：实现简单，因为所有操作都是顺序进行的。 缺点：在等待数据时，调用方无法执行其他任务，这可能导致资源低效利用。 非阻塞 I/O 模型（Non-blocking I/O）
+描述：调用方在发起I/O操作时立即返回，即使数据尚未准备好。调用方需要不断地重试操作以检查数据是否可用。 优点：调用方在等待数据时可以执行其他任务。 缺点：需要实现轮询机制（polling），这可能导致CPU资源浪费。 I/O 复用模型（I/O Multiplexing）
+描述：使用select、poll或epoll等系统调用来监视多个文件描述符。当一个或多个文件描述符准备好进行I/O操作时，系统调用返回。(可以用来等很多描述符, 但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。) 优点：允许一个线程同时处理多个I/O操作，提高资源利用率。 缺点：在监视大量文件描述符时可能存在性能瓶颈。 信号驱动 I/O 模型（Signal-driven I/O）'><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>GMP模型结构体 | go调度源码分析</title>
+<link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.e8f3027174919f2e180a0249799944e9fe3b88c531db0e7f0672d53b680a727e.js integrity="sha256-6PMCcXSRny4YCgJJeZlE6f47iMUx2w5/BnLVO2gKcn4=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
 <span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/ class=active>GMP模型结构体</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-740657f38f0c4de9a986bda642ff0388 class=toggle>
 <label for=section-740657f38f0c4de9a986bda642ff0388 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script><script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu>
 </label><strong>GMP模型结构体</strong>
-<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><a href=#1g结构体>1.G结构体</a></li><li><a href=#11-go关键字绑定gopcstartpc>1.1 go关键字绑定(gopc、startpc)</a></li><li><a href=#12-goroutine的上下文信息sched>1.2 goroutine的上下文信息(sched)</a><ul><li><a href=#121-恢复goroutine上下文到寄存器>1.2.1 恢复goroutine上下文到寄存器</a></li><li><a href=#122-保存寄存器值到goroutine上下文>1.2.2 保存寄存器值到goroutine上下文</a></li></ul></li></ul></li><li><a href=#golang-gmp概念>golang GMP概念</a><ul><li><a href=#fqa>FQA</a><ul><li><a href=#g0m0gm>g0,m0,gM</a></li><li><a href=#说一说gmp的底层实现>说一说GMP的底层实现。</a><ul><li><a href=#从程序加载到main函数执行的过程>从程序加载到main函数执行的过程。</a></li><li><a href=#新的goroutine创建的过程newproc>新的goroutine创建的过程newproc()。</a></li><li><a href=#调度的过程schedule>调度的过程schedule()。</a></li></ul></li></ul></li><li><a href=#archive>archive</a></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></aside></header><article class=markdown><pre tabindex=0><code class=language-plantuml data-lang=plantuml>@startuml
-package &#34;Concurrency vs Parallelism&#34; {
-    class Concurrency {
-        + Task1
-        + Task2
-        + Task3
-        note right: Tasks are managed\nand switched by the CPU
-    }
-    
-    class Parallelism {
-        + Task1
-        + Task2
-        + Task3
-        note right: Tasks are executed\nsimultaneously on different cores
-    }
-    
-    Concurrency -- Parallelism : Difference
-}
-@enduml
-</code></pre><p>我觉得“同步/异步”、“阻塞/非阻塞”可以从字面上理解。所谓“同步”，是指“相同的步调”，既然是相同，必然涉及比较，那么就是关于两者（调用方与被调用方）的。也即是说，“同步/异步”描述的是两个模块之间的关系。所谓“阻塞”，是指“无法前进”了，“卡住了”，等待在那里而不能做其他事情了。也即是说，“阻塞/非阻塞”描述的是一个模块自身的运行状态。“同步/异步”、“阻塞/非阻塞”一个是描述两者的关系，另一个是描述一者的状态，所以其实是讲的不同的事情。</p><p>阻塞IO就是那种recv, read，一直等，等到有了数据才返回；</p><p>非阻塞IO就是立即返回，设置描述符为非阻塞，但是要进程自己一直检查是否可读；</p><p>IO复用其实也是阻塞的，不过可以用来等很多描述符，比起阻塞有了进步，可以算有点异步了，但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。</p><p>信号驱动采用信号机制等待，有了更多的进步，不用监视描述符了，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。</p><p>异步IO，发送IO请求后，不用等了，也不再需要发送IO请求获取结果了。等到通知后，其实是系统帮你把数据读取好了的，你等到的通知也不再是要求你去读写IO了，而是告诉你IO请求过程已经结束了。你要做的就是可以处理数据了。且同一个描述符上可能同时存在很多请求。(对应上面那个买书例子中，就是送书到我家，我直接看书就行了，不需要再去跑一趟了)。</p><p>一个操作可以是非阻塞的但仍然是同步的，也就是说调用者仍然需要等待操作完成后才能继续执行。</p><ol><li><p>同步异步是一种涉及两方的关系。</p></li><li><p>并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B</p></li><li><p>调用方与被调用方的关系。</p></li></ol><p>同步http请求，异步http请求:
-同步：提交请求(调用方)->等待服务器处理(被调用方)->处理完毕返回 这个期间客户端浏览器不能干任何事(调用方)
-异步: 请求通过事件触发(调用方)->服务器处理（这是浏览器仍然可以作其他事情）->处理完毕</p><p>同步io，异步io</p><p>2.同步、异步</p><p>定义</p><p>同步：在发出一个同步调用后，只有得到结果后，该调用才会。
-异步：在发出一个异步调用后，调用者不会立刻得到结果，该调用就返回了.</p><p>同步例子</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>int</span> <span style=color:#a6e22e>n</span> = <span style=color:#66d9ef>func</span>();
-</span></span><span style=display:flex><span><span style=color:#a6e22e>next</span>();
-</span></span><span style=display:flex><span><span style=color:#75715e>// func() 的结果没有返回，next() 就不会执行，直到 func() 运行完。
-</span></span></span><span style=display:flex><span><span style=color:#75715e></span>
-</span></span><span style=display:flex><span><span style=color:#a6e22e>异步例子</span>
-</span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span><span style=color:#66d9ef>func</span>(<span style=color:#a6e22e>callback</span>);
-</span></span><span style=display:flex><span><span style=color:#a6e22e>next</span>();
-</span></span><span style=display:flex><span><span style=color:#f92672>...</span>
-</span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span><span style=color:#a6e22e>void</span> <span style=color:#a6e22e>callback</span>(<span style=color:#66d9ef>int</span> <span style=color:#a6e22e>n</span>) <span style=color:#75715e>// func 结果回调
-</span></span></span><span style=display:flex><span><span style=color:#75715e></span>{
-</span></span><span style=display:flex><span><span style=color:#66d9ef>int</span> <span style=color:#a6e22e>k</span> = <span style=color:#a6e22e>n</span>;
-</span></span><span style=display:flex><span>}
-</span></span><span style=display:flex><span><span style=color:#75715e>// func() 执行后，还没得出结果就立即返回，然后执行 next() 了
-</span></span></span><span style=display:flex><span><span style=color:#75715e>// 等到结果出来，func() 回调 callback() 通知调用者结果。
-</span></span></span></code></pre></div><p>同步的定义看起来跟阻塞很像，但是同步跟阻塞是两个概念，同步调用的时候，线程不一定阻塞，调用虽然没返回，但它还是在运行状态中的，CPU很可能还在执行这段代码，而阻塞的话，它就肯定不在CPU中跑这个代码了。这就是同步和阻塞的区别。同步是肯定可以在，阻塞是肯定不在。</p><p>异步和非阻塞的定义比较像，两者的区别是异步是说调用的时候结果不会马上返回，线程可能被阻塞起来，也可能不阻塞，两者没关系。非阻塞是说调用的时候，线程肯定不会进入阻塞状态。</p><p>并行∈并发，并发=并行+交错</p><p>什么是协程？协程是可以暂停和恢复的函数。</p><p>协程恢复:</p><ol><li>回到调度器——goroutine</li><li>回到 caller——python yield</li><li>直接恢复另一个协程</li></ol><p>协程和多线程的关系</p><p>协程和多线程</p><p>协程和多线程是两个不同的概念，协程可以多线程，也可以单线程。协程强调异步，线程强调并行。没有线程的协程不能并行，但是依旧可以异步。</p><hr><p>在Go语言的运行时系统中，GMP模型（Goroutine, Machine, Processor）是用于调度和管理goroutine的核心概念。尽管它们各自只是普通的结构体，但它们协同工作构成了Go语言高效并发模型的基础。</p><h2 id=1g结构体>1.G结构体
+<label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><a href=#同步异步阻塞非阻塞>同步&异步/阻塞&非阻塞</a><ul><li><a href=#同步异步>同步异步</a><ul><li><a href=#程序处理多任务>程序处理多任务</a></li><li><a href=#程序与外部交互可以是外部系统也可能是操作系统>程序与外部交互(可以是外部系统，也可能是操作系统)</a></li></ul></li></ul></li><li><a href=#协程>协程</a><ul><li><a href=#协程和多线程的关系>协程和多线程的关系</a></li></ul></li><li><a href=#gmp模型结构体>GMP模型结构体</a><ul><li><a href=#1g结构体>1.G结构体</a></li><li><a href=#11-go关键字绑定gopcstartpc>1.1 go关键字绑定(gopc、startpc)</a></li><li><a href=#12-goroutine的上下文信息sched>1.2 goroutine的上下文信息(sched)</a><ul><li><a href=#121-恢复goroutine上下文到寄存器>1.2.1 恢复goroutine上下文到寄存器</a></li><li><a href=#122-保存寄存器值到goroutine上下文>1.2.2 保存寄存器值到goroutine上下文</a></li></ul></li></ul></li><li><a href=#golang-gmp概念>golang GMP概念</a><ul><li><a href=#fqa>FQA</a><ul><li><a href=#g0m0gm>g0,m0,gM</a></li><li><a href=#说一说gmp的底层实现>说一说GMP的底层实现。</a><ul><li><a href=#从程序加载到main函数执行的过程>从程序加载到main函数执行的过程。</a></li><li><a href=#新的goroutine创建的过程newproc>新的goroutine创建的过程newproc()。</a></li><li><a href=#调度的过程schedule>调度的过程schedule()。</a></li></ul></li></ul></li><li><a href=#archive>archive</a></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></aside></header><article class=markdown><h1 id=同步异步阻塞非阻塞>同步&异步/阻塞&非阻塞
+<a class=anchor href=#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5%e9%98%bb%e5%a1%9e%e9%9d%9e%e9%98%bb%e5%a1%9e>#</a></h1><p>同步/异步、阻塞/非阻塞可从字面上理解。</p><p>同步，同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的"关系"。（最常见的比如：调用方、被调用方）。</p><p>阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。</p><p>综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。</p><h2 id=同步异步>同步异步
+<a class=anchor href=#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5>#</a></h2><blockquote><p>同步异步是一种涉及两着的关系。</p></blockquote><h3 id=程序处理多任务>程序处理多任务
+<a class=anchor href=#%e7%a8%8b%e5%ba%8f%e5%a4%84%e7%90%86%e5%a4%9a%e4%bb%bb%e5%8a%a1>#</a></h3><blockquote><p>并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B</p></blockquote><p>并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应
+能力。
+并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。</p><p align=left><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20241013152155.png width=50% height=50% alt=效果图></p><blockquote><p>并行∈并发，并发=并行+交错</p></blockquote><p>这里并发包括同步（synchronous）和异步（asynchronous）两种方式:
+同步是指任务按照一定的顺序依次执行，每个任务需要等待前一个任务完成后才能执行，任务之间有明显的先后顺序。同步执行的任务需要占用CPU资源，但是其执行结果是可预测的。</p><p>异步是指任务在不等待其他任务执行结果的情况下，直接进行下一步操作，任务之间不受顺序限制。异步执行的任务不会占用CPU资源，因为它们不会一直等待其他任务的完成，但是其执行结果不一定是可预测的。</p><h3 id=程序与外部交互可以是外部系统也可能是操作系统>程序与外部交互(可以是外部系统，也可能是操作系统)
+<a class=anchor href=#%e7%a8%8b%e5%ba%8f%e4%b8%8e%e5%a4%96%e9%83%a8%e4%ba%a4%e4%ba%92%e5%8f%af%e4%bb%a5%e6%98%af%e5%a4%96%e9%83%a8%e7%b3%bb%e7%bb%9f%e4%b9%9f%e5%8f%af%e8%83%bd%e6%98%af%e6%93%8d%e4%bd%9c%e7%b3%bb%e7%bb%9f>#</a></h3><p>调用方与被调用方的关系。</p><ol><li>web开发最多的HTTP接口同步异步。</li></ol><blockquote><p>需要说明的是接口本身不区分同步和异步。这种区分更在于客户端(调用方)如何与接口进行交互，以及服务端(被调用方)如何处理请求。</p><ul><li>服务端接口<ul><li>服务端实现：服务端处理请求的方式可以是同步的，也可以是异步的。同步实现可能在处理请求时会阻塞直到完成，而异步实现可能会利用事件驱动或多线程来提高并发性和响应速度。</li><li>对客户端的透明性：从客户端的角度来看，服务端的实现细节是透明的。客户端并不知道服务端是同步还是异步地处理请求。</li><li>提供额外的机制来支持异步操作，例如：<ul><li>Webhooks/mq：服务端在处理完成后主动通知客户端。</li><li>回调URL：客户端提供一个回调URL，服务端在处理完成后向该URL发送通知。</li><li>轮询（Polling）：客户端定期检查服务端的状态以获取结果。</li></ul></li></ul></li><li>客户端调用<ul><li>同步调用：客户端发起请求并等待响应完成后再继续执行其他操作。这种方式在编写代码时表现为阻塞调用。</li><li>异步调用：客户端发起请求后可以立即继续执行其他任务，并在响应返回时通过回调、Promise或其他机制处理结果。</li></ul></li></ul></blockquote><ol start=2><li>操作系统的io操作, 同步io，异步io。</li></ol><p>《UNIX Network Programming》（简称UNP）中，通常总结了五种I/O模型，这些模型描述了在UNIX系统中进行网络编程时处理I/O操作的不同方式。</p><blockquote><p>阻塞 I/O 模型（Blocking I/O）</p><ul><li>描述：这是最简单的I/O模型。在发起I/O操作（如read或recv）时，调用方会阻塞，直到数据准备好并完成操作。</li><li>优点：实现简单，因为所有操作都是顺序进行的。</li><li>缺点：在等待数据时，调用方无法执行其他任务，这可能导致资源低效利用。</li></ul><p>非阻塞 I/O 模型（Non-blocking I/O）</p><ul><li>描述：调用方在发起I/O操作时立即返回，即使数据尚未准备好。调用方需要不断地重试操作以检查数据是否可用。</li><li>优点：调用方在等待数据时可以执行其他任务。</li><li>缺点：需要实现轮询机制（polling），这可能导致CPU资源浪费。</li></ul><p>I/O 复用模型（I/O Multiplexing）</p><ul><li>描述：使用select、poll或epoll等系统调用来监视多个文件描述符。当一个或多个文件描述符准备好进行I/O操作时，系统调用返回。(可以用来等很多描述符, 但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。)</li><li>优点：允许一个线程同时处理多个I/O操作，提高资源利用率。</li><li>缺点：在监视大量文件描述符时可能存在性能瓶颈。</li></ul><p>信号驱动 I/O 模型（Signal-driven I/O）</p><ul><li>描述：使用信号机制进行I/O操作。当文件描述符准备就绪时，内核向进程发送信号。(不用监视描述符，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。)</li><li>优点：减少了轮询的需要，进程可以在信号到达前执行其他任务。</li><li>缺点：信号处理相对复杂，需要处理信号的异步性。(仍由请求进程将数据从内核读入用户空间（阻塞))</li></ul><p>异步 I/O 模型（Asynchronous I/O）</p><ul><li>描述：调用方发起I/O操作后立即返回，内核在操作完成后通知调用方。</li><li>优点：调用方无需等待I/O操作完成，真正的异步处理。</li><li>缺点：实现复杂，支持此模型的系统接口较少。</li></ul></blockquote><p>其中IO复用和信号驱动，在处理业务逻辑上可以说有异步，但在IO操作层面上来说还是同步的。</p><p>异步IO，发送IO请求后，不用等了，也不再需要发送IO请求获取结果了。等到通知后，其实是系统帮你把数据读取好了的，你等到的通知也不再是要求你去读写IO了，而是告诉你IO请求过程已经结束了。你要做的就是可以处理数据了。且同一个描述符上可能同时存在很多请求。</p><p>注意：一个操作可以是非阻塞的但仍然是同步的，也就是说调用者仍然需要等待操作完成后才能继续执行。</p><h1 id=协程>协程
+<a class=anchor href=#%e5%8d%8f%e7%a8%8b>#</a></h1><p>什么是协程？协程是可以暂停和恢复的函数。</p><p>协程恢复:</p><ol><li>回到调度器——goroutine</li><li>回到 caller——python yield</li><li>直接恢复另一个协程</li></ol><table><thead><tr><th style=text-align:left>\</th><th style=text-align:left>对称（灵活）</th><th style=text-align:left>非对称（易用）</th></tr></thead><tbody><tr><td style=text-align:left>无栈（性能）</td><td style=text-align:left>python、rust、c#、c++、js</td><td style=text-align:left>kotlin</td></tr><tr><td style=text-align:left>有栈（易用）</td><td style=text-align:left>-</td><td style=text-align:left>go、java、lua</td></tr></tbody></table><p>对称（Symmetric） vs 非对称（Asymmetric）：
+对称协程：协程之间可以相互调用和切换，通常通过显式的调用机制实现。这种方式提供更大的灵活性。
+非对称协程：通常有一个主协程(调度器)调用其它协程，协程在执行完后返回到主协程(调度器)。它们在设计上更接近于传统的函数调用，易于理解和使用。</p><p>无栈（Stackless） vs 有栈（Stackful）：
+无栈协程：不需要为每个协程维护单独的调用栈。通常实现起来更轻量，性能较高，但也可能限制了某些功能的实现。
+有栈协程：为每个协程维护独立的调用栈，允许协程拥有更复杂的控制流，类似于线程。</p><table><thead><tr><th style=text-align:left>无栈</th><th style=text-align:left>有栈</th></tr></thead><tbody><tr><td style=text-align:left>定制结构体</td><td style=text-align:left>自定义栈</td></tr><tr><td style=text-align:left>显式暂停</td><td style=text-align:left>隐蔽暂停</td></tr><tr><td style=text-align:left>内存紧凑</td><td style=text-align:left>内存浪费/爆栈</td></tr><tr><td style=text-align:left>深递归慢</td><td style=text-align:left>深递归快</td></tr></tbody></table><h2 id=协程和多线程的关系>协程和多线程的关系
+<a class=anchor href=#%e5%8d%8f%e7%a8%8b%e5%92%8c%e5%a4%9a%e7%ba%bf%e7%a8%8b%e7%9a%84%e5%85%b3%e7%b3%bb>#</a></h2><p>协程和多线程是两个不同的概念，协程可以多线程，也可以单线程。协程强调异步，线程强调并行。没有线程的协程不能并行，但是依旧可以异步。</p><h1 id=gmp模型结构体>GMP模型结构体
+<a class=anchor href=#gmp%e6%a8%a1%e5%9e%8b%e7%bb%93%e6%9e%84%e4%bd%93>#</a></h1><p>在Go语言的运行时系统中，GMP模型（Goroutine, Machine, Processor）是用于调度和管理goroutine的核心概念。尽管它们各自只是普通的结构体，但它们协同工作构成了Go语言高效并发模型的基础。</p><h2 id=1g结构体>1.G结构体
 <a class=anchor href=#1g%e7%bb%93%e6%9e%84%e4%bd%93>#</a></h2><p>g结构体代表一个goroutine，包含了栈、上下文信息以及其他状态信息。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>g</span> <span style=color:#66d9ef>struct</span> {
 </span></span><span style=display:flex><span>    <span style=color:#75715e>//...
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#a6e22e>gopc</span>      <span style=color:#66d9ef>uintptr</span>  <span style=color:#75715e>// 保存创建这个goroutine的代码位置。
@@ -220,7 +243,7 @@ package &#34;Concurrency vs Parallelism&#34; {
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>  <span style=color:#75715e>//...
 </span></span></span></code></pre></div><ol start=2><li>而调用macll函数的场景就比较多，分别为：</li></ol><ul><li>goexit1()：goroutine执行完成时</li><li>Gosched()：触发协作&抢占式式调度时</li><li>gopark：g从运行状态转换为等待状态时</li><li>exitsyscall()：退出系统调用时</li></ul><p align=left><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240930110152.png width=50% height=50% alt=效果图></p><h1 id=golang-gmp概念>golang GMP概念
 <a class=anchor href=#golang-gmp%e6%a6%82%e5%bf%b5>#</a></h1><ul><li><p>what: 是golang内部自己实现的调度器，由’‘G’’,“M”,“P"用来调度goruntine，被称为"GMP模型”。</p><ul><li>GMP<ul><li>G:为了调度方便，保存寄存器，栈地址等-><code>对应cpu切换[1.cpu寄存器的值；2.stack地址]</code></li><li>M:与系统线程一一对应</li><li>P:一些上下文，比如局部P，防止锁，局部P的heap,也能防止加锁的导致的资源损耗。</li></ul></li></ul></li><li><p>why:</p><ul><li><p>单进程时代不需要调度器</p><ul><li>1.单一的执行流程，计算机只能一个任务一个任务处理。</li><li>2.进程阻塞所带来的CPU时间浪费。</li></ul></li><li><p>多进程/线程时代有了调度器需求</p><ul><li>1.解决了阻塞的问题</li><li>2.CPU有很大的一部分都被浪费在进程调度</li><li>设计会变得更加复杂，要考虑很多同步竞争等问题，如锁、竞争冲突等。</li></ul></li><li><p>协程(用户线程)来提高CPU利用率(减少CPU浪费在进程调度上)</p></li></ul><blockquote><ul><li>为什么。<ul><li>线程和进程有很多相同的控制权。线程有自己的信号掩码，可以分配CPU时间，可以放入cgroups，可以查询它们使用了哪些资源。所有这些控制都增加了一些功能的开销，而这些功能对于Go程序如何使用goroutine来说是根本不需要的，而且当你的程序中有10万个线程时，它们很快就会增加。</li><li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。</li></ul></li><li>如何进行调度。<ul><li>一种是N:1，即在一个操作系统线程上运行几个用户空间线程。这样做的好处是上下文切换非常快，但不能利用多核系统的优势。</li><li>另一种是1:1，一个执行线程匹配一个OS线程。它可以利用机器上所有的核心，但是上下文切换很慢，因为它要通过OS进行切换。</li><li>M:N调度器。你可以得到快速的上下文切换，你可以利用系统中所有的核心。这种方法的主要缺点是它增加了调度器的复杂性。</li></ul></li><li>摆脱上下文(在这里P就是上下文)？<ul><li><del>不行。我们使用上下文的原因是，如果正在运行的线程由于某些原因需要阻塞，我们可以将它们移交给其他线程。</del></li><li>以前就只有一个全局的P，也可以运行。必须要有P（上下文），是有什么值保存在里面？</li></ul></li></ul></blockquote><blockquote><ul><li>why:<ul><li>threads get a lot of the same controls as processes. Threads have their own signal mask, can be assigned CPU affinity, can be put into cgroups and can be queried for which resources they use. All these controls add overhead for features that are simply not needed for how Go programs use goroutines and they quickly add up when you have 100,000 threads in your program.</li><li>Go调度器可以做出只在它知道内存是一致的点进行调度的决定。</li></ul></li><li>how:<ul><li>One is N:1 where several userspace threads are run on one OS thread. This has the advantage of being very quick to context switch but cannot take advantage of multi-core systems.</li><li>Another is 1:1 where one thread of execution matches one OS thread. It takes advantage of all of the cores on the machine, but context switching is slow because it has to trap through the OS.</li><li>M:N scheduler. You get quick context switches and you take advantage of all the cores in your system. The main disadvantage of this approach is the complexity it adds to the scheduler.</li></ul></li><li>get rid of contexts?<ul><li>Not really. The reason we have contexts is so that we can hand them off to other threads if the running thread needs to block for some reason.</li></ul></li></ul></blockquote><hr><blockquote><p>这个也就说明了<code>N-M</code>的基础，用户线程的各自栈空间其实就是放在公共的堆（heap）上。</p><blockquote><p>每个系统线程都有一个唯一的m0, g0与之对应，想想为什么？(g0的栈空间与其他的不同，它是放在系统线程的栈空间，**应该是进程的栈空间？**TODO,线程的栈空间)</p><blockquote><p>每个线程有自己的栈空间(而这个g0就在这个栈上)。但是是与其他的线程公用的<del>代码段</del>，<strong>数据段，堆空间</strong>,</p><blockquote><p>所以当创建其他的goroutine的时候，把它的协裎栈在堆上，所以它可以被其他的M调用。</p></blockquote></blockquote></blockquote></blockquote></li><li><p>how:</p><ul><li>Go调度本质是把<strong>大量的goroutine分配到少量系统线程</strong>上去执行，并利用多核并行，实现更强大的并发。<ul><li>通过这一点去记住，把大量goroutine分配到小量线程去尽快执行<ul><li>复用</li><li>并发</li><li>防止饥饿</li><li>全局G</li></ul></li></ul></li></ul><blockquote><ul><li>调度器的有两大思想：
-<a href=/go-goroutine/#zxc-anchor-1><sup>1</sup></a><ul><li><strong>压榨系统线程</strong>：协程本身就是运行在一组线程之上，不需要频繁的创建、销毁线程，而是对线程的复用。在调度器中复用线程还有2个体现：<ul><li><strong>work stealing(<em>不让它休息</em>)</strong>，当本线程无可运行的G时，尝试从其他线程绑定的P偷取G，而不是销毁线程。</li><li><strong>hand off(<em>阻塞了，那就换一个压榨</em>)</strong>，当本线程因为G进行系统调用阻塞时，线程释放绑定的P，把P转移给其他空闲的线程执行。</li></ul></li><li><strong>利用并行</strong>：GOMAXPROCS设置P的数量，当GOMAXPROCS大于1时，就最多有GOMAXPROCS个线程处于运行状态，<strong>这些线程可能分布在多个CPU核上同时运行</strong>，使得并发利用并行。另外，GOMAXPROCS也限制了并发的程度，比如GOMAXPROCS = 核数/2，则最多利用了一半的CPU核进行并行。<ul><li>golang并发和并行：Rob Pike一直在强调Go是并发，不是并行，因为Go做的是在一段时间内完成几十万、甚至几百万的工作，而不是同一时间同时在做大量的工作。并发可以利用并行提高效率，调度器是有并行设计的。</li></ul></li></ul></li><li>调度器的两小策略：<ul><li>抢占：在coroutine中要等待一个协程主动让出CPU才执行下一个协程，在Go中，一个goroutine最多占用CPU 10ms，防止其他goroutine被饿死，<strong>这就是goroutine不同于coroutine的一个地方</strong>。</li><li>全局G队列：在新的调度器中依然有全局G队列，但功能已经被弱化了，当M执行work stealing从其他P偷不到G时，它可以从全局G队列获取G。</li></ul></li></ul></blockquote></li></ul><ul><li><a href=/go-goroutine/#1g%e7%bb%93%e6%9e%84%e4%bd%93>1.G结构体</a></li><li><a href=/go-goroutine/#11-go%e5%85%b3%e9%94%ae%e5%ad%97%e7%bb%91%e5%ae%9agopc-startpc>1.1 go关键字绑定(gopc、startpc)</a></li><li><a href=/go-goroutine/#12-goroutine%e7%9a%84%e4%b8%8a%e4%b8%8b%e6%96%87%e4%bf%a1%e6%81%afsched>1.2 goroutine的上下文信息(sched)</a><ul><li><a href=/go-goroutine/#121-%e6%81%a2%e5%a4%8dgoroutine%e4%b8%8a%e4%b8%8b%e6%96%87%e5%88%b0%e5%af%84%e5%ad%98%e5%99%a8>1.2.1 恢复goroutine上下文到寄存器</a></li><li><a href=/go-goroutine/#122-%e4%bf%9d%e5%ad%98%e5%af%84%e5%ad%98%e5%99%a8%e5%80%bc%e5%88%b0goroutine%e4%b8%8a%e4%b8%8b%e6%96%87>1.2.2 保存寄存器值到goroutine上下文</a></li></ul></li><li><a href=/go-goroutine/#golang-gmp%e6%a6%82%e5%bf%b5>golang GMP概念</a><ul><li><a href=/go-goroutine/#fqa>FQA</a><ul><li><a href=/go-goroutine/#g0m0gm>g0,m0,gM</a></li><li><a href=/go-goroutine/#%e8%af%b4%e4%b8%80%e8%af%b4gmp%e7%9a%84%e5%ba%95%e5%b1%82%e5%ae%9e%e7%8e%b0>说一说GMP的底层实现。</a><ul><li><a href=/go-goroutine/#%e4%bb%8e%e7%a8%8b%e5%ba%8f%e5%8a%a0%e8%bd%bd%e5%88%b0main%e5%87%bd%e6%95%b0%e6%89%a7%e8%a1%8c%e7%9a%84%e8%bf%87%e7%a8%8b>从程序加载到main函数执行的过程。</a></li><li><a href=/go-goroutine/#%e6%96%b0%e7%9a%84goroutine%e5%88%9b%e5%bb%ba%e7%9a%84%e8%bf%87%e7%a8%8bnewproc>新的goroutine创建的过程newproc()。</a></li><li><a href=/go-goroutine/#%e8%b0%83%e5%ba%a6%e7%9a%84%e8%bf%87%e7%a8%8bschedule>调度的过程schedule()。</a></li></ul></li></ul></li><li><a href=/go-goroutine/#archive>archive</a></li><li><a href=/go-goroutine/#%e9%99%84%e5%bd%95>附录</a></li></ul></li></ul><h2 id=fqa>FQA
+<a href=/go-goroutine/#zxc-anchor-1><sup>1</sup></a><ul><li><strong>压榨系统线程</strong>：协程本身就是运行在一组线程之上，不需要频繁的创建、销毁线程，而是对线程的复用。在调度器中复用线程还有2个体现：<ul><li><strong>work stealing(<em>不让它休息</em>)</strong>，当本线程无可运行的G时，尝试从其他线程绑定的P偷取G，而不是销毁线程。</li><li><strong>hand off(<em>阻塞了，那就换一个压榨</em>)</strong>，当本线程因为G进行系统调用阻塞时，线程释放绑定的P，把P转移给其他空闲的线程执行。</li></ul></li><li><strong>利用并行</strong>：GOMAXPROCS设置P的数量，当GOMAXPROCS大于1时，就最多有GOMAXPROCS个线程处于运行状态，<strong>这些线程可能分布在多个CPU核上同时运行</strong>，使得并发利用并行。另外，GOMAXPROCS也限制了并发的程度，比如GOMAXPROCS = 核数/2，则最多利用了一半的CPU核进行并行。<ul><li>golang并发和并行：Rob Pike一直在强调Go是并发，不是并行，因为Go做的是在一段时间内完成几十万、甚至几百万的工作，而不是同一时间同时在做大量的工作。并发可以利用并行提高效率，调度器是有并行设计的。</li></ul></li></ul></li><li>调度器的两小策略：<ul><li>抢占：在coroutine中要等待一个协程主动让出CPU才执行下一个协程，在Go中，一个goroutine最多占用CPU 10ms，防止其他goroutine被饿死，<strong>这就是goroutine不同于coroutine的一个地方</strong>。</li><li>全局G队列：在新的调度器中依然有全局G队列，但功能已经被弱化了，当M执行work stealing从其他P偷不到G时，它可以从全局G队列获取G。</li></ul></li></ul></blockquote></li></ul><ul><li><a href=/go-goroutine/#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5%e9%98%bb%e5%a1%9e%e9%9d%9e%e9%98%bb%e5%a1%9e>同步&异步/阻塞&非阻塞</a><ul><li><a href=/go-goroutine/#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5>同步异步</a><ul><li><a href=/go-goroutine/#%e7%a8%8b%e5%ba%8f%e5%a4%84%e7%90%86%e5%a4%9a%e4%bb%bb%e5%8a%a1>程序处理多任务</a></li><li><a href=/go-goroutine/#%e7%a8%8b%e5%ba%8f%e4%b8%8e%e5%a4%96%e9%83%a8%e4%ba%a4%e4%ba%92%e5%8f%af%e4%bb%a5%e6%98%af%e5%a4%96%e9%83%a8%e7%b3%bb%e7%bb%9f%e4%b9%9f%e5%8f%af%e8%83%bd%e6%98%af%e6%93%8d%e4%bd%9c%e7%b3%bb%e7%bb%9f>程序与外部交互(可以是外部系统，也可能是操作系统)</a></li></ul></li></ul></li><li><a href=/go-goroutine/#%e5%8d%8f%e7%a8%8b>协程</a><ul><li><a href=/go-goroutine/#%e5%8d%8f%e7%a8%8b%e5%92%8c%e5%a4%9a%e7%ba%bf%e7%a8%8b%e7%9a%84%e5%85%b3%e7%b3%bb>协程和多线程的关系</a></li></ul></li><li><a href=/go-goroutine/#gmp%e6%a8%a1%e5%9e%8b%e7%bb%93%e6%9e%84%e4%bd%93>GMP模型结构体</a><ul><li><a href=/go-goroutine/#1g%e7%bb%93%e6%9e%84%e4%bd%93>1.G结构体</a></li><li><a href=/go-goroutine/#11-go%e5%85%b3%e9%94%ae%e5%ad%97%e7%bb%91%e5%ae%9agopc-startpc>1.1 go关键字绑定(gopc、startpc)</a></li><li><a href=/go-goroutine/#12-goroutine%e7%9a%84%e4%b8%8a%e4%b8%8b%e6%96%87%e4%bf%a1%e6%81%afsched>1.2 goroutine的上下文信息(sched)</a><ul><li><a href=/go-goroutine/#121-%e6%81%a2%e5%a4%8dgoroutine%e4%b8%8a%e4%b8%8b%e6%96%87%e5%88%b0%e5%af%84%e5%ad%98%e5%99%a8>1.2.1 恢复goroutine上下文到寄存器</a></li><li><a href=/go-goroutine/#122-%e4%bf%9d%e5%ad%98%e5%af%84%e5%ad%98%e5%99%a8%e5%80%bc%e5%88%b0goroutine%e4%b8%8a%e4%b8%8b%e6%96%87>1.2.2 保存寄存器值到goroutine上下文</a></li></ul></li></ul></li><li><a href=/go-goroutine/#golang-gmp%e6%a6%82%e5%bf%b5>golang GMP概念</a><ul><li><a href=/go-goroutine/#fqa>FQA</a><ul><li><a href=/go-goroutine/#g0m0gm>g0,m0,gM</a></li><li><a href=/go-goroutine/#%e8%af%b4%e4%b8%80%e8%af%b4gmp%e7%9a%84%e5%ba%95%e5%b1%82%e5%ae%9e%e7%8e%b0>说一说GMP的底层实现。</a><ul><li><a href=/go-goroutine/#%e4%bb%8e%e7%a8%8b%e5%ba%8f%e5%8a%a0%e8%bd%bd%e5%88%b0main%e5%87%bd%e6%95%b0%e6%89%a7%e8%a1%8c%e7%9a%84%e8%bf%87%e7%a8%8b>从程序加载到main函数执行的过程。</a></li><li><a href=/go-goroutine/#%e6%96%b0%e7%9a%84goroutine%e5%88%9b%e5%bb%ba%e7%9a%84%e8%bf%87%e7%a8%8bnewproc>新的goroutine创建的过程newproc()。</a></li><li><a href=/go-goroutine/#%e8%b0%83%e5%ba%a6%e7%9a%84%e8%bf%87%e7%a8%8bschedule>调度的过程schedule()。</a></li></ul></li></ul></li><li><a href=/go-goroutine/#archive>archive</a></li><li><a href=/go-goroutine/#%e9%99%84%e5%bd%95>附录</a></li></ul></li></ul><h2 id=fqa>FQA
 <a class=anchor href=#fqa>#</a></h2><h3 id=g0m0gm>g0,m0,gM
 <a class=anchor href=#g0m0gm>#</a></h3><blockquote><p>我们知道g0,m0是开始就创建的，那么后面创建了gM，它是新建一个M，还是使用m0？</p><blockquote><p>从图中可以看到是使用m0:<code>https://zput.github.io/go-goroutine/part1.%E8%BF%9B%E5%85%A5main%E5%87%BD%E6%95%B0%E4%B9%8B%E5%89%8D%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96/1.%E8%BF%9B%E5%85%A5main%E5%87%BD%E6%95%B0%E4%B9%8B%E5%89%8D%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96.html#mstart</code>
 一个M对应一个系统线程，那么你想在程序开始的时候就会进行又创建一个系统线程？</p></blockquote></blockquote><h3 id=说一说gmp的底层实现>说一说GMP的底层实现。
@@ -235,4 +258,4 @@ package &#34;Concurrency vs Parallelism&#34; {
 预先创建一堆线程池，然后用户代码里面接收请求，来一个请求handle一个。</li></ul><hr><ul><li>202104月总结<ul><li>没有按照what，why, how顺序来说:<ul><li>what里面没有阐述G，M，P的实际是什么.</li><li>why里面没有把握<strong>调度</strong>这个思想.<ul><li>单进程里面<strong>不需要</strong>调度，但是可能进程阻塞。</li><li>多线程<strong>需要调度</strong>，解决了阻塞，<ul><li>但是调度在内核态，调度花费时间长，</li><li>线程笨重，有自己的信号掩码，。。。// TODO</li></ul></li><li>用户态调度，<strong>需要调度</strong>, 比如协程，goroutine.<ul><li>由协程与系统线程的关联比例，可以分为<code>[1 : N] [N : 1] [M : N]</code>.</li></ul></li></ul></li><li>how里面要点出主旨：把大量的goroutine高效的分配给少量的系统线程。<ul><li>二个策略：<ul><li>压榨系统线程：<ul><li>M执行P队列中的G完了，不让它销毁或者停止，从别的地方拿</li><li>当陷入系统调用中，让M-G关联，P重新拿一个M执行剩下的G.</li></ul></li><li>P的策略，可控制程序的并行数量，[与实际机器的CPU核数]</li></ul></li><li>两个小策略：<ul><li>防止饥饿；</li><li>保留一个全局P，当局部P满了，可以放入全局P中。</li></ul></li></ul></li></ul></li></ul></li></ul><hr><h2 id=附录>附录
 <a class=anchor href=#%e9%99%84%e5%bd%95>#</a></h2><p><span id=zxc-anchor-1></span></p><ul><li><p>[1]
 <a href=https://mp.weixin.qq.com/s/epWDv9Nrmgg4ySFlk1gGKg>我是大彬: Go调度器系列</a></p></li><li><p>[2]
-<a href=https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw/edit>Scalable Go Scheduler Design Doc</a></p></li><li><p><a href=https://lessisbetter.site/2019/04/14/golang-scheduler-4-explore-source-code/>https://lessisbetter.site/2019/04/14/golang-scheduler-4-explore-source-code/</a></p></li><li><p><a href="https://speakerdeck.com/kavya719/the-scheduler-saga?slide=103">https://speakerdeck.com/kavya719/the-scheduler-saga?slide=103</a></p></li><li><p><a href="https://www.cnblogs.com/CodeWithTxT/p/11370215.html#:~:text=%E4%B8%BA%E4%BA%86%E6%9B%B4%E5%90%88%E7%90%86%E7%9A%84%E5%88%A9%E7%94%A8,%E5%88%86%E5%9C%B0%E5%88%A9%E7%94%A8CPU%E3%80%82">https://www.cnblogs.com/CodeWithTxT/p/11370215.html#:~:text=%E4%B8%BA%E4%BA%86%E6%9B%B4%E5%90%88%E7%90%86%E7%9A%84%E5%88%A9%E7%94%A8,%E5%88%86%E5%9C%B0%E5%88%A9%E7%94%A8CPU%E3%80%82</a></p></li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><ul><li><a href=#1g结构体>1.G结构体</a></li><li><a href=#11-go关键字绑定gopcstartpc>1.1 go关键字绑定(gopc、startpc)</a></li><li><a href=#12-goroutine的上下文信息sched>1.2 goroutine的上下文信息(sched)</a><ul><li><a href=#121-恢复goroutine上下文到寄存器>1.2.1 恢复goroutine上下文到寄存器</a></li><li><a href=#122-保存寄存器值到goroutine上下文>1.2.2 保存寄存器值到goroutine上下文</a></li></ul></li></ul></li><li><a href=#golang-gmp概念>golang GMP概念</a><ul><li><a href=#fqa>FQA</a><ul><li><a href=#g0m0gm>g0,m0,gM</a></li><li><a href=#说一说gmp的底层实现>说一说GMP的底层实现。</a><ul><li><a href=#从程序加载到main函数执行的过程>从程序加载到main函数执行的过程。</a></li><li><a href=#新的goroutine创建的过程newproc>新的goroutine创建的过程newproc()。</a></li><li><a href=#调度的过程schedule>调度的过程schedule()。</a></li></ul></li></ul></li><li><a href=#archive>archive</a></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></div></aside></main></body></html><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><script type=text/javascript>(function(){var e="language-viz-";Array.prototype.forEach.call(document.querySelectorAll("[class^="+e+"]"),function(t){console.log(t),t.getAttribute("class").split(" ").forEach(function(t){t.startsWith(e)&&(s=t.substr(e.length))}),console.log("------------MIDDLE--------");var s,o=Viz(t.innerText,{format:"svg",engine:s}),n=(new DOMParser).parseFromString(o,"image/svg+xml");n.documentElement.setAttribute("style","max-width:100%; max-height:100%;"),t.parentNode.insertBefore(n.documentElement,t),t.style.display="none",t.parentNode.style.backgroundColor="white",t.style.width=n.documentElement.getAttribute("width")+"px",t.style.height=n.documentElement.getAttribute("height")+"px",console.log("--------------END------")})})()</script>
+<a href=https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw/edit>Scalable Go Scheduler Design Doc</a></p></li><li><p><a href=https://lessisbetter.site/2019/04/14/golang-scheduler-4-explore-source-code/>https://lessisbetter.site/2019/04/14/golang-scheduler-4-explore-source-code/</a></p></li><li><p><a href="https://speakerdeck.com/kavya719/the-scheduler-saga?slide=103">https://speakerdeck.com/kavya719/the-scheduler-saga?slide=103</a></p></li><li><p><a href="https://www.cnblogs.com/CodeWithTxT/p/11370215.html#:~:text=%E4%B8%BA%E4%BA%86%E6%9B%B4%E5%90%88%E7%90%86%E7%9A%84%E5%88%A9%E7%94%A8,%E5%88%86%E5%9C%B0%E5%88%A9%E7%94%A8CPU%E3%80%82">https://www.cnblogs.com/CodeWithTxT/p/11370215.html#:~:text=%E4%B8%BA%E4%BA%86%E6%9B%B4%E5%90%88%E7%90%86%E7%9A%84%E5%88%A9%E7%94%A8,%E5%88%86%E5%9C%B0%E5%88%A9%E7%94%A8CPU%E3%80%82</a></p></li></ul></article><footer class=book-footer><div class="flex flex-wrap justify-between"></div><script>(function(){function e(e){const t=window.getSelection(),n=document.createRange();n.selectNodeContents(e),t.removeAllRanges(),t.addRange(n)}document.querySelectorAll("pre code").forEach(t=>{t.addEventListener("click",function(){if(window.getSelection().toString())return;e(t.parentElement),navigator.clipboard&&navigator.clipboard.writeText(t.parentElement.textContent)})})})()</script></footer><div class=book-comments><script src=https://giscus.app/client.js data-repo=zput/utterances-comments data-repo-id=R_kgDOHhATGQ data-category=Announcements data-category-id=DIC_kwDOHhATGc4CPxca data-mapping=pathname data-reactions-enabled=1 data-emit-metadata=1 data-input-position=top data-theme=light data-lang=zh-CN data-loading=lazy crossorigin=anonymous async></script></div><label for=menu-control class="hidden book-menu-overlay"></label></div><aside class=book-toc><div class=book-toc-content><nav id=TableOfContents><ul><li><a href=#同步异步阻塞非阻塞>同步&异步/阻塞&非阻塞</a><ul><li><a href=#同步异步>同步异步</a><ul><li><a href=#程序处理多任务>程序处理多任务</a></li><li><a href=#程序与外部交互可以是外部系统也可能是操作系统>程序与外部交互(可以是外部系统，也可能是操作系统)</a></li></ul></li></ul></li><li><a href=#协程>协程</a><ul><li><a href=#协程和多线程的关系>协程和多线程的关系</a></li></ul></li><li><a href=#gmp模型结构体>GMP模型结构体</a><ul><li><a href=#1g结构体>1.G结构体</a></li><li><a href=#11-go关键字绑定gopcstartpc>1.1 go关键字绑定(gopc、startpc)</a></li><li><a href=#12-goroutine的上下文信息sched>1.2 goroutine的上下文信息(sched)</a><ul><li><a href=#121-恢复goroutine上下文到寄存器>1.2.1 恢复goroutine上下文到寄存器</a></li><li><a href=#122-保存寄存器值到goroutine上下文>1.2.2 保存寄存器值到goroutine上下文</a></li></ul></li></ul></li><li><a href=#golang-gmp概念>golang GMP概念</a><ul><li><a href=#fqa>FQA</a><ul><li><a href=#g0m0gm>g0,m0,gM</a></li><li><a href=#说一说gmp的底层实现>说一说GMP的底层实现。</a><ul><li><a href=#从程序加载到main函数执行的过程>从程序加载到main函数执行的过程。</a></li><li><a href=#新的goroutine创建的过程newproc>新的goroutine创建的过程newproc()。</a></li><li><a href=#调度的过程schedule>调度的过程schedule()。</a></li></ul></li></ul></li><li><a href=#archive>archive</a></li><li><a href=#附录>附录</a></li></ul></li></ul></nav></div></aside></main></body></html><script type=text/javascript src=https://cdn.bootcss.com/viz.js/1.8.2/viz.js></script><script type=text/javascript>(function(){var e="language-viz-";Array.prototype.forEach.call(document.querySelectorAll("[class^="+e+"]"),function(t){console.log(t),t.getAttribute("class").split(" ").forEach(function(t){t.startsWith(e)&&(s=t.substr(e.length))}),console.log("------------MIDDLE--------");var s,o=Viz(t.innerText,{format:"svg",engine:s}),n=(new DOMParser).parseFromString(o,"image/svg+xml");n.documentElement.setAttribute("style","max-width:100%; max-height:100%;"),t.parentNode.insertBefore(n.documentElement,t),t.style.display="none",t.parentNode.style.backgroundColor="white",t.style.width=n.documentElement.getAttribute("width")+"px",t.style.height=n.documentElement.getAttribute("height")+"px",console.log("--------------END------")})})()</script>

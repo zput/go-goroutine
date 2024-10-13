@@ -1,48 +1,93 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;pre tabindex="0">&lt;code class="language-plantuml" data-lang="plantuml">@startuml
-package &amp;#34;Concurrency vs Parallelism&amp;#34; {
- class Concurrency {
- + Task1
- + Task2
- + Task3
- note right: Tasks are managed\nand switched by the CPU
- }
- 
- class Parallelism {
- + Task1
- + Task2
- + Task3
- note right: Tasks are executed\nsimultaneously on different cores
- }
- 
- Concurrency -- Parallelism : Difference
-}
-@enduml
-&lt;/code>&lt;/pre>&lt;p>我觉得“同步/异步”、“阻塞/非阻塞”可以从字面上理解。所谓“同步”，是指“相同的步调”，既然是相同，必然涉及比较，那么就是关于两者（调用方与被调用方）的。也即是说，“同步/异步”描述的是两个模块之间的关系。所谓“阻塞”，是指“无法前进”了，“卡住了”，等待在那里而不能做其他事情了。也即是说，“阻塞/非阻塞”描述的是一个模块自身的运行状态。“同步/异步”、“阻塞/非阻塞”一个是描述两者的关系，另一个是描述一者的状态，所以其实是讲的不同的事情。&lt;/p>
-&lt;p>阻塞IO就是那种recv, read，一直等，等到有了数据才返回；&lt;/p>
-&lt;p>非阻塞IO就是立即返回，设置描述符为非阻塞，但是要进程自己一直检查是否可读；&lt;/p>
-&lt;p>IO复用其实也是阻塞的，不过可以用来等很多描述符，比起阻塞有了进步，可以算有点异步了，但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。&lt;/p>
-&lt;p>信号驱动采用信号机制等待，有了更多的进步，不用监视描述符了，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。&lt;/p>
-&lt;p>异步IO，发送IO请求后，不用等了，也不再需要发送IO请求获取结果了。等到通知后，其实是系统帮你把数据读取好了的，你等到的通知也不再是要求你去读写IO了，而是告诉你IO请求过程已经结束了。你要做的就是可以处理数据了。且同一个描述符上可能同时存在很多请求。(对应上面那个买书例子中，就是送书到我家，我直接看书就行了，不需要再去跑一趟了)。&lt;/p>
-&lt;p>一个操作可以是非阻塞的但仍然是同步的，也就是说调用者仍然需要等待操作完成后才能继续执行。&lt;/p>
-&lt;ol>
-&lt;li>
-&lt;p>同步异步是一种涉及两方的关系。&lt;/p>
-&lt;/li>
-&lt;li>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;h1 id="同步异步阻塞非阻塞">
+ 同步&amp;amp;异步/阻塞&amp;amp;非阻塞
+ &lt;a class="anchor" href="#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5%e9%98%bb%e5%a1%9e%e9%9d%9e%e9%98%bb%e5%a1%9e">#&lt;/a>
+&lt;/h1>
+&lt;p>同步/异步、阻塞/非阻塞可从字面上理解。&lt;/p>
+&lt;p>同步，同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的&amp;quot;关系&amp;quot;。（最常见的比如：调用方、被调用方）。&lt;/p>
+&lt;p>阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。&lt;/p>
+&lt;p>综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。&lt;/p>
+&lt;h2 id="同步异步">
+ 同步异步
+ &lt;a class="anchor" href="#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5">#&lt;/a>
+&lt;/h2>
+&lt;blockquote>
+&lt;p>同步异步是一种涉及两着的关系。&lt;/p>
+&lt;/blockquote>
+&lt;h3 id="程序处理多任务">
+ 程序处理多任务
+ &lt;a class="anchor" href="#%e7%a8%8b%e5%ba%8f%e5%a4%84%e7%90%86%e5%a4%9a%e4%bb%bb%e5%8a%a1">#&lt;/a>
+&lt;/h3>
+&lt;blockquote>
 &lt;p>并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B&lt;/p>
-&lt;/li>
-&lt;li>
+&lt;/blockquote>
+&lt;p>并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应
+能力。
+并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。&lt;/p>
+&lt;p align="left">
+ &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20241013152155.png" width = "50%" height="50%" alt="效果图">
+&lt;/p>
+&lt;blockquote>
+&lt;p>并行∈并发，并发=并行+交错&lt;/p>
+&lt;/blockquote>
+&lt;p>这里并发包括同步（synchronous）和异步（asynchronous）两种方式:
+同步是指任务按照一定的顺序依次执行，每个任务需要等待前一个任务完成后才能执行，任务之间有明显的先后顺序。同步执行的任务需要占用CPU资源，但是其执行结果是可预测的。&lt;/p>
+&lt;p>异步是指任务在不等待其他任务执行结果的情况下，直接进行下一步操作，任务之间不受顺序限制。异步执行的任务不会占用CPU资源，因为它们不会一直等待其他任务的完成，但是其执行结果不一定是可预测的。&lt;/p>
+&lt;h3 id="程序与外部交互可以是外部系统也可能是操作系统">
+ 程序与外部交互(可以是外部系统，也可能是操作系统)
+ &lt;a class="anchor" href="#%e7%a8%8b%e5%ba%8f%e4%b8%8e%e5%a4%96%e9%83%a8%e4%ba%a4%e4%ba%92%e5%8f%af%e4%bb%a5%e6%98%af%e5%a4%96%e9%83%a8%e7%b3%bb%e7%bb%9f%e4%b9%9f%e5%8f%af%e8%83%bd%e6%98%af%e6%93%8d%e4%bd%9c%e7%b3%bb%e7%bb%9f">#&lt;/a>
+&lt;/h3>
 &lt;p>调用方与被调用方的关系。&lt;/p>
-&lt;/li>
+&lt;ol>
+&lt;li>web开发最多的HTTP接口同步异步。&lt;/li>
 &lt;/ol>
-&lt;p>同步http请求，异步http请求:
-同步：提交请求(调用方)-&amp;gt;等待服务器处理(被调用方)-&amp;gt;处理完毕返回 这个期间客户端浏览器不能干任何事(调用方)
-异步: 请求通过事件触发(调用方)-&amp;gt;服务器处理（这是浏览器仍然可以作其他事情）-&amp;gt;处理完毕&lt;/p>
-&lt;p>同步io，异步io&lt;/p>
-&lt;p>2.同步、异步&lt;/p>
-&lt;p>定义&lt;/p>
-&lt;p>同步：在发出一个同步调用后，只有得到结果后，该调用才会。
-异步：在发出一个异步调用后，调用者不会立刻得到结果，该调用就返回了.&lt;/p></description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
+&lt;blockquote>
+&lt;p>需要说明的是接口本身不区分同步和异步。这种区分更在于客户端(调用方)如何与接口进行交互，以及服务端(被调用方)如何处理请求。&lt;/p>
+&lt;ul>
+&lt;li>服务端接口
+&lt;ul>
+&lt;li>服务端实现：服务端处理请求的方式可以是同步的，也可以是异步的。同步实现可能在处理请求时会阻塞直到完成，而异步实现可能会利用事件驱动或多线程来提高并发性和响应速度。&lt;/li>
+&lt;li>对客户端的透明性：从客户端的角度来看，服务端的实现细节是透明的。客户端并不知道服务端是同步还是异步地处理请求。&lt;/li>
+&lt;li>提供额外的机制来支持异步操作，例如：
+&lt;ul>
+&lt;li>Webhooks/mq：服务端在处理完成后主动通知客户端。&lt;/li>
+&lt;li>回调URL：客户端提供一个回调URL，服务端在处理完成后向该URL发送通知。&lt;/li>
+&lt;li>轮询（Polling）：客户端定期检查服务端的状态以获取结果。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>客户端调用
+&lt;ul>
+&lt;li>同步调用：客户端发起请求并等待响应完成后再继续执行其他操作。这种方式在编写代码时表现为阻塞调用。&lt;/li>
+&lt;li>异步调用：客户端发起请求后可以立即继续执行其他任务，并在响应返回时通过回调、Promise或其他机制处理结果。&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;ol start="2">
+&lt;li>操作系统的io操作, 同步io，异步io。&lt;/li>
+&lt;/ol>
+&lt;p>《UNIX Network Programming》（简称UNP）中，通常总结了五种I/O模型，这些模型描述了在UNIX系统中进行网络编程时处理I/O操作的不同方式。&lt;/p>
+&lt;blockquote>
+&lt;p>阻塞 I/O 模型（Blocking I/O）&lt;/p>
+&lt;ul>
+&lt;li>描述：这是最简单的I/O模型。在发起I/O操作（如read或recv）时，调用方会阻塞，直到数据准备好并完成操作。&lt;/li>
+&lt;li>优点：实现简单，因为所有操作都是顺序进行的。&lt;/li>
+&lt;li>缺点：在等待数据时，调用方无法执行其他任务，这可能导致资源低效利用。&lt;/li>
+&lt;/ul>
+&lt;p>非阻塞 I/O 模型（Non-blocking I/O）&lt;/p>
+&lt;ul>
+&lt;li>描述：调用方在发起I/O操作时立即返回，即使数据尚未准备好。调用方需要不断地重试操作以检查数据是否可用。&lt;/li>
+&lt;li>优点：调用方在等待数据时可以执行其他任务。&lt;/li>
+&lt;li>缺点：需要实现轮询机制（polling），这可能导致CPU资源浪费。&lt;/li>
+&lt;/ul>
+&lt;p>I/O 复用模型（I/O Multiplexing）&lt;/p>
+&lt;ul>
+&lt;li>描述：使用select、poll或epoll等系统调用来监视多个文件描述符。当一个或多个文件描述符准备好进行I/O操作时，系统调用返回。(可以用来等很多描述符, 但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。)&lt;/li>
+&lt;li>优点：允许一个线程同时处理多个I/O操作，提高资源利用率。&lt;/li>
+&lt;li>缺点：在监视大量文件描述符时可能存在性能瓶颈。&lt;/li>
+&lt;/ul>
+&lt;p>信号驱动 I/O 模型（Signal-driven I/O）&lt;/p></description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
  1 前言
  &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80">#&lt;/a>
 &lt;/h1>
