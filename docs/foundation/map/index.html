@@ -1,61 +1,4 @@
-<!doctype html><html lang=zh dir=ltr><head><meta charset=UTF-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="
-  并发map
-  #
-
-设计一个并发的map,最简单的就是使用锁加普通map来实现。
-type simpleConcurrentMap struct{
-    mu sync.Mutex
-    m map[interface{}]interface{}
-}
-上面情形，不管是读还是写都需要先加锁，性能太低，假设我们要设计一个高并发的map呢？我们按读写操作来分一下类：
-
-读多写少
-读少写多
-读写平衡
-可以分为上述三类。
-
-
-  读多写少场景
-  #
-
-可以让它们读写分离,分成两个map（readMap与writeMap）, 类似mysql的读写分离吗? 那么插入/更新(删除)的时候怎么从writeMap同步到readMap呢？不可能实时同步，否则readMap也转变为了writeMap,也需要加锁!!! 这么看读写分离就没有必要了，徒增复杂度。
-那么可以设计成类似缓存的cacheMap(不加锁，原子锁)与持久化的persistentMap(加锁)？且把真实的value保存在第三方，自己保留的是第三方的句柄(handle), 类似下图的结构:
-cacheMap:                                  nil
-   key--->ValuePtr(第三方句柄)              /
-                         \               /
-                          \             /
-                           --->valuePtr/----->value(真实的值)
-                          / 可理解为第三方的唯一键
-persistentMap:           /
-   key--->valuePtr(第三方句柄)
-当删除的时候，如果在cacheMap中存在，就把对应的ValuePtr设置为nil(代表删除)
-当更新的的时候，如果在cacheMap中存在，就把对应的ValuePtr所指向的value改为newValue(这样persistentMap也更新了)
-当查询的时候，先去cacheMap查(如果key存在，valuePtr为nil则说明删除了，但是没有同步到persistentMap)，再去persistentMap查
-当插入新的key时候，操作persistentMap。但是这也会遇到什么时候同步到cacheMap中去的问题，因为如果一直不同步，会导致查询的时候都会到persistentMap中去，也是要加锁的。
-一个补偿措施是: 加一个计数器misses，在查询的时候，如果只有在persistentMap中才查到则misses++，到了一定条件，我们把persistentMap安全地同步到cacheMap中，并且清空persistentMap。
-cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只能读或者改。
-
-golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。
-
-读取 Map.Load
-
-if is exist readMap[key]
-    读取返回
-    ret
-lock()
-if is exist readMap[key]         // double-checking
-    读取返回
-else if is exist dirtyMap[key]
-    读到了，在dirtyMap存在，但是在readMap中不存在
-    misses++  // 未命中自增
-    if misses >= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap
-        readMap = dirtyMap
-        dirtyMap = nil // dirtyMap置空
-else 
-    key is not exist
-unlock()
-
-写入 Map.Store"><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/foundation/map/"><meta property="og:site_name" content="go调度源码分析"><meta property="og:title" content="map"><meta property="og:description" content=" 并发map # 设计一个并发的map,最简单的就是使用锁加普通map来实现。
+<!doctype html><html lang=zh dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="并发map # 设计一个并发的map,最简单的就是使用锁加普通map来实现。
 type simpleConcurrentMap struct{ mu sync.Mutex m map[interface{}]interface{} } 上面情形，不管是读还是写都需要先加锁，性能太低，假设我们要设计一个高并发的map呢？我们按读写操作来分一下类：
 读多写少 读少写多 读写平衡 可以分为上述三类。 读多写少场景 # 可以让它们读写分离,分成两个map（readMap与writeMap）, 类似mysql的读写分离吗? 那么插入/更新(删除)的时候怎么从writeMap同步到readMap呢？不可能实时同步，否则readMap也转变为了writeMap,也需要加锁!!! 这么看读写分离就没有必要了，徒增复杂度。
 那么可以设计成类似缓存的cacheMap(不加锁，原子锁)与持久化的persistentMap(加锁)？且把真实的value保存在第三方，自己保留的是第三方的句柄(handle), 类似下图的结构:
@@ -64,12 +7,23 @@ cacheMap: nil key--->ValuePtr(第三方句柄) / \ / \ / --->valuePtr/----->valu
 cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只能读或者改。
 golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。
 读取 Map.Load
-if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses >= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map.Store"><meta property="og:locale" content="zh"><meta property="og:type" content="article"><meta property="article:section" content="docs"><title>map | go调度源码分析</title>
-<link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script><script defer src=/go-goroutine/en.search.min.e8f3027174919f2e180a0249799944e9fe3b88c531db0e7f0672d53b680a727e.js integrity="sha256-6PMCcXSRny4YCgJJeZlE6f47iMUx2w5/BnLVO2gKcn4=" crossorigin=anonymous></script><script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
+if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses >= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map."><meta name=theme-color media="(prefers-color-scheme: light)" content="#ffffff"><meta name=theme-color media="(prefers-color-scheme: dark)" content="#343a40"><meta name=color-scheme content="light dark"><meta property="og:title" content="map"><meta property="og:description" content="并发map # 设计一个并发的map,最简单的就是使用锁加普通map来实现。
+type simpleConcurrentMap struct{ mu sync.Mutex m map[interface{}]interface{} } 上面情形，不管是读还是写都需要先加锁，性能太低，假设我们要设计一个高并发的map呢？我们按读写操作来分一下类：
+读多写少 读少写多 读写平衡 可以分为上述三类。 读多写少场景 # 可以让它们读写分离,分成两个map（readMap与writeMap）, 类似mysql的读写分离吗? 那么插入/更新(删除)的时候怎么从writeMap同步到readMap呢？不可能实时同步，否则readMap也转变为了writeMap,也需要加锁!!! 这么看读写分离就没有必要了，徒增复杂度。
+那么可以设计成类似缓存的cacheMap(不加锁，原子锁)与持久化的persistentMap(加锁)？且把真实的value保存在第三方，自己保留的是第三方的句柄(handle), 类似下图的结构:
+cacheMap: nil key--->ValuePtr(第三方句柄) / \ / \ / --->valuePtr/----->value(真实的值) / 可理解为第三方的唯一键 persistentMap: / key--->valuePtr(第三方句柄) 当删除的时候，如果在cacheMap中存在，就把对应的ValuePtr设置为nil(代表删除) 当更新的的时候，如果在cacheMap中存在，就把对应的ValuePtr所指向的value改为newValue(这样persistentMap也更新了) 当查询的时候，先去cacheMap查(如果key存在，valuePtr为nil则说明删除了，但是没有同步到persistentMap)，再去persistentMap查 当插入新的key时候，操作persistentMap。但是这也会遇到什么时候同步到cacheMap中去的问题，因为如果一直不同步，会导致查询的时候都会到persistentMap中去，也是要加锁的。
+一个补偿措施是: 加一个计数器misses，在查询的时候，如果只有在persistentMap中才查到则misses++，到了一定条件，我们把persistentMap安全地同步到cacheMap中，并且清空persistentMap。
+cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只能读或者改。
+golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。
+读取 Map.Load
+if is exist readMap[key] 读取返回 ret lock() if is exist readMap[key] // double-checking 读取返回 else if is exist dirtyMap[key] 读到了，在dirtyMap存在，但是在readMap中不存在 misses++ // 未命中自增 if misses >= len(dirtyMap) // 判断是否需要把dirtyMap提升级为readMap readMap = dirtyMap dirtyMap = nil // dirtyMap置空 else key is not exist unlock() 写入 Map."><meta property="og:type" content="article"><meta property="og:url" content="https://zput.github.io/go-goroutine/docs/foundation/map/"><meta property="article:section" content="docs"><title>map | go调度源码分析</title><link rel=manifest href=/go-goroutine/manifest.json><link rel=icon href=/go-goroutine/favicon.png><link rel=stylesheet href=/go-goroutine/book.min.a7d3a43391e1f7eb43ae94bcae6354b739c49cba56473620924ec707afe0864d.css integrity="sha256-p9OkM5Hh9+tDrpS8rmNUtznEnLpWRzYgkk7HB6/ghk0=" crossorigin=anonymous><script defer src=/go-goroutine/flexsearch.min.js></script>
+<script defer src=/go-goroutine/en.search.min.0b1724745d1ed3b5e5072382095a64c68b616bcdb739909acba7cca20221ee6f.js integrity="sha256-CxckdF0e07XlByOCCVpkxotha823OZCay6fMogIh7m8=" crossorigin=anonymous></script>
+<script defer src=/go-goroutine/sw.min.ec96d6e09af3075a94dd4de723a2edddf2ef138381c7e1e5b5a1f2c0578ee8bd.js integrity="sha256-7JbW4JrzB1qU3U3nI6Lt3fLvE4OBx+HltaHywFeO6L0=" crossorigin=anonymous></script></head><body dir=ltr><input type=checkbox class="hidden toggle" id=menu-control>
 <input type=checkbox class="hidden toggle" id=toc-control><main class="container flex"><aside class=book-menu><div class=book-menu-content><nav><h2 class=book-brand><a class="flex align-center" href=/go-goroutine/><span>go调度源码分析</span></a></h2><div class=magic><div class=book-search><input type=text id=book-search-input placeholder=Search aria-label=Search maxlength=64><div class="book-search-spinner spinner hidden"></div><ul id=book-search-results></ul></div><div class=book-switch><label class=switch><input id=dark-mode-checkbox type=checkbox onchange=darkmode()>
-<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/ class=active>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP模型结构体</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-740657f38f0c4de9a986bda642ff0388 class=toggle>
-<label for=section-740657f38f0c4de9a986bda642ff0388 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script><script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu>
-</label><strong>map</strong>
+<span class=slider></span></label></div></div><ul><li><a href=https://zput.github.io target=_blank rel=noopener>Zput博客</a></li><li><a href=https://github.com/zput target=_blank rel=noopener>GitHub</a></li></ul><hr><ul><li><span>基础知识</span><ul><li><a href=/go-goroutine/docs/foundation/golang_basic/>基本用法</a></li><li><a href=/go-goroutine/docs/foundation/slice/>slice</a></li><li><a href=/go-goroutine/docs/foundation/map/ class=active>map</a></li><li><a href=/go-goroutine/docs/foundation/sort/>sort</a></li><li><a href=/go-goroutine/docs/foundation/directory/>Directory</a></li></ul></li><li><span>鲁棒和性能</span><ul><li><a href=/go-goroutine/docs/robustness_and_performance/golang_test/>测试相关函数</a></li></ul></li><li><span>运行时</span><ul><li><a href=/go-goroutine/docs/runtime/golang_gmp/>GMP模型结构体</a></li><li><span>堆分配原理</span><ul><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/1_summarize/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_big_object/>分配大对象</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_middle_object/>概述</a></li><li><a href=/go-goroutine/docs/runtime/heap/ch0_prespective_of_uses/alloc_small_object/>概述</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/golang_memery/>内存分配器</a></li><li><a href=/go-goroutine/docs/runtime/golang_gc/>垃圾回收</a></li><li><a href=/go-goroutine/docs/runtime/schedule/>调度</a><ul><li><span>前置知识</span><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/register_functionstack/>伪寄存器与函数栈帧</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/similar_assemble/>类汇编</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch0-preknowledge/go_underlying_struct/>底层重要结构</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/2_init_before_enter_main_function/>初始化</a></li><li><a href=/go-goroutine/docs/runtime/schedule/3_exit_goroutine/>退出</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/>调度挑选策略</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/take_goroutine_from_globalorlocal_p/>从全局/本P队列</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch1-scheduling_selection_strategy/steal_goroutine_from_other_p/>从其他P队列</a></li></ul></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/>调度到达时机</a><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/active_scheduling/>主动调度</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/passive_scheduling/>被动调度</a></li><li><input type=checkbox id=section-99f41010918d678e89a7af90330cabe1 class=toggle>
+<label for=section-99f41010918d678e89a7af90330cabe1 class="flex justify-between"><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/>剥夺调度</a></label><ul><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/start_sysmon/>开启系统监控</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/user_code_preemption/>代码执行过久</a></li><li><a href=/go-goroutine/docs/runtime/schedule/ch2-Scheduling_arrival_time/deprivation_of_scheduling/system_call_preemption/>陷入系统调用</a></li></ul></li></ul></li></ul></li></ul></li></ul></nav><script>(function(){var e=document.querySelector("aside .book-menu-content");addEventListener("beforeunload",function(){localStorage.setItem("menu.scrollTop",e.scrollTop)}),e.scrollTop=localStorage.getItem("menu.scrollTop")})()</script><script src=/go-goroutine/magic.js></script>
+<script src=/go-goroutine/dark.js></script></div></aside><div class=book-page><header class=book-header><div class="flex align-center justify-between"><label for=menu-control><img src=/go-goroutine/svg/menu.svg class=book-icon alt=Menu></label>
+<strong>map</strong>
 <label for=toc-control><img src=/go-goroutine/svg/toc.svg class=book-icon alt="Table of Contents"></label></div><aside class="hidden clearfix"><nav id=TableOfContents><ul><li><ul><li><a href=#并发map>并发map</a><ul><li><a href=#读多写少场景>读多写少场景</a><ul><li><a href=#疑问>疑问</a></li></ul></li><li><a href=#读少写多读写平衡场景>读少写多/读写平衡场景</a></li></ul></li></ul></li></ul></nav></aside></header><article class=markdown><h2 id=并发map>并发map
 <a class=anchor href=#%e5%b9%b6%e5%8f%91map>#</a></h2><p>设计一个并发的map,最简单的就是使用锁加普通map来实现。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>type</span> <span style=color:#a6e22e>simpleConcurrentMap</span> <span style=color:#66d9ef>struct</span>{
 </span></span><span style=display:flex><span>    <span style=color:#a6e22e>mu</span> <span style=color:#a6e22e>sync</span>.<span style=color:#a6e22e>Mutex</span>
@@ -89,13 +43,13 @@ persistentMap:           /
 当更新的的时候，如果在cacheMap中存在，就把对应的ValuePtr所指向的value改为newValue(这样persistentMap也更新了)
 当查询的时候，先去cacheMap查(如果key存在，valuePtr为nil则说明删除了，但是没有同步到persistentMap)，再去persistentMap查
 当插入新的key时候，操作persistentMap。但是这也会遇到什么时候同步到cacheMap中去的问题，因为如果一直不同步，会导致查询的时候都会到persistentMap中去，也是要加锁的。</p><p>一个补偿措施是: 加一个计数器misses，在查询的时候，如果只有在persistentMap中才查到则<code>misses++</code>，到了一定条件，我们把persistentMap安全地同步到cacheMap中，并且清空persistentMap。</p><p>cacheMap是 persistentMap的一个只读拷贝，禁止自行增加新key，只能读或者改。</p><hr><p>golang中的sync.Map就是一种适合读多写少的并发map; 把我们的 persistentMap 叫做了 dirtyMap，把persistentMap 同步到 cacheMap 叫做了promote（升级）。</p><blockquote><p>读取 Map.Load</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>exist</span> <span style=color:#a6e22e>readMap</span>[<span style=color:#a6e22e>key</span>]
-</span></span><span style=display:flex><span>    <span style=color:#a6e22e>读取返回</span>
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>读取返回</span>
 </span></span><span style=display:flex><span>    <span style=color:#a6e22e>ret</span>
 </span></span><span style=display:flex><span><span style=color:#a6e22e>lock</span>()
 </span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>exist</span> <span style=color:#a6e22e>readMap</span>[<span style=color:#a6e22e>key</span>]         <span style=color:#75715e>// double-checking
-</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#a6e22e>读取返回</span>
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#960050;background-color:#1e0010>读取返回</span>
 </span></span><span style=display:flex><span><span style=color:#66d9ef>else</span> <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>exist</span> <span style=color:#a6e22e>dirtyMap</span>[<span style=color:#a6e22e>key</span>]
-</span></span><span style=display:flex><span>    <span style=color:#a6e22e>读到了</span><span style=color:#960050;background-color:#1e0010>，</span><span style=color:#a6e22e>在dirtyMap存在</span><span style=color:#960050;background-color:#1e0010>，</span><span style=color:#a6e22e>但是在readMap中不存在</span>
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>读到了，在</span><span style=color:#a6e22e>dirtyMap</span><span style=color:#960050;background-color:#1e0010>存在，但是在</span><span style=color:#a6e22e>readMap</span><span style=color:#960050;background-color:#1e0010>中不存在</span>
 </span></span><span style=display:flex><span>    <span style=color:#a6e22e>misses</span><span style=color:#f92672>++</span>  <span style=color:#75715e>// 未命中自增
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>misses</span> <span style=color:#f92672>&gt;=</span> len(<span style=color:#a6e22e>dirtyMap</span>) <span style=color:#75715e>// 判断是否需要把dirtyMap提升级为readMap
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>        <span style=color:#a6e22e>readMap</span> = <span style=color:#a6e22e>dirtyMap</span>
@@ -104,15 +58,15 @@ persistentMap:           /
 </span></span><span style=display:flex><span>    <span style=color:#a6e22e>key</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>not</span> <span style=color:#a6e22e>exist</span>
 </span></span><span style=display:flex><span><span style=color:#a6e22e>unlock</span>()
 </span></span></code></pre></div><blockquote><p>写入 Map.Store</p></blockquote><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>exist</span> <span style=color:#a6e22e>readMap</span>[<span style=color:#a6e22e>key</span>]
-</span></span><span style=display:flex><span>    <span style=color:#a6e22e>原子操作直接修改值指针</span>
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>原子操作直接修改值指针</span>
 </span></span><span style=display:flex><span>    <span style=color:#a6e22e>ret</span>
 </span></span><span style=display:flex><span><span style=color:#a6e22e>lock</span>()
 </span></span><span style=display:flex><span><span style=color:#66d9ef>if</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>exist</span> <span style=color:#a6e22e>readMap</span>[<span style=color:#a6e22e>key</span>]         <span style=color:#75715e>// double-checking
-</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#a6e22e>原子操作直接修改值指针</span>
+</span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#960050;background-color:#1e0010>原子操作直接修改值指针</span>
 </span></span><span style=display:flex><span><span style=color:#66d9ef>else</span> <span style=color:#66d9ef>if</span> <span style=color:#a6e22e>is</span> <span style=color:#a6e22e>exist</span> <span style=color:#a6e22e>dirtyMap</span>[<span style=color:#a6e22e>key</span>]
-</span></span><span style=display:flex><span>    <span style=color:#a6e22e>修改值指针</span>
+</span></span><span style=display:flex><span>    <span style=color:#960050;background-color:#1e0010>修改值指针</span>
 </span></span><span style=display:flex><span><span style=color:#66d9ef>else</span> 
-</span></span><span style=display:flex><span>    <span style=color:#a6e22e>dirtyMap新增一个key</span><span style=color:#960050;background-color:#1e0010>，</span><span style=color:#a6e22e>方便之后dirtyMap升级成readMmap</span><span style=color:#960050;background-color:#1e0010>，</span><span style=color:#a6e22e>我们还要把原先的readMap中没删除的全复制过来</span>
+</span></span><span style=display:flex><span>    <span style=color:#a6e22e>dirtyMap</span><span style=color:#960050;background-color:#1e0010>新增一个</span><span style=color:#a6e22e>key</span><span style=color:#960050;background-color:#1e0010>，方便之后</span><span style=color:#a6e22e>dirtyMap</span><span style=color:#960050;background-color:#1e0010>升级成</span><span style=color:#a6e22e>readMmap</span><span style=color:#960050;background-color:#1e0010>，我们还要把原先的</span><span style=color:#a6e22e>readMap</span><span style=color:#960050;background-color:#1e0010>中没删除的全复制过来</span>
 </span></span><span style=display:flex><span><span style=color:#a6e22e>unlock</span>()
 </span></span></code></pre></div><p>这里补充一下两个字段的解释：</p><p>一个是misses,一个是readOnly.amended; 而dirty与readOnly.m数据类型是一样的。</p><p>readOnly.amended是判断是否dirtyMap中容纳readMap所没有的key, 首先说下它的位置，它是和readMap一起放在readOnly结构体中的, 这是方便进行原子的操作, readOnly是不能修改的。如果要修改只能是用一个新的readOnly去替换旧的only，<code>m.read.Store(readOnly{m: read.m, amended: true})</code>比如这个，要修改readOnly.amended，就是构造一个新的readOnly去原子替换, 所以它没有与misses一样放在外面。</p><pre tabindex=0><code>type Map struct {
 	mu Mutex

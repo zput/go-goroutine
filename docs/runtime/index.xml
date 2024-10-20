@@ -1,321 +1,51 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo</generator><language>zh</language><lastBuildDate>Mon, 01 Jan 0001 00:00:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>&lt;h1 id="同步异步阻塞非阻塞">
- 同步&amp;amp;异步/阻塞&amp;amp;非阻塞
- &lt;a class="anchor" href="#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5%e9%98%bb%e5%a1%9e%e9%9d%9e%e9%98%bb%e5%a1%9e">#&lt;/a>
-&lt;/h1>
-&lt;p>同步/异步、阻塞/非阻塞可从字面上理解。&lt;/p>
-&lt;p>同步，同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的&amp;quot;关系&amp;quot;。（最常见的比如：调用方、被调用方）。&lt;/p>
-&lt;p>阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。&lt;/p>
-&lt;p>综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。&lt;/p>
-&lt;h2 id="同步异步">
- 同步异步
- &lt;a class="anchor" href="#%e5%90%8c%e6%ad%a5%e5%bc%82%e6%ad%a5">#&lt;/a>
-&lt;/h2>
-&lt;blockquote>
-&lt;p>同步异步是一种涉及两着的关系。&lt;/p>
-&lt;/blockquote>
-&lt;h3 id="程序处理多任务">
- 程序处理多任务
- &lt;a class="anchor" href="#%e7%a8%8b%e5%ba%8f%e5%a4%84%e7%90%86%e5%a4%9a%e4%bb%bb%e5%8a%a1">#&lt;/a>
-&lt;/h3>
-&lt;blockquote>
-&lt;p>并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B&lt;/p>
-&lt;/blockquote>
-&lt;p>并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应
-能力。
-并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。&lt;/p>
-&lt;p align="left">
- &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20241013152155.png" width = "50%" height="50%" alt="效果图">
-&lt;/p>
-&lt;blockquote>
-&lt;p>并行∈并发，并发=并行+交错&lt;/p>
-&lt;/blockquote>
-&lt;p>这里并发包括同步（synchronous）和异步（asynchronous）两种方式:
-同步是指任务按照一定的顺序依次执行，每个任务需要等待前一个任务完成后才能执行，任务之间有明显的先后顺序。同步执行的任务需要占用CPU资源，但是其执行结果是可预测的。&lt;/p>
-&lt;p>异步是指任务在不等待其他任务执行结果的情况下，直接进行下一步操作，任务之间不受顺序限制。异步执行的任务不会占用CPU资源，因为它们不会一直等待其他任务的完成，但是其执行结果不一定是可预测的。&lt;/p>
-&lt;h3 id="程序与外部交互可以是外部系统也可能是操作系统">
- 程序与外部交互(可以是外部系统，也可能是操作系统)
- &lt;a class="anchor" href="#%e7%a8%8b%e5%ba%8f%e4%b8%8e%e5%a4%96%e9%83%a8%e4%ba%a4%e4%ba%92%e5%8f%af%e4%bb%a5%e6%98%af%e5%a4%96%e9%83%a8%e7%b3%bb%e7%bb%9f%e4%b9%9f%e5%8f%af%e8%83%bd%e6%98%af%e6%93%8d%e4%bd%9c%e7%b3%bb%e7%bb%9f">#&lt;/a>
-&lt;/h3>
-&lt;p>调用方与被调用方的关系。&lt;/p>
-&lt;ol>
-&lt;li>web开发最多的HTTP接口同步异步。&lt;/li>
-&lt;/ol>
-&lt;blockquote>
-&lt;p>需要说明的是接口本身不区分同步和异步。这种区分更在于客户端(调用方)如何与接口进行交互，以及服务端(被调用方)如何处理请求。&lt;/p>
-&lt;ul>
-&lt;li>服务端接口
-&lt;ul>
-&lt;li>服务端实现：服务端处理请求的方式可以是同步的，也可以是异步的。同步实现可能在处理请求时会阻塞直到完成，而异步实现可能会利用事件驱动或多线程来提高并发性和响应速度。&lt;/li>
-&lt;li>对客户端的透明性：从客户端的角度来看，服务端的实现细节是透明的。客户端并不知道服务端是同步还是异步地处理请求。&lt;/li>
-&lt;li>提供额外的机制来支持异步操作，例如：
-&lt;ul>
-&lt;li>Webhooks/mq：服务端在处理完成后主动通知客户端。&lt;/li>
-&lt;li>回调URL：客户端提供一个回调URL，服务端在处理完成后向该URL发送通知。&lt;/li>
-&lt;li>轮询（Polling）：客户端定期检查服务端的状态以获取结果。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>客户端调用
-&lt;ul>
-&lt;li>同步调用：客户端发起请求并等待响应完成后再继续执行其他操作。这种方式在编写代码时表现为阻塞调用。&lt;/li>
-&lt;li>异步调用：客户端发起请求后可以立即继续执行其他任务，并在响应返回时通过回调、Promise或其他机制处理结果。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;/blockquote>
-&lt;ol start="2">
-&lt;li>操作系统的io操作, 同步io，异步io。&lt;/li>
-&lt;/ol>
-&lt;p>《UNIX Network Programming》（简称UNP）中，通常总结了五种I/O模型，这些模型描述了在UNIX系统中进行网络编程时处理I/O操作的不同方式。&lt;/p>
-&lt;blockquote>
-&lt;p>阻塞 I/O 模型（Blocking I/O）&lt;/p>
-&lt;ul>
-&lt;li>描述：这是最简单的I/O模型。在发起I/O操作（如read或recv）时，调用方会阻塞，直到数据准备好并完成操作。&lt;/li>
-&lt;li>优点：实现简单，因为所有操作都是顺序进行的。&lt;/li>
-&lt;li>缺点：在等待数据时，调用方无法执行其他任务，这可能导致资源低效利用。&lt;/li>
-&lt;/ul>
-&lt;p>非阻塞 I/O 模型（Non-blocking I/O）&lt;/p>
-&lt;ul>
-&lt;li>描述：调用方在发起I/O操作时立即返回，即使数据尚未准备好。调用方需要不断地重试操作以检查数据是否可用。&lt;/li>
-&lt;li>优点：调用方在等待数据时可以执行其他任务。&lt;/li>
-&lt;li>缺点：需要实现轮询机制（polling），这可能导致CPU资源浪费。&lt;/li>
-&lt;/ul>
-&lt;p>I/O 复用模型（I/O Multiplexing）&lt;/p>
-&lt;ul>
-&lt;li>描述：使用select、poll或epoll等系统调用来监视多个文件描述符。当一个或多个文件描述符准备好进行I/O操作时，系统调用返回。(可以用来等很多描述符, 但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。)&lt;/li>
-&lt;li>优点：允许一个线程同时处理多个I/O操作，提高资源利用率。&lt;/li>
-&lt;li>缺点：在监视大量文件描述符时可能存在性能瓶颈。&lt;/li>
-&lt;/ul>
-&lt;p>信号驱动 I/O 模型（Signal-driven I/O）&lt;/p></description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>&lt;h1 id="1-前言">
- 1 前言
- &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80">#&lt;/a>
-&lt;/h1>
-&lt;p>从程序的角度来看，
-我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。&lt;/p>
-&lt;p>细化下上述所说的内容，主要包含如下：&lt;/p>
-&lt;ol>
-&lt;li>怎么评估变量所需的内存大小?&lt;/li>
-&lt;li>如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？&lt;/li>
-&lt;li>如果第二点都使用后者的方式，那么如何进行管理？&lt;/li>
-&lt;/ol>
-&lt;h1 id="2-评估内存大小">
- 2 评估内存大小
- &lt;a class="anchor" href="#2-%e8%af%84%e4%bc%b0%e5%86%85%e5%ad%98%e5%a4%a7%e5%b0%8f">#&lt;/a>
-&lt;/h1>
-&lt;h2 id="21-内存对齐">
- 2.1 内存对齐
- &lt;a class="anchor" href="#21-%e5%86%85%e5%ad%98%e5%af%b9%e9%bd%90">#&lt;/a>
-&lt;/h2>
-&lt;ol>
-&lt;li>what&lt;/li>
-&lt;/ol>
-&lt;p>什么是内存对齐呢？官方解释是：xxxx&lt;/p>
-&lt;blockquote>
-&lt;/blockquote>
-&lt;ol start="2">
-&lt;li>why
-为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。&lt;/li>
-&lt;/ol>
-&lt;h1 id="3-分配内存">
- 3 分配内存
- &lt;a class="anchor" href="#3-%e5%88%86%e9%85%8d%e5%86%85%e5%ad%98">#&lt;/a>
-&lt;/h1>
-&lt;ol>
-&lt;li>
-&lt;p>没有内存管理，每次申请都直接向操作系统申请&lt;/p>
-&lt;/li>
-&lt;li>
-&lt;p>通过程序级别的内存管理&lt;/p>
-&lt;/li>
-&lt;/ol>
-&lt;p>因程序运行起来所需要分配的内存块有大有小，而分散的、大小不一的碎片化内存，一方面会降低内存的使用率，另一方面要找到大小合适的内存块的代价会因碎片化而增加，为降低碎片化内存给程序性能造成的不良影响，&lt;/p>
-&lt;h2 id="31-tcmalloc">
- 3.1 Tcmalloc
- &lt;a class="anchor" href="#31-tcmalloc">#&lt;/a>
-&lt;/h2>
-&lt;p>golang采用了类似谷歌的Tcmalloc算法来解决碎片化问题：&lt;/p>
-&lt;blockquote>
-&lt;p>Tcmalloc：&lt;/p>
-&lt;ol>
-&lt;li>按照一组预置的大小规格把内存页划分成块，相同的块串联在一个空闲链表中。&lt;/li>
-&lt;li>程序申请内存时，会先根据要申请的内存大小，找到最匹配的规格，然后从对应空闲链表中分配一个空闲块。&lt;/li>
-&lt;/ol>
-&lt;/blockquote>
-&lt;h1 id="4-golang内存管理">
- 4 golang内存管理
- &lt;a class="anchor" href="#4-golang%e5%86%85%e5%ad%98%e7%ae%a1%e7%90%86">#&lt;/a>
-&lt;/h1>
-&lt;h2 id="41-内存结构">
- 4.1 内存结构
- &lt;a class="anchor" href="#41-%e5%86%85%e5%ad%98%e7%bb%93%e6%9e%84">#&lt;/a>
-&lt;/h2>
-&lt;p>golang把内存大小分为四种级别，分别为:Arena, Page, Span，内存块。&lt;/p>
-&lt;blockquote>
-&lt;p>注：下文讨论的都是在amd64架构的Linux环境下.&lt;/p>
-&lt;/blockquote>
-&lt;ol>
-&lt;li>
-&lt;p>Arena：golang将堆地址空间划分为一个个arena区，arena区域起始地址定义在arenaBaseOffset，每个arena的大小是64MB，起始地址也对齐到64MB&lt;/p>
-&lt;/li>
-&lt;li>
-&lt;p>Page：每个arena包含8192个page，所以每个page大小为8KB。&lt;/p>
-&lt;/li>
-&lt;li>
-&lt;p>Span：包含一个或多个页大小的内存。golang给出了67种预置的大小规格，最小8Byte，最大32KB，所以在划分整整齐齐的arena中，又会按需划分出不同的Span,每个Span包含一组连续的Page，&lt;/p>
-&lt;/li>
-&lt;/ol>
-&lt;table>
- &lt;thead>
- &lt;tr>
- &lt;th style="text-align: left">类别(class)&lt;/th>
- &lt;th style="text-align: left">内存块对象大小(bytes/obj)&lt;/th>
- &lt;th style="text-align: left">Span大小(bytes/span)&lt;/th>
- &lt;th style="text-align: left">Span中内存块对象个数(objects)&lt;/th>
- &lt;th style="text-align: left">尾部浪费(tail waste)&lt;/th>
- &lt;th style="text-align: left">最大浪费百分比(max waste)&lt;/th>
- &lt;/tr>
- &lt;/thead>
- &lt;tbody>
- &lt;tr>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;td style="text-align: left">8&lt;/td>
- &lt;td style="text-align: left">8192&lt;/td>
- &lt;td style="text-align: left">1024&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">87.50%&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">2&lt;/td>
- &lt;td style="text-align: left">16&lt;/td>
- &lt;td style="text-align: left">8192&lt;/td>
- &lt;td style="text-align: left">512&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">43.75%&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">3&lt;/td>
- &lt;td style="text-align: left">24&lt;/td>
- &lt;td style="text-align: left">8192&lt;/td>
- &lt;td style="text-align: left">341&lt;/td>
- &lt;td style="text-align: left">8&lt;/td>
- &lt;td style="text-align: left">29.24%&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">4&lt;/td>
- &lt;td style="text-align: left">32&lt;/td>
- &lt;td style="text-align: left">8192&lt;/td>
- &lt;td style="text-align: left">256&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">21.88%&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">&amp;hellip;&lt;/td>
- &lt;td style="text-align: left">&lt;/td>
- &lt;td style="text-align: left">&lt;/td>
- &lt;td style="text-align: left">&lt;/td>
- &lt;td style="text-align: left">&lt;/td>
- &lt;td style="text-align: left">&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">66&lt;/td>
- &lt;td style="text-align: left">28672&lt;/td>
- &lt;td style="text-align: left">57344&lt;/td>
- &lt;td style="text-align: left">2&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">4.91%&lt;/td>
- &lt;/tr>
- &lt;tr>
- &lt;td style="text-align: left">67&lt;/td>
- &lt;td style="text-align: left">32768&lt;/td>
- &lt;td style="text-align: left">32768&lt;/td>
- &lt;td style="text-align: left">1&lt;/td>
- &lt;td style="text-align: left">0&lt;/td>
- &lt;td style="text-align: left">12.50%&lt;/td>
- &lt;/tr>
- &lt;/tbody>
-&lt;/table>
-&lt;ol start="4">
-&lt;li>内存块：并且按照特定规格划，在Span中分成了等大的内存块。&lt;/li>
-&lt;/ol>
-&lt;p align="left">
- &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240601173403.png" width = "50%" height="50%" alt="效果图">
-&lt;/p></description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>&lt;h1 id="1-前言变量的存放区">
- 1 前言：变量的存放区
- &lt;a class="anchor" href="#1-%e5%89%8d%e8%a8%80%e5%8f%98%e9%87%8f%e7%9a%84%e5%ad%98%e6%94%be%e5%8c%ba">#&lt;/a>
-&lt;/h1>
-&lt;p>通常情况下，变量的分配位置一般是下列三个区：&lt;/p>
-&lt;ol>
-&lt;li>全局数据区&lt;/li>
-&lt;li>栈区&lt;/li>
-&lt;li>堆区&lt;/li>
-&lt;/ol>
-&lt;p align="left">
- &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240622185210.png" width = "70%" height="70%" alt="效果图">
-&lt;/p>
-&lt;p>全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。&lt;/p>
-&lt;p>栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。&lt;/p>
-&lt;p>堆区:主要用于程序运行阶段的动态分配。&lt;/p>
-&lt;p>内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。&lt;/p>
-&lt;h1 id="2-定义">
- 2 定义
- &lt;a class="anchor" href="#2-%e5%ae%9a%e4%b9%89">#&lt;/a>
-&lt;/h1>
-&lt;p>垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：&lt;strong>垃圾识别&lt;/strong>和&lt;strong>垃圾清理&lt;/strong>。&lt;/p>
-&lt;p>golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。&lt;/p>
-&lt;h2 id="21-垃圾识别">
- 2.1 垃圾识别
- &lt;a class="anchor" href="#21-%e5%9e%83%e5%9c%be%e8%af%86%e5%88%ab">#&lt;/a>
-&lt;/h2>
-&lt;h3 id="211-双色标记法">
- 2.1.1 双色标记法
- &lt;a class="anchor" href="#211-%e5%8f%8c%e8%89%b2%e6%a0%87%e8%ae%b0%e6%b3%95">#&lt;/a>
-&lt;/h3>
-&lt;p>根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。&lt;/p>
-&lt;p>双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。&lt;/p>
-&lt;p>双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。&lt;/p>
-&lt;p>双色标记法只能描述对象节点自身是否扫描，&lt;strong>而不能描述子节点是否完成&lt;/strong>。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。&lt;/p>
-&lt;blockquote>
-&lt;p>由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。&lt;/p>
-&lt;/blockquote>
-&lt;h3 id="212-三色标记法">
- 2.1.2 三色标记法
- &lt;a class="anchor" href="#212-%e4%b8%89%e8%89%b2%e6%a0%87%e8%ae%b0%e6%b3%95">#&lt;/a>
-&lt;/h3>
-&lt;p>全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。&lt;/p>
-&lt;ul>
-&lt;li>黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。&lt;/li>
-&lt;li>灰色：基于当前节点展开的追踪还未完成。&lt;/li>
-&lt;li>白色：当追踪完成后，代表可回收的对象。&lt;/li>
-&lt;/ul>
-&lt;p>问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。&lt;/p>
-&lt;p align="left">
- &lt;img src="https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20240622204628.png" width = "50%" height="50%" alt="效果图">
-&lt;/p>
-&lt;p>原因：
-并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。&lt;/p>
-&lt;blockquote>
-&lt;p>当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)&lt;/p>
-&lt;/blockquote>
-&lt;p>处理措施：&lt;/p>
-&lt;p>有两种方法来避免:&lt;/p>
-&lt;ul>
-&lt;li>强三色：黑色对象只能引用灰色对象。&lt;/li>
-&lt;li>弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态.&lt;/li>
-&lt;/ul>
-&lt;p>引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。&lt;/p>
-&lt;p>分为两种，一种是插入写屏障，一种是删除写屏障。&lt;/p>
-&lt;ol>
-&lt;li>插入写屏障&lt;/li>
-&lt;/ol>
-&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">writePointer&lt;/span>(&lt;span style="color:#a6e22e">slot&lt;/span>, &lt;span style="color:#a6e22e">ptr&lt;/span>): &lt;span style="color:#75715e">// ⚠️:slot现在指向的还是旧对象
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">shade&lt;/span>(&lt;span style="color:#a6e22e">ptr&lt;/span>) &lt;span style="color:#75715e">//shade函数尝试改变指针的颜色--&amp;gt;改变ptr的颜色
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">slot&lt;/span> = &lt;span style="color:#a6e22e">ptr&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;ol start="2">
-&lt;li>删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。&lt;/li>
-&lt;/ol>
-&lt;div class="highlight">&lt;pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;">&lt;code class="language-go" data-lang="go">&lt;span style="display:flex;">&lt;span>&lt;span style="color:#a6e22e">writePointer&lt;/span>(&lt;span style="color:#a6e22e">slot&lt;/span>, &lt;span style="color:#a6e22e">ptr&lt;/span>) &lt;span style="color:#75715e">// ⚠️:slot现在指向的还是旧对象
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#a6e22e">shade&lt;/span>(&lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">slot&lt;/span>) &lt;span style="color:#75715e">//shade函数尝试改变指针的颜色--&amp;gt;改变(*slot)的颜色---&amp;gt;注意这个是*slot(旧对象),slot保存着它原先的保存的地址。
-&lt;/span>&lt;/span>&lt;/span>&lt;span style="display:flex;">&lt;span>&lt;span style="color:#75715e">&lt;/span> &lt;span style="color:#f92672">*&lt;/span>&lt;span style="color:#a6e22e">slot&lt;/span> = &lt;span style="color:#a6e22e">ptr&lt;/span>
-&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;blockquote>
-&lt;p>引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为&lt;strong>忽略协程栈&lt;/strong>上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。&lt;/p></description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo -- gohugo.io</generator><language>zh</language><lastBuildDate>Tue, 23 Jun 2020 20:50:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>同步&amp;amp;异步/阻塞&amp;amp;非阻塞 # 同步/异步、阻塞/非阻塞可从字面上理解。
+同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的&amp;quot;关系&amp;quot;。（最常见的比如：调用方、被调用方）。
+阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。
+综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。
+同步异步 # 同步异步是一种涉及两着的关系。
+程序处理多任务 # 并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B
+并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应 能力。 并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。
+并行∈并发，并发=并行+交错
+这里并发包括同步（synchronous）和异步（asynchronous）两种方式: 同步是指任务按照一定的顺序依次执行，每个任务需要等待前一个任务完成后才能执行，任务之间有明显的先后顺序。同步执行的任务需要占用CPU资源，但是其执行结果是可预测的。
+异步是指任务在不等待其他任务执行结果的情况下，直接进行下一步操作，任务之间不受顺序限制。异步执行的任务不会占用CPU资源，因为它们不会一直等待其他任务的完成，但是其执行结果不一定是可预测的。
+程序与外部交互(可以是外部系统，也可能是操作系统) # 调用方与被调用方的关系。
+web开发最多的HTTP接口同步异步。 需要说明的是接口本身不区分同步和异步。这种区分更在于客户端(调用方)如何与接口进行交互，以及服务端(被调用方)如何处理请求。
+服务端接口 服务端实现：服务端处理请求的方式可以是同步的，也可以是异步的。同步实现可能在处理请求时会阻塞直到完成，而异步实现可能会利用事件驱动或多线程来提高并发性和响应速度。 对客户端的透明性：从客户端的角度来看，服务端的实现细节是透明的。客户端并不知道服务端是同步还是异步地处理请求。 提供额外的机制来支持异步操作，例如： Webhooks/mq：服务端在处理完成后主动通知客户端。 回调URL：客户端提供一个回调URL，服务端在处理完成后向该URL发送通知。 轮询（Polling）：客户端定期检查服务端的状态以获取结果。 客户端调用 同步调用：客户端发起请求并等待响应完成后再继续执行其他操作。这种方式在编写代码时表现为阻塞调用。 异步调用：客户端发起请求后可以立即继续执行其他任务，并在响应返回时通过回调、Promise或其他机制处理结果。 操作系统的io操作, 同步io，异步io。 《UNIX Network Programming》（简称UNP）中，通常总结了五种I/O模型，这些模型描述了在UNIX系统中进行网络编程时处理I/O操作的不同方式。
+阻塞 I/O 模型（Blocking I/O）
+描述：这是最简单的I/O模型。在发起I/O操作（如read或recv）时，调用方会阻塞，直到数据准备好并完成操作。 优点：实现简单，因为所有操作都是顺序进行的。 缺点：在等待数据时，调用方无法执行其他任务，这可能导致资源低效利用。 非阻塞 I/O 模型（Non-blocking I/O）
+描述：调用方在发起I/O操作时立即返回，即使数据尚未准备好。调用方需要不断地重试操作以检查数据是否可用。 优点：调用方在等待数据时可以执行其他任务。 缺点：需要实现轮询机制（polling），这可能导致CPU资源浪费。 I/O 复用模型（I/O Multiplexing）
+描述：使用select、poll或epoll等系统调用来监视多个文件描述符。当一个或多个文件描述符准备好进行I/O操作时，系统调用返回。(可以用来等很多描述符, 但需要阻塞着检查是否可读。对同一个描述符的IO操作也是有序的。) 优点：允许一个线程同时处理多个I/O操作，提高资源利用率。 缺点：在监视大量文件描述符时可能存在性能瓶颈。 信号驱动 I/O 模型（Signal-driven I/O）
+描述：使用信号机制进行I/O操作。当文件描述符准备就绪时，内核向进程发送信号。(不用监视描述符，而且不用阻塞着等待数据到来，被动等待信号通知，由信号处理程序处理。但对同一个描述符的IO操作还是有序的。) 优点：减少了轮询的需要，进程可以在信号到达前执行其他任务。 缺点：信号处理相对复杂，需要处理信号的异步性。(仍由请求进程将数据从内核读入用户空间（阻塞)) 异步 I/O 模型（Asynchronous I/O）</description></item><item><title>内存分配器</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_memery/</guid><description>1 前言 # 从程序的角度来看， 我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。
+细化下上述所说的内容，主要包含如下：
+怎么评估变量所需的内存大小? 如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？ 如果第二点都使用后者的方式，那么如何进行管理？ 2 评估内存大小 # 2.1 内存对齐 # what 什么是内存对齐呢？官方解释是：xxxx
+why 为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。 3 分配内存 # 没有内存管理，每次申请都直接向操作系统申请
+通过程序级别的内存管理
+因程序运行起来所需要分配的内存块有大有小，而分散的、大小不一的碎片化内存，一方面会降低内存的使用率，另一方面要找到大小合适的内存块的代价会因碎片化而增加，为降低碎片化内存给程序性能造成的不良影响，
+3.1 Tcmalloc # golang采用了类似谷歌的Tcmalloc算法来解决碎片化问题：
+Tcmalloc：
+按照一组预置的大小规格把内存页划分成块，相同的块串联在一个空闲链表中。 程序申请内存时，会先根据要申请的内存大小，找到最匹配的规格，然后从对应空闲链表中分配一个空闲块。 4 golang内存管理 # 4.1 内存结构 # golang把内存大小分为四种级别，分别为:Arena, Page, Span，内存块。
+注：下文讨论的都是在amd64架构的Linux环境下.
+Arena：golang将堆地址空间划分为一个个arena区，arena区域起始地址定义在arenaBaseOffset，每个arena的大小是64MB，起始地址也对齐到64MB
+Page：每个arena包含8192个page，所以每个page大小为8KB。
+Span：包含一个或多个页大小的内存。golang给出了67种预置的大小规格，最小8Byte，最大32KB，所以在划分整整齐齐的arena中，又会按需划分出不同的Span,每个Span包含一组连续的Page，
+类别(class) 内存块对象大小(bytes/obj) Span大小(bytes/span) Span中内存块对象个数(objects) 尾部浪费(tail waste) 最大浪费百分比(max waste) 1 8 8192 1024 0 87.50% 2 16 8192 512 0 43.75% 3 24 8192 341 8 29.</description></item><item><title>垃圾回收</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gc/</guid><description>1 前言：变量的存放区 # 通常情况下，变量的分配位置一般是下列三个区：
+全局数据区 栈区 堆区 全局数据区:主要用于全局变量的分配，也即包级别的变量,其生命周期和进程相同。
+栈区:主要存储函数内部定义的本地变量,当函数执行完毕，变量即可释放。函数执行时通过栈帧加偏移来访问这些数据。
+堆区:主要用于程序运行阶段的动态分配。
+内存中的对象存在着相互的引用关系。全局数据区与栈区可能指同堆上的数据,这两个地方的指针是堆内存访问的起点，也就是堆内存访问的根节点(root)。
+2 定义 # 垃圾回收（garbage collect）简称gc,主要是释放那些不再需要的分配在堆（heap）上的数据, 以便再次用来进行内存分配。垃圾回收一般分为两个步骤：垃圾识别和垃圾清理。
+golang支持垃圾自动回收，主要是降低人的心智负担，从堆（heap）中申请的内存，不需要手动的释放。其采用三色标记法来识别垃圾对象，并使用清除算法进行垃圾清理。
+2.1 垃圾识别 # 2.1.1 双色标记法 # 根节点一般为全局变量、栈中的变量，维护根节点集合是可达性分析的前提。可达性分析是指从根对象开始，遍历其引用的子节点对象，直至遍历完毕。凡是能够触达的对象，都视作有效对象，而无法触达的，则视作垃圾对象。
+双色标标记法采用可达性分析来标记对象状态;通过对象的可达性近视的认为存活性。
+双色标记法看上去简单易用，但却存在着一个比较大的缺点，即整个标记过程必须一次性完成，中间不能有任何停顿。也就是说，在执行过程中，不能让出CPU时间片给其他线程。对于应用程序来说，可能会出现用户线程完全停顿，直至标记过程结束。
+双色标记法只能描述对象节点自身是否扫描，而不能描述子节点是否完成。这导致重启标记开始后，很难抉择该如何继续，如果再次从根节点开始，那就意味着上次所做的工作完全被浪费掉了。因此，双色标记在停顿、再次重启过程中，无法完成状态的自描述。
+由于新增对象无法确定置为黑色还是白色，因此导致扫描过程不能停顿。对双色标记而言可将新增对象直接标记为黑色，然后到下轮垃圾回收才将本轮新增对象中的垃圾对象（往往是生命周期很短的对象）清除。
+2.1.2 三色标记法 # 全局数据区与栈区的指针是堆内存访问的起点, 所以把它们放入一个待扫描队列（工作队列）,通过它们可以发现堆上第一批可达数据,发现的可达数据中有指针的加入待扫描队列（灰色节点）扫描完的标为黑色，离开队列,通过扫描灰色节点会发现更多灰色节点，也会产生更多黑色点节点,直到没有待扫描的灰色节点,我们就找到了所有可达数据（黑色节点）,剩下的白色节点就是不可达数据不可达自然用不到,也即是可以进行释放。
+黑色：当基于当前节点的追踪任务完成后，表示为存活数据，后续无需再追踪。 灰色：基于当前节点展开的追踪还未完成。 白色：当追踪完成后，代表可回收的对象。 问题：黑色对象如果指向白色对象,会导致白色对象被错误回收。
+原因： 并发执行,如果将白色对象写入黑色对象,同时没有其它未扫描的路径,可抵达该白色对象,它就不会被扫描携程发现,继而被误判为垃圾。
+当gc使用三色标记法与用户程序并发执行的时候，可能让黑色对象重新引用了白色对象，且无其他灰色对象引用了这个白色对象。导致白色对象错误回收。(用户程序和垃圾收集器可以在交替工作的)
+处理措施：
+有两种方法来避免:
+强三色：黑色对象只能引用灰色对象。 弱三色：所有被黑色对象引用的白色对象都处于灰色保护状态. 引入写屏障：就是在执行写操作时，额外做些标记工作(把数据对象的修改通知到垃圾回收器)，避免垃圾误判。
+分为两种，一种是插入写屏障，一种是删除写屏障。
+插入写屏障 writePointer(slot, ptr): // ⚠️:slot现在指向的还是旧对象 shade(ptr) //shade函数尝试改变指针的颜色--&amp;gt;改变ptr的颜色 *slot = ptr 删除写屏障： 会在老对象的引用被删除时，将白色的老对象涂成灰色。 writePointer(slot, ptr) // ⚠️:slot现在指向的还是旧对象 shade(*slot) //shade函数尝试改变指针的颜色--&amp;gt;改变(*slot)的颜色---&amp;gt;注意这个是*slot(旧对象),slot保存着它原先的保存的地址。 *slot = ptr 引入新问题：只有插入写屏障，但是这需要对所有堆、栈的写操作都开启写屏障，程序性能会受到影响，代价太大。为了改善这个问题，改为忽略协程栈上的写屏障，只在标记结束阶段重新扫描那些被激活的栈帧。但是Go语言通常会有大量活跃的协程，这就导致第二次STW时重新扫描协程栈的时间太长。</description></item></channel></rss>
