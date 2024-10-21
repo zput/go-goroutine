@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo -- gohugo.io</generator><language>zh</language><lastBuildDate>Tue, 23 Jun 2020 20:50:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>同步&amp;amp;异步/阻塞&amp;amp;非阻塞 # 同步/异步、阻塞/非阻塞可从字面上理解。
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>运行时 on go调度源码分析</title><link>https://zput.github.io/go-goroutine/docs/runtime/</link><description>Recent content in 运行时 on go调度源码分析</description><generator>Hugo -- gohugo.io</generator><language>zh</language><lastBuildDate>Tue, 23 Jun 2020 20:50:00 +0000</lastBuildDate><atom:link href="https://zput.github.io/go-goroutine/docs/runtime/index.xml" rel="self" type="application/rss+xml"/><item><title>GMP模型结构体</title><link>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/golang_gmp/</guid><description>1.同步&amp;amp;异步/阻塞&amp;amp;非阻塞 # 同步/异步、阻塞/非阻塞可从字面上理解。
 同步是指相同的步调，既然是相同，必然涉及比较，那至少是关于两者或以上的比较，同理异步描述的是不同的步调，所以同步、异步描述的是两个对象（模块）之间的&amp;quot;关系&amp;quot;。（最常见的比如：调用方、被调用方）。
 阻塞是指卡住了，等待在那里而不能做其他事情了。也即是说，阻塞、非阻塞描述的是自身的一个运行状态。
 综上所述:同步、异步描述两者的关系, 阻塞、非阻塞描述的是一者的状态，其两者讲的不同的事情。
-同步异步 # 同步异步是一种涉及两着的关系。
+1.2 同步异步 # 同步异步是一种涉及两着的关系。
 程序处理多任务 # 并发，并行引出来的一种多个任务运行的关系，涉及的关系是任务A与任务B
 并发是指在同一时间间隔内同时执行多个任务的能力，这些任务可能会交替执行或部分重叠执行。并发的重点在于在同一时间间隔内最大化完成任务的数量，它通常侧重于提高系统的吞吐量和响应 能力。 并行是指同时执行多个任务，这些任务将被同时分配给不同的计算资源，例如不同的处理器、内核或线程/进程。并行的重点在于尽可能缩短任务的执行时间，它通常侧重于提高系统的性能和效率。
 并行∈并发，并发=并行+交错
