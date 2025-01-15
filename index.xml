@@ -23,7 +23,7 @@ sort # type Interface interface { // Len is the number of elements in the collec
 1.前言 # 我们首先来gdb调试一下这个程序
 // main.go package main import &amp;#34;fmt&amp;#34; // the function&amp;#39;s body is empty func add(x, y int64) int64 func main() { gg:=add(2, 3) fmt.Println(gg) } // add_amd.s TEXT ·add(SB),$0-24 MOVQ x+0(FP), BX MOVQ y+8(FP), BP ADDQ BP, BX MOVQ BX, ret+16(FP) RET 编译一下源代码: go build -gcflags &amp;quot;-N -l&amp;quot; -o test .
 2.程序加载到内存入口 # Expand ↕ (gdb) info files
-Symbols from &amp;#34;/tmp/kubernets/test&amp;#34;. Local exec file: `/tmp/kubernets/test&amp;#39;, file type elf64-x86-64.</description></item><item><title>Go 内存管理</title><link>https://zput.github.io/go-goroutine/docs/runtime/2.golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/2.golang_memery/</guid><description>1 前言 # 从程序的角度来看， 我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。
+Symbols from &amp;#34;/tmp/kubernets/test&amp;#34;. Local exec file: &amp;#39;/tmp/kubernets/test&amp;#39;, file type elf64-x86-64.</description></item><item><title>Go 内存管理</title><link>https://zput.github.io/go-goroutine/docs/runtime/2.golang_memery/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://zput.github.io/go-goroutine/docs/runtime/2.golang_memery/</guid><description>1 前言 # 从程序的角度来看， 我们定义个变量，需要知道存储此变量所需的内存大小，以及申请一块内存，并返回内存的首地址；后续变量名与此地址就绑定起来，方便后续操作。
 细化下上述所说的内容，主要包含如下：
 怎么评估变量所需的内存大小? 如何申请一块内存。是每次申请时都向操作系统直接申请吗？还是先向操作系统申请一大块内存，在程序内部进行管理，当都用完时，才继续向操作系统进行申请呢？ 如果第二点都使用后者的方式，那么如何进行管理？ 2 评估内存大小 # 2.1 内存对齐 # what 什么是内存对齐呢？官方解释是：xxxx
 why 为什么需要进行内存对齐呢? 主要是当前的内存限制的原因。 3 分配内存 # 没有内存管理，每次申请都直接向操作系统申请
