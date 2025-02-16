@@ -344,8 +344,6 @@ MOVQ 0(AX)(TLS*1), CX  // 将 g 加载到 CX
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>    <span style=color:#a6e22e>JEQ</span> <span style=color:#ae81ff>2</span>(<span style=color:#a6e22e>PC</span>)
 </span></span><span style=display:flex><span>    <span style=color:#a6e22e>CALL</span>	<span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>abort</span>(<span style=color:#a6e22e>SB</span>)
 </span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>
-</span></span><span style=display:flex><span>
 </span></span><span style=display:flex><span>  <span style=color:#a6e22e>TEXT</span> <span style=color:#a6e22e>runtime</span><span style=color:#960050;background-color:#1e0010>·</span><span style=color:#a6e22e>settls</span>(<span style=color:#a6e22e>SB</span>),<span style=color:#a6e22e>NOSPLIT</span>,<span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>32</span>
 </span></span><span style=display:flex><span>      <span style=color:#a6e22e>ADDQ</span> <span style=color:#960050;background-color:#1e0010>$</span><span style=color:#ae81ff>8</span>, <span style=color:#a6e22e>DI</span>      <span style=color:#75715e>// ELF wants to use -8(FS) // https://akkadia.org/drepper/tls.pdf
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>      <span style=color:#a6e22e>MOVQ</span> <span style=color:#a6e22e>DI</span>, <span style=color:#a6e22e>SI</span>      <span style=color:#75715e>// SI是arch_prctl的第二个参数addr
