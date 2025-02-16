@@ -359,8 +359,7 @@ MOVQ 0(AX)(TLS*1), CX  // 将 g 加载到 CX
 <a href=https://golang.org/doc/asm#symbols>ARCH_SET_FS <sup>1</sup></a>代表将FS寄存器的64位基数设置为addr指定的参数操作,它定义的操作类型代号为<code>0x1002</code></li></ul></li></ul></li><li>DI 将作为<code>arch_prctl</code>系统调用的第一个参数（code）</li><li>SI 将作为<code>arch_prctl</code>系统调用的第二个参数（addr）</li></ul></li></ul><p>上面的步骤是把段基寄存器 设置为 <code>m0.tls[0]</code>所在的地址.</p><h5 id=get_tlsbx与gbx>get_tls(BX)与g(BX)
 <a class=anchor href=#get_tlsbx%e4%b8%8egbx>#</a></h5><p>这个<code>get_tls(BX)</code>与<code>g()</code>其实都是宏定义：</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#75715e>#ifdef GOARCH_amd64
 </span></span></span><span style=display:flex><span><span style=color:#75715e>#define	get_tls(r)	MOVQ TLS, r
-</span></span></span><span style=display:flex><span><span style=color:#75715e></span> 
-</span></span><span style=display:flex><span><span style=color:#75715e>#define	g(r)	0(r)(TLS*1)
+</span></span></span><span style=display:flex><span><span style=color:#75715e>#define	g(r)	0(r)(TLS*1)
 </span></span></span><span style=display:flex><span><span style=color:#75715e>#endif
 </span></span></span></code></pre></div><p>翻译过来就是:</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-asm data-lang=asm><span style=display:flex><span><span style=color:#a6e22e>MOVQ</span> <span style=color:#66d9ef>TLS</span>, <span style=color:#66d9ef>BX</span>
 </span></span><span style=display:flex><span><span style=color:#960050;background-color:#1e0010>0(</span><span style=color:#a6e22e>BX</span>)(<span style=color:#66d9ef>TLS</span>*<span style=color:#ae81ff>1</span>) 
