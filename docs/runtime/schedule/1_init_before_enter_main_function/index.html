@@ -637,7 +637,7 @@ Symbols from &#34;/tmp/kubernets/test&#34;. Local exec file: '/tmp/kubernets/tes
 </span></span><span style=display:flex><span>	<span style=color:#75715e>//...
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>	<span style=color:#a6e22e>gogo</span>(<span style=color:#f92672>&amp;</span><span style=color:#a6e22e>gp</span>.<span style=color:#a6e22e>sched</span>)
 </span></span><span style=display:flex><span>}
-</span></span></code></pre></div><p>execute函数主要为将要被调度运行的gorouine的g设置状态,与M相互关联</p><p align=left><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20241122210528.png width=80% height=80% alt=效果图></p><h4 id=gogo>gogo
+</span></span></code></pre></div><p>execute函数主要为将要被调度运行的gorouine的g设置状态,与M相互关联</p><p align=left><img src=https://raw.githubusercontent.com/zput/myPicLib/master/zput.github.io/20250223235248.png width=60% height=60% alt=效果图></p><h4 id=gogo>gogo
 <a class=anchor href=#gogo>#</a></h4><p>gogo把将要运行main函数的goroutine从gobuf中取出恢复到寄存器中，同时把gobuf重置为0，有助于垃圾回收。</p><div class=highlight><pre tabindex=0 style=color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4><code class=language-go data-lang=go><span style=display:flex><span><span style=color:#75715e>// list /usr/lib/golang/src/runtime/proc.go:2165
 </span></span></span><span style=display:flex><span><span style=color:#75715e>// gdb查看发现又到了asm_amd64.s文件
 </span></span></span><span style=display:flex><span><span style=color:#75715e></span>
